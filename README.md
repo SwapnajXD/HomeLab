@@ -1,16 +1,16 @@
 # HomeLab
 
-Lean homelab project for building a remotely manageable home server stack before college.
+This is my homelab project. I’m building a small home server setup that I can manage remotely before i go back to college.
 
 ## Goal
 
-Build a headless home server that can be managed remotely over Tailscale, with a dashboard, monitoring, backups, and Terraform-managed infrastructure.
+My goal is to set up a headless home server I can reach through Tailscale, with a dashboard, monitoring, backups, and Terraform-managed infrastructure.
 
-The full plan lives in [HOMELAB_ROADMAP.md](HOMELAB_ROADMAP.md).
+The full plan is in [HOMELAB_ROADMAP.md](HOMELAB_ROADMAP.md).
 
-## What This Repo Contains
+## What I’m Keeping Here
 
-This repository is used to track the homelab plan, supporting documentation, and infrastructure code.
+I’m using this repo to keep my plan, notes, and infrastructure files in one place.
 
 ## Planned Structure
 
@@ -37,7 +37,7 @@ homelab/
 
 ## Documentation
 
-Keep these files updated as the setup grows:
+I’ll keep these files updated as the setup grows:
 
 - `docs/architecture.md`
 - `docs/network.md`
@@ -45,4 +45,4 @@ Keep these files updated as the setup grows:
 
 ## Start Here
 
-Read [HOMELAB_ROADMAP.md](HOMELAB_ROADMAP.md) for the detailed 30-day plan and checklist.
+Read [HOMELAB_ROADMAP.md](HOMELAB_ROADMAP.md) for the full 30-day plan and checklist.
