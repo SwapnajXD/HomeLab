@@ -20,12 +20,19 @@ homelab/
 ├── HOMELAB_ROADMAP.md
 ├── docs/
 │   ├── architecture.md
+│   ├── architecture-diagram.mmd
 │   ├── network.md
 │   └── troubleshooting.md
 ├── docker-compose/
+│   └── README.md
 ├── terraform/
+│   ├── README.md
+│   └── localstack/
+│       └── README.md
 ├── scripts/
+│   └── README.md
 └── screenshots/
+    └── README.md
 ```
 
 ## Key Areas
@@ -40,6 +47,7 @@ homelab/
 I’ll keep these files updated as the setup grows:
 
 - `docs/architecture.md`
+- `docs/architecture-diagram.mmd`
 - `docs/network.md`
 - `docs/troubleshooting.md`
 
