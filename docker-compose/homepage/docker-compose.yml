@@ -9,5 +9,5 @@ services:
       - ./config:/app/config
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - HOMEPAGE_ALLOWED_HOSTS=100.117.35.70
+      - HOMEPAGE_ALLOWED_HOSTS=100.117.35.70:3000
     restart: unless-stopped
