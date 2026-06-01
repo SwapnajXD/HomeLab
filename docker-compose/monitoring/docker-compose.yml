@@ -37,7 +37,7 @@ services:
       - grafana_data:/var/lib/grafana
 
   proxmox-exporter:
-    image: promsid/proxmox-ve-exporter:latest
+    image: promhippie/proxmox-ve-exporter:latest
     container_name: proxmox-exporter
     restart: unless-stopped
     environment:
