@@ -86,6 +86,7 @@ sudo apt update
 sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
 ```
 
+
 ---
 
 ### 5. Dashboard Host Validation Block
@@ -438,27 +439,53 @@ Complete the operational monitoring matrix by deploying Grafana Open Source (OSS
 ## 📍 Updated Architectural Layout
 
 ```text
-       [ Arch Laptop (artemis) ]
-                   │
-         🔒 Secure Tailscale Mesh
-                   │
-      ┌────────────┴─────────────┐
-      │  Proxmox Server (apollo) │
-      └────────────┬─────────────┘
-                   │
-      🔀 Host NAT Gateway (10.10.10.1)
-                   │
-      ┌────────────┴─────────────┐
-      │     Ubuntu Server VM     │
-      │  (Static IP: 10.10.10.10)│
-      ├──────────────────────────┤
-      │  🐳 Active Docker Core   │
-      │   ├── Homepage (Port3000)│
-      │   ├── Portainer(Port9443)│
-      │   ├── Prometheus(Port9090)│ <--- LIVE
-      │   └── Node-Exporter(9100)│ <--- LIVE
-      └──────────────────────────┘
+   [ Arch Laptop (artemis) ]
+       │
+     🔒 Secure Tailscale Mesh
+       │
+  ┌────────────┴─────────────┐
+  │  Proxmox Server (apollo) │
+  └────────────┬─────────────┘
+       │
+  🔀 Host NAT Gateway (10.10.10.1)
+       │
+  ┌────────────┴─────────────┐
+  │     Ubuntu Server VM     │
+  │  (Static IP: 10.10.10.10)│
+  ├──────────────────────────┤
+  │  🐳 Active Docker Core   │
+  │   ├── Homepage (Port3000)│
+  │   ├── Portainer(Port9443)│
+  │   ├── Prometheus(Port9090)│ <--- LIVE
+  │   └── Node-Exporter(9100)│ <--- LIVE
+  └──────────────────────────┘
 
 ```
+
+---
+
+# 📓 Homelab Engineering Log: Day 12 — Relabeled Proxmox Telemetry Integration
+
+## 🎯 Objective
+
+To complete bare-metal host monitoring by routing Proxmox VE hypervisor metrics natively into Prometheus and Grafana without exposing plaintext core administrative credentials within the codebase.
+
+---
+
+## 🛠️ Infrastructure Achievements & Configuration
+
+1. **Dynamic Parameter Relabeling Topology:** Configured a complex `relabel_configs` orchestration sequence within `prometheus.yml`. This abstracts the connection flow, masking the proxy container destination (`proxmox-exporter:9221`) while seamlessly passing the target physical endpoint variable (`10.10.10.1`).
+2. **API Endpoint Translation Layer:** Deployed the official `prompve/prometheus-pve-exporter` container image, mounting a secure local configuration asset (`pve.yml`) read-only (`ro`) to execute secure query loops against the hypervisor cluster interface.
+3. **Multi-Tier Visual Aggregation:** Imported Grafana Matrix Asset ID `10347` to tie host hardware metrics and virtual allocation layers into a singular, cohesive operational pane.
+
+---
+
+## 💥 Technical Challenges & Resolution Index
+
+### 1. Inbound Target Scrape 500 Execution Errors
+
+- **The Problem:** The initial connection bridge between Prometheus and the exporter threw a hard `HTTP 500 Internal Server Error`.
+- **The Root Cause:** The Prometheus scrape worker was triggering direct calls to the root scraper endpoint without supplying a target query parameter header, causing the backend exporter container to crash because it didn't know which physical node to parse.
+- **The Resolution:** Rewrote the job configuration layout on the Arch laptop to implement an advanced URL parameter rewriting block. This forces Prometheus to append the node target string to its queries before routing them through the Docker container network link, restoring clean telemetry data flow.
 
 ---
