@@ -13,3 +13,9 @@
 
 # Ignore OS system artifacts
 .DS_Store
+
+# Global Terraform Overrides
+**/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
