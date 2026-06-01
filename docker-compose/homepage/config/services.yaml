@@ -1,0 +1,15 @@
+---
+# Infrastructure Group
+- Infrastructure:
+    - Proxmox:
+        icon: proxmox
+        href: "https://100.81.86.51:8006"
+        description: "Type-1 Hypervisor Host"
+    - Ubuntu Server:
+        icon: ubuntu
+        href: "http://100.117.35.70:3000"
+        description: "Core Development VM"
+    - Portainer:
+        icon: portainer
+        href: "https://100.117.35.70:9443"
+        description: "Docker Container Management"

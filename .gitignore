@@ -1,0 +1,10 @@
+# Ignore container log outputs generated on the VM
+**/logs/
+*.log
+
+# Ignore raw container database volumes
+**/prometheus_data/
+**/portainer_data/
+
+# Ignore OS system artifacts
+.DS_Store

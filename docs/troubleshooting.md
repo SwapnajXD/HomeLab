@@ -205,3 +205,88 @@ Then pressed **`Ctrl` + `Shift` + `R`** in the browser to force-refresh and dump
 ```
 
 ---
+
+# 📓 Git Workflow Realignment: Arch Laptop as Master Repository
+
+## 🎯 Objective
+
+Establish a single source of truth for all homelab configurations on the Arch laptop (`artemis`), using SCP to sync runtime files from the Ubuntu VM. This keeps the production server lean and dependency-free while maintaining full version control history on the management workstation.
+
+## 💥 Technical Challenges & Resolution Index
+
+### Problem: Git Overhead on Production VM
+
+Running Git commands natively inside a production VM creates unnecessary workspace drift, config duplicates, and requires managing redundant SSH deployment keys on the server itself.
+
+### Root Cause
+
+Architectural separation of concerns: a server should act purely as a headless compute engine, while the engineer's workstation should act as the administrative development environment.
+
+### Resolution
+
+Realigned the workflow to use **Secure Copy Protocol (SCP)** over the encrypted Tailscale layer. Configurations are authored and committed on the Arch laptop, then synced to the VM for live deployment.
+
+## 🛠️ Sync Workflow
+
+### Step 1: Pull Files from Ubuntu VM to Arch Laptop
+
+Open a terminal **on your Arch laptop** (not in the SSH session). Navigate to your local `HomeLab` repo and sync the docker-compose directories:
+
+```bash
+cd /path/to/your/local/HomeLab
+
+# Pull homepage from the VM
+scp -r ubuntu@100.117.35.70:~/homelab/docker-compose/homepage docker-compose/
+
+# Pull portainer from the VM
+scp -r ubuntu@100.117.35.70:~/homelab/docker-compose/portainer docker-compose/
+```
+
+### Step 2: Create `.gitignore` on Your Arch Laptop
+
+Create a `.gitignore` at the root of your local `HomeLab` folder to exclude runtime artifacts:
+
+```bash
+nano .gitignore
+```
+
+Add these patterns:
+
+```text
+# Ignore container log outputs generated on the VM
+**/logs/
+*.log
+
+# Ignore raw container database volumes
+**/prometheus_data/
+**/portainer_data/
+
+# Ignore OS system artifacts
+.DS_Store
+```
+
+Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`).
+
+### Step 3: Stage and Commit on Your Arch Laptop
+
+Commit the synced files to track your progress:
+
+```bash
+# Check the layout
+git status
+
+# Stage all new files
+git add .
+
+# Commit with a clear message
+git commit -m "feat: track homepage and portainer infrastructure configuration files from VM"
+```
+
+## 📋 Going Forward
+
+- Author and edit all configs on your Arch laptop in the `HomeLab` repo.
+- Use `git commit` and `git push` to track history on your laptop.
+- Use `scp` to push updated configs to the Ubuntu VM for deployment.
+- The Ubuntu VM runs containers but does not manage Git.
+
+---
