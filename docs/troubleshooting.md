@@ -489,3 +489,4 @@ To complete bare-metal host monitoring by routing Proxmox VE hypervisor metrics 
 - **The Resolution:** Rewrote the job configuration layout on the Arch laptop to implement an advanced URL parameter rewriting block. This forces Prometheus to append the node target string to its queries before routing them through the Docker container network link, restoring clean telemetry data flow.
 
 ---
+3
