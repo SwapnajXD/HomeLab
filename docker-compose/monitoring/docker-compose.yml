@@ -37,15 +37,13 @@ services:
       - grafana_data:/var/lib/grafana
 
   proxmox-exporter:
-    image: promhippie/proxmox-ve-exporter:latest
+    image: prompve/prometheus-pve-exporter:latest
     container_name: proxmox-exporter
     restart: unless-stopped
-    environment:
-      - PVE_USER=root@pam
-      - PVE_PASSWORD=${PROXMOX_ROOT_PASSWORD}  # Docker engine pulls this out of the local .env block automatically
-      - PVE_VERIFY_SSL=false
+    volumes:
+      - ./prometheus/pve.yml:/etc/prometheus/pve.yml:ro
     ports:
-      - 9221:9221
+      - 9221:9221 
 
 volumes:
   prometheus_data:
