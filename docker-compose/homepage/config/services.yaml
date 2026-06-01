@@ -13,11 +13,14 @@
         icon: portainer
         href: "https://100.117.35.70:9443"
         description: "Docker Container Management"
+        container: portainer
     - Prometheus:
         icon: prometheus
         href: "http://100.117.35.70:9090"
         description: "Time-Series Telemetry DB"
+        container: prometheus
     - Grafana:
         icon: grafana
         href: "http://100.117.35.70:3001"
         description: "Operational Telemetry Dashboards"
+        container: grafana

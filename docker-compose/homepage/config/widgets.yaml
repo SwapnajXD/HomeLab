@@ -1,9 +1,14 @@
----
-- search:
-    provider: google
-    target: _blank
+- logo:
+    icon: https://raw.githubusercontent.com/gethomepage/homepage/main/public/icons/homepage.png
 
 - datetime:
-    text_size: xl
+    text_color: "slate"
     format:
-      timeStyle: short
+      date_style: "short"
+      time_style: "short"
+      hour12: true
+
+- resources:
+    cpu: true
+    memory: true
+    disk: /host/rootfs
