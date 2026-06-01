@@ -133,6 +133,75 @@ Then recreated the container with `docker compose up -d --force-recreate`.
 
 - Update `docs/network.md` with the final NAT and host UI addresses (done).
 - Keep this engineering log here for future incident review.
-- I haven't added Portainer to docs because it hasn't been installed yet.
+
+---
+
+# 📓 Day 9: Portainer Deployment
+
+## 🎯 Objective
+
+Deploy Portainer Community Edition (CE) using Docker Compose to establish a visual management console over the private network. This lets me control containers, networks, volumes, and images without relying on raw terminal commands.
+
+## 🛠️ Infrastructure Achievements
+
+1. **Declarative Compose Architecture:** Created an isolated directory structure (`~/homelab/docker-compose/portainer/`).
+2. **Container Runtime Access:** Mounted `/var/run/docker.sock` into the Portainer container to give it administrative privileges over the Docker daemon.
+3. **Data Persistence Engine:** Provisioned a named Docker volume (`portainer_data`) mapped to `/data` so credentials, endpoints, and custom stacks survive container teardowns or server reboots.
+4. **Hardened Execution Context:** Injected security flags (`no-new-privileges:true`) to prevent privilege escalation.
+5. **Centralized Integration:** Added Portainer to the Homepage Dashboard via `config/services.yaml`.
+
+## 💥 Technical Challenges & Resolution Index
+
+### 1. Browser TLS Untrusted Certificate Warning
+
+**Problem:** Navigating to `https://100.117.35.70:9443` triggered a browser security block stating "Your connection is not private."
+
+**Root Cause:** Portainer uses a self-signed certificate not signed by a public CA like Let's Encrypt.
+
+**Resolution:** This is expected and safe for private homelab environments. I clicked **Advanced** → **Proceed to 100.117.35.70 (unsafe)** to accept the local TLS encryption over the Tailscale tunnel.
+
+---
+
+### 2. Homepage Dashboard Asset Caching Block
+
+**Problem:** After adding Portainer to `config/services.yaml`, a simple `docker compose restart homepage` didn't show the new service card on the dashboard.
+
+**Root Cause:** The Homepage app caches configuration in memory during startup. A simple restart doesn't always force a state flush. Additionally, browsers cache frontend layouts aggressively.
+
+**Resolution:** Completely reset the containers and cleared the browser cache:
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+Then pressed **`Ctrl` + `Shift` + `R`** in the browser to force-refresh and dump local cache storage.
+
+---
+
+## 📍 Updated Architectural Layout
+
+```text
+       [ Arch Laptop (artemis) ]
+                   │
+         🔒 Secure Tailscale Mesh
+                   │
+      ┌────────────┴─────────────┐
+      │  Proxmox Server (apollo) │
+      │  (Host IP: 192.168.1.150)│
+      └────────────┬─────────────┘
+                   │
+      🔀 Host NAT Gateway (10.10.10.1)
+                   │
+      ┌────────────┴─────────────┐
+      │     Ubuntu Server VM     │
+      │  (Static IP: 10.10.10.10)│
+      ├──────────────────────────┤
+      │  🐳 Active Docker Core   │
+      │   ├── Homepage (Port3000)│
+      │   └── Portainer(Port9443)│ <--- Added and Verified!
+      └──────────────────────────┘
+
+```
 
 ---
