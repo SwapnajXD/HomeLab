@@ -27,5 +27,15 @@ services:
     ports:
       - 9100:9100
 
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - 3001:3000   # Maps internal port 3000 to external host port 3001 to avoid conflicts
+    volumes:
+      - grafana_data:/var/lib/grafana
+
 volumes:
   prometheus_data:
+  grafana_data:
