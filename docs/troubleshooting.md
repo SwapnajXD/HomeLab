@@ -489,4 +489,75 @@ To complete bare-metal host monitoring by routing Proxmox VE hypervisor metrics 
 - **The Resolution:** Rewrote the job configuration layout on the Arch laptop to implement an advanced URL parameter rewriting block. This forces Prometheus to append the node target string to its queries before routing them through the Docker container network link, restoring clean telemetry data flow.
 
 ---
-3
+
+# 📓 Homelab Engineering Log: Day 13 — Homepage Asset Hardening and Vaultwarden Launch
+
+## 🎯 Objective
+
+To turn the homelab into a more complete private services environment by keeping the Homepage dashboard stable without external asset dependencies and deploying Vaultwarden behind private HTTPS on the Tailscale mesh.
+
+---
+
+## 🛠️ Infrastructure Achievements & Configuration
+
+1. **Local-First Dashboard Assets:** Kept the Homepage dashboard lightweight by avoiding external icon/CDN dependencies and relying on locally stored config so the dashboard remains stable in an isolated network.
+2. **Private Credential Vault:** Deployed Vaultwarden as the low-footprint credential and notes service for passwords, 2FA, and secure storage.
+3. **Encrypted Access Layer:** Bound Vaultwarden to private HTTPS over the Tailscale domain so the browser sees a secure context and can enable the login flow.
+4. **Access Control Lifecycle:** Temporarily enabled signups only long enough to create the initial account, then disabled signups again to lock the vault down.
+
+---
+
+## 💥 Technical Challenges & Resolution Index
+
+### 1. 403 Forbidden Icon Loop
+
+- **The Problem:** Homepage attempted to pull application icons from external CDNs, which repeatedly failed with forbidden responses in the isolated homelab network.
+- **The Root Cause:** The environment had limited or blocked external asset access, so remote icon fetching was not reliable.
+- **The Resolution:** Moved the dashboard to a local-first configuration and backed the working files up to the Arch laptop repository so the dashboard no longer depends on brittle external asset fetches.
+
+### 2. Opaque Response Blocking (ORB)
+
+- **The Problem:** Switching to external asset URLs triggered browser ORB protection and produced HTTP 400-style loading failures.
+- **The Root Cause:** The browser refused to load cross-origin assets from insecure local contexts while serving the dashboard from `http://100.117.35.70:3000`.
+- **The Resolution:** Avoided cross-origin asset loading for the dashboard and kept the operational configuration local and self-contained.
+
+### 3. Crypto Lockout on Vaultwarden
+
+- **The Problem:** Vaultwarden login and registration pages would not function over a raw IP because the browser required a secure context to enable cryptographic features.
+- **The Root Cause:** Modern browsers disable `SubtleCrypto` and related auth functions unless the site is served over HTTPS.
+- **The Resolution:** Used a self-signed local certificate strategy on the host machine and bound Vaultwarden to the private Tailscale domain over HTTPS.
+
+### 4. Tailscale Certificate Generation Error
+
+- **The Problem:** The built-in Tailscale certificate path returned a 500-style internal error.
+- **The Root Cause:** The tailnet configuration prevented the `tailscale cert` automation from completing.
+- **The Resolution:** Fell back to a direct `openssl` certificate workflow on the host, then wired the container to serve HTTPS from that local cert.
+
+### 5. SSL Parsing Panic (`SSL_ERROR_RX_RECORD_TOO_LONG`)
+
+- **The Problem:** The browser failed to connect after local certificates were introduced.
+- **The Root Cause:** The container was answering plain HTTP on the port the browser expected to be HTTPS.
+- **The Resolution:** Refactored the `docker-compose.yml` so Vaultwarden binds to port `443` using `ROCKET_PORT`, ensuring the browser and container speak the same protocol.
+
+### 6. Signup Paradox
+
+- **The Problem:** Keeping `SIGNUPS_ALLOWED=false` from the start prevented creation of the first master account.
+- **The Root Cause:** The vault needed one initial owner account before signups were disabled.
+- **The Resolution:** Temporarily enabled signups, created the master account, and then immediately turned signups back off.
+
+### 7. Import Layout Conflict
+
+- **The Problem:** Existing credentials were in spreadsheet form rather than a native vault schema.
+- **The Root Cause:** The source data was stored as a standard spreadsheet export instead of a dedicated password-manager format.
+- **The Resolution:** Used Vaultwarden's CSV import path to load the spreadsheet records without re-entering them manually.
+
+---
+
+## 📊 Current System State Matrix
+
+| Container / Engine | Status | Access Endpoint | Port Mapping | Resource Profile | Security Mode |
+| --- | --- | --- | --- | --- | --- |
+| **Homepage** | 🟢 Active | `http://100.117.35.70:3000` | `3000:3000` | Minimal | Tailscale Network Auth |
+| **Vaultwarden** | 🟢 Active | `https://ubuntu-dev.taila5af45.ts.net:8080` | `8080:443` | ~50MB RAM | Enforced TLS (Self-Signed) + Signups Disabled |
+
+All core configurations are now tracked in the local Git repository on the Arch laptop, and the homelab runway is clear for the next infrastructure layer.
