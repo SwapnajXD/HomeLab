@@ -2,10 +2,12 @@ services:
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
-    user: "1000:998"  # Keeps your Docker socket group access fully authorized
+    user: "1000:998"
     ports:
       - 3000:3000
     volumes:
       - ./config:/app/config
-      - /var/run/docker.sock:/var/run/docker.sock:ro  # Kept for container api tracking
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - HOMEPAGE_ALLOWED_HOSTS=100.117.35.70
     restart: unless-stopped
