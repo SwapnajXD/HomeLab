@@ -17,3 +17,7 @@
         icon: prometheus
         href: "http://100.117.35.70:9090"
         description: "Time-Series Telemetry DB"
+    - Grafana:
+        icon: grafana
+        href: "http://100.117.35.70:3001"
+        description: "Operational Telemetry Dashboards"
