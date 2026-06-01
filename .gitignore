@@ -9,6 +9,7 @@
 # Ignore local secret environment variable stores
 *.env
 .env
+**/pve.yml
 
 # Ignore OS system artifacts
 .DS_Store

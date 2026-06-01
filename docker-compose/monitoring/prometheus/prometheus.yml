@@ -16,4 +16,12 @@ scrape_configs:
     params:
       module: [default]
     static_configs:
-      - targets: ['proxmox-exporter:9221']
+      - targets:
+          - 10.10.10.1  # The actual IP of your bare-metal Proxmox Host
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: proxmox-exporter:9221  # Forwards the scrape query to the exporter container
