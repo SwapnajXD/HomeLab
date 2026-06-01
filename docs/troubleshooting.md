@@ -206,87 +206,151 @@ Then pressed **`Ctrl` + `Shift` + `R`** in the browser to force-refresh and dump
 
 ---
 
-# 📓 Git Workflow Realignment: Arch Laptop as Master Repository
+# 📓 Day 10: Deploy Monitoring Stack (Prometheus & Node Exporter)
 
 ## 🎯 Objective
 
-Establish a single source of truth for all homelab configurations on the Arch laptop (`artemis`), using SCP to sync runtime files from the Ubuntu VM. This keeps the production server lean and dependency-free while maintaining full version control history on the management workstation.
+Deploy Prometheus and Node Exporter to establish metric collection and system telemetry. This allows deep kernel monitoring and historical data retention for the Ubuntu VM.
 
-## 💥 Technical Challenges & Resolution Index
+## 🛠️ Infrastructure Achievements
 
-### Problem: Git Overhead on Production VM
+1. **Declarative Monitoring Architecture:** Created `docker-compose/monitoring/` structure on the Arch laptop, maintaining modular separation of concerns.
+2. **Prometheus Time-Series Database:** Configured Prometheus with a 15-second scrape interval to collect metrics from both itself and Node Exporter.
+3. **Host Telemetry Agent:** Deployed Node Exporter to expose kernel-level metrics (CPU, memory, disk, network) to Prometheus.
+4. **Data Persistence:** Provisioned a named `prometheus_data` volume to ensure metrics survive container restart or recreation.
+5. **Source-First Development:** Used SCP workflow to push testing-proven configs from Arch laptop to the VM, maintaining git history as the single source of truth.
 
-Running Git commands natively inside a production VM creates unnecessary workspace drift, config duplicates, and requires managing redundant SSH deployment keys on the server itself.
+## 📝 Configuration Files
 
-### Root Cause
+### `prometheus.yml`
 
-Architectural separation of concerns: a server should act purely as a headless compute engine, while the engineer's workstation should act as the administrative development environment.
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
 
-### Resolution
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
 
-Realigned the workflow to use **Secure Copy Protocol (SCP)** over the encrypted Tailscale layer. Configurations are authored and committed on the Arch laptop, then synced to the VM for live deployment.
-
-## 🛠️ Sync Workflow
-
-### Step 1: Pull Files from Ubuntu VM to Arch Laptop
-
-Open a terminal **on your Arch laptop** (not in the SSH session). Navigate to your local `HomeLab` repo and sync the docker-compose directories:
-
-```bash
-cd /path/to/your/local/HomeLab
-
-# Pull homepage from the VM
-scp -r ubuntu@100.117.35.70:~/homelab/docker-compose/homepage docker-compose/
-
-# Pull portainer from the VM
-scp -r ubuntu@100.117.35.70:~/homelab/docker-compose/portainer docker-compose/
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
 ```
 
-### Step 2: Create `.gitignore` on Your Arch Laptop
+### `docker-compose.yml`
 
-Create a `.gitignore` at the root of your local `HomeLab` folder to exclude runtime artifacts:
+```yaml
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - 9090:9090
 
-```bash
-nano .gitignore
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+    ports:
+      - 9100:9100
+
+volumes:
+  prometheus_data:
 ```
 
-Add these patterns:
+## 🔄 Deployment Workflow
+
+### Step 1: Create Directory Structure on Arch Laptop
+
+```bash
+mkdir -p docker-compose/monitoring/prometheus
+```
+
+### Step 2: Write Configuration Files Locally
+
+Created `docker-compose/monitoring/prometheus/prometheus.yml` and `docker-compose/monitoring/docker-compose.yml` with standard Prometheus scrape config and Node Exporter integration.
+
+### Step 3: Commit to Git on Arch Laptop
+
+```bash
+git add docker-compose/monitoring/
+git commit -m "feat: design declarative prometheus and node-exporter monitoring stack layout"
+```
+
+### Step 4: Push to Ubuntu VM via SCP
+
+```bash
+scp -r docker-compose/monitoring/ ubuntu@100.117.35.70:~/homelab/docker-compose/
+```
+
+Both `prometheus.yml` and `docker-compose.yml` transferred successfully.
+
+### Step 5: Launch on Ubuntu VM
+
+SSH into the VM and started the stack:
+
+```bash
+ssh ubuntu@100.117.35.70
+cd ~/homelab/docker-compose/monitoring
+docker compose up -d
+```
+
+## ✅ Validation Test
+
+Access Prometheus web UI from browser:
 
 ```text
-# Ignore container log outputs generated on the VM
-**/logs/
-*.log
-
-# Ignore raw container database volumes
-**/prometheus_data/
-**/portainer_data/
-
-# Ignore OS system artifacts
-.DS_Store
+http://100.117.35.70:9090
 ```
 
-Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`).
+Navigate to **Status** → **Targets** and verify:
 
-### Step 3: Stage and Commit on Your Arch Laptop
+- `prometheus` job shows green `UP` status
+- `node-exporter` job shows green `UP` status
 
-Commit the synced files to track your progress:
+Both endpoints collecting metrics successfully.
 
-```bash
-# Check the layout
-git status
+## 📍 Updated Architectural Layout
 
-# Stage all new files
-git add .
+```text
+       [ Arch Laptop (artemis) ]
+                   │
+         🔒 Secure Tailscale Mesh
+                   │
+      ┌────────────┴─────────────┐
+      │  Proxmox Server (apollo) │
+      └────────────┬─────────────┘
+                   │
+      🔀 Host NAT Gateway (10.10.10.1)
+                   │
+      ┌────────────┴─────────────┐
+      │     Ubuntu Server VM     │
+      │  (Static IP: 10.10.10.10)│
+      ├──────────────────────────┤
+      │  🐳 Active Docker Core   │
+      │   ├── Homepage (Port3000)│
+      │   ├── Portainer(Port9443)│
+      │   ├── Prometheus(Port9090)│ <--- LIVE
+      │   └── Node-Exporter(9100)│ <--- LIVE
+      └──────────────────────────┘
 
-# Commit with a clear message
-git commit -m "feat: track homepage and portainer infrastructure configuration files from VM"
 ```
-
-## 📋 Going Forward
-
-- Author and edit all configs on your Arch laptop in the `HomeLab` repo.
-- Use `git commit` and `git push` to track history on your laptop.
-- Use `scp` to push updated configs to the Ubuntu VM for deployment.
-- The Ubuntu VM runs containers but does not manage Git.
 
 ---
