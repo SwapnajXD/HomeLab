@@ -31,3 +31,20 @@ resource "aws_s3_bucket" "homelab_storage" {
     Owner       = "Swapnaj"
   }
 }
+
+resource "aws_dynamodb_table" "homelab_db" {
+  name         = "tf-homelab-metadata"
+  billing_mode = "PAY_PER_REQUEST" # On-demand scaling (perfect for local environments)
+  hash_key     = "LockID"         # The primary partition key
+
+  attribute {
+    name = "LockID"
+    type = "S" # "S" stands for String data type
+  }
+
+  tags = {
+    Environment = "Dev"
+    ManagedBy   = "Terraform"
+    Project     = "Cloud-Sentinel"
+  }
+}
