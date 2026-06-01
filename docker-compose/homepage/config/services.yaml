@@ -6,9 +6,10 @@
         href: "https://100.81.86.51:8006"
         description: "Type-1 Hypervisor Host"
     - Ubuntu Server:
-        icon: ubuntu
+        icon: https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/App_icon_Ubuntu.png/128px-App_icon_Ubuntu.png
         href: "http://100.117.35.70:3000"
         description: "Core Development VM"
+        container: homepage  # Attaches container tracking to force asset binding
     - Portainer:
         icon: portainer
         href: "https://100.117.35.70:9443"
@@ -24,3 +25,6 @@
         href: "http://100.117.35.70:3001"
         description: "Operational Telemetry Dashboards"
         container: grafana
+
+
+
