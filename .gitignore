@@ -4,7 +4,11 @@
 
 # Ignore raw container database volumes
 **/prometheus_data/
-**/portainer_data/
+**/grafana_data/
+
+# Ignore local secret environment variable stores
+*.env
+.env
 
 # Ignore OS system artifacts
 .DS_Store
