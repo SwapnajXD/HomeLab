@@ -11,4 +11,4 @@
 - resources:
     cpu: true
     memory: true
-    disk: /host/rootfs
+    disk: /

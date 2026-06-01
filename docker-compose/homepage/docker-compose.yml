@@ -2,11 +2,10 @@ services:
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
-    user: "1000:998"  # Maps your Ubuntu user and the correct local Docker socket GID
+    user: "1000:998"  # Keeps your Docker socket group access fully authorized
     ports:
       - 3000:3000
     volumes:
       - ./config:/app/config
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /:/host/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Kept for container api tracking
     restart: unless-stopped
