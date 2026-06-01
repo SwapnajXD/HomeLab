@@ -15,3 +15,7 @@ Use this file for repeatable recovery steps, common failures, and checks that he
 ## Notes
 
 Add symptoms, root causes, and the exact fix after each incident.
+
+## Recent Incident Report
+
+- [Homelab Post-Mortem - 2026-06-01](homelab-postmortem-2026-06-01.md)
