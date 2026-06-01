@@ -43,8 +43,9 @@ resource "aws_dynamodb_table" "homelab_db" {
   }
 
   tags = {
-    Environment = "Dev"
+    Environment = "Staging"
     ManagedBy   = "Terraform"
     Project     = "Cloud-Sentinel"
+    Tier        = "Backend-Database"
   }
 }
