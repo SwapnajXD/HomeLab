@@ -561,3 +561,135 @@ To turn the homelab into a more complete private services environment by keeping
 | **Vaultwarden** | 🟢 Active | `https://ubuntu-dev.taila5af45.ts.net:8080` | `8080:443` | ~50MB RAM | Enforced TLS (Self-Signed) + Signups Disabled |
 
 All core configurations are now tracked in the local Git repository on the Arch laptop, and the homelab runway is clear for the next infrastructure layer.
+
+---
+
+# 📓 Day 23: Infrastructure Optimization & Service Consolidation Refactor
+
+## 🎯 Objective & Executive Summary
+
+Audit and refactor the deployment environment on **athena** (Ubuntu VM) to resolve implicit configuration drift and container management overhead. Consolidate fragmented, standalone multi-directory deployments into a single unified execution domain (`core-services`), minimizing network namespace overhead, reclaiming memory capacity, and bringing production states into absolute alignment with local version-controlled Git repositories on **artemis**.
+
+---
+
+## 🛠️ Infrastructure Changes (What We Did)
+
+### 1. SSH Optimization
+
+Implemented a standardized local SSH configuration matrix (`~/.ssh/config`) on artemis to short-circuit manual IP/username lookups, enabling abstract alias routing:
+
+```bash
+ssh athena
+
+```
+
+No need to track full IP addresses or remember usernames—just use the alias.
+
+### 2. Service Consolidation: Docker Compose Unification
+
+**Before:** Separate standalone `docker-compose.yml` environments scattered across:
+- `~/homelab/docker-compose/portainer/`
+- `~/homelab/docker-compose/vaultwarden/`
+- `~/homelab/docker-compose/homepage/`
+- `~/homelab/docker-compose/monitoring/`
+
+**After:** Merged all services into a single, master composition stack:
+```
+~/homelab/core-services/docker-compose.yml
+├── Portainer (Admin Console)
+├── Vaultwarden (Credentials Vault)
+├── Homepage (Dashboard)
+├── Prometheus (Metrics)
+├── Node Exporter (System Telemetry)
+└── Grafana (Visualization)
+
+```
+
+**Impact:** Reduced container orchestration complexity, unified networking namespace, consolidated volume management.
+
+### 3. Resource Sandboxing: LocalStack Manual Invocation
+
+Extracted LocalStack away from automated system-d or Docker engine boot hooks—moved execution posture to **manual invocation only**:
+
+```yaml
+localstack:
+  image: localstack/localstack:4.4.0
+  restart: "no"  # Never auto-start; prevents memory bloat
+  # ... rest of config ...
+
+```
+
+**Impact:** LocalStack no longer consumes host memory at boot; enables on-demand sandboxing for Terraform IaC testing.
+
+---
+
+## 💥 Engineering Challenges & Troubleshooting (How We Solved It)
+
+### Challenge 1: Permission Denied Errors on Directory Cleandown
+
+**The Symptom:**
+```bash
+$ rm -rf ~/homelab/docker-compose/
+rm: cannot remove '...': Permission denied
+rm: cannot remove database.sqlite3: Operation not permitted
+
+```
+
+**The Root Cause:** The master `core-services/docker-compose.yml` file was mapped directly to active data directories inside the legacy paths via absolute links. Because the containers were actively running, the Docker engine held kernel-level locks on SQLite databases and cache structures under root privileges. Forced system deletion would have caused instantaneous database corruption and catastrophic password data loss (Vaultwarden vault).
+
+**The Resolution:**
+1. Gracefully brought down the running composition stack to release engine file locks:
+```bash
+cd ~/homelab/core-services && docker compose down
+
+```
+2. Executed file migrations (`mv`) to pull the production database (`vaultwarden-data`) and configurations (`homepage-config/`) locally into the active relative path workspace:
+```bash
+mv ~/homelab/docker-compose/vaultwarden/vaultwarden-data ~/homelab/core-services/
+mv ~/homelab/docker-compose/homepage/config ~/homelab/core-services/homepage-config/
+
+```
+3. Relinked the volume mounts within the master composition file using self-contained relative path mapping nodes (`./vaultwarden-data` instead of absolute paths).
+
+---
+
+### Challenge 2: Total Application Reset / Empty States on Initial Boot
+
+**The Symptom:**
+- **Portainer:** Initialized into an unconfigured state demanding fresh administrative user creation.
+- **Homepage:** Displayed default generic sample placeholders instead of custom infrastructure tiles.
+
+**The Root Cause:**
+1. **Portainer:** Moving directory scopes shifted Docker's implicit named volume prefix mapping from `docker-compose_portainer_data` to a blank volume instance (`core-services_portainer_data`).
+2. **Homepage:** The original data configurations inside the legacy folders had generic, commented-out template variables and a disabled underlying Docker API runtime socket (`docker.yaml` was not configured).
+
+**The Resolution:**
+1. Swapped the generic Homepage example code block inside `services.yaml` with an explicit, structured layout split cleanly into logical columns representing specific hardware layers (Proxmox, Monitoring, Docker, Utilities).
+2. Stripped comment headers (`#`) out of `docker.yaml` to unlock native engine communication via `/var/run/docker.sock`:
+```yaml
+# docker.yaml - BEFORE (commented/disabled)
+# docker:
+#   host: http://localhost:2375
+
+# docker.yaml - AFTER (active)
+docker:
+  host: unix:///var/run/docker.sock
+
+```
+3. Decided to keep the fresh, isolated **Portainer instance clean** while letting its internal daemon automatically auto-discover the running monitoring stack over the system socket bridge (no manual endpoint configuration needed).
+
+---
+
+## ✅ Current System State (Post-Day 23 Refactor)
+
+| Service | Status | Access | Port | Mode | Notes |
+| --- | --- | --- | --- | --- | --- |
+| **Homepage** | 🟢 UP | `http://100.117.35.70:3000` | `3000:3000` | Active | Auto-discovers Docker containers via socket |
+| **Portainer** | 🟢 UP | `https://100.117.35.70:9443` | `9443:9443` | Active | Fresh instance, auto-discovering services |
+| **Vaultwarden** | 🟢 UP | `https://athena.ts.net:443` | `8080:443` | Active | Vault locked, manual signups only |
+| **Prometheus** | 🟢 UP | `http://100.117.35.70:9090` | `9090:9090` | Active | Scraping node-exporter, PVE exporter |
+| **Grafana** | 🟢 UP | `http://100.117.35.70:3001` | `3001:3000` | Active | Visualizing metrics, hardware dashboards |
+| **Node Exporter** | 🟢 UP | `:9100` | `9100:9100` | Active | System telemetry collection |
+| **LocalStack** | 🟡 Manual | `http://100.117.35.70:4566` | `4566:4566` | Off (on-demand) | Restart: "no" - manual invocation only |
+
+All configurations are unified in `~/homelab/core-services/` and fully version-controlled on artemis Git repository. Production state now perfectly mirrors the Git tracking tree.
