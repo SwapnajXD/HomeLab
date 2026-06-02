@@ -5,6 +5,8 @@
 # Ignore raw container database volumes
 **/prometheus_data/
 **/grafana_data/
+**/loki-data/
+**/localstack_data/
 
 # Ignore local secret environment variable stores
 *.env
