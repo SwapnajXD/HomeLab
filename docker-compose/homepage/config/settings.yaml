@@ -1,7 +1,0 @@
----
-title: Apollo Operations Dashboard
-base: http://100.117.35.70:3000
-
-# Bypasses browser client-side CORS blocking mechanics entirely
-corsBypass: true
-proxy: true

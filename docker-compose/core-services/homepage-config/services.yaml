@@ -1,0 +1,38 @@
+# For configuration options and examples, please see:
+# https://gethomepage.dev/configs/services/
+
+- Infrastructure & Admin:
+    - Portainer:
+        icon: portainer.png
+        href: https://100.117.35.70:9443/
+        description: Master Container Control Board
+        server: my-docker
+        container: portainer
+
+    - Proxmox:
+        icon: proxmox.png
+        href: https://100.81.86.51:8006/
+        description: Hypervisor Cluster Manager
+
+- Security & Gateways:
+    - Vaultwarden:
+        icon: vaultwarden.png
+        href: http://100.117.35.70:8080/
+        description: Secure Encrypted Password Vault
+        server: my-docker
+        container: vaultwarden
+
+- Metrics & Telemetry:
+    - Grafana:
+        icon: grafana.png
+        href: http://100.117.35.70:3001/
+        description: Systems Observability Engine
+        server: my-docker
+        container: grafana
+
+    - Prometheus:
+        icon: prometheus.png
+        href: http://100.117.35.70:9090/
+        description: Time-Series Telemetry Data
+        server: my-docker
+        container: prometheus
