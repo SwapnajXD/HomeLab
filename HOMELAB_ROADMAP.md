@@ -518,3 +518,87 @@ By completing this roadmap, I will gain hands-on experience with:
 * Basic Cloud Architecture
 * Local AWS Emulation (LocalStack)
 * Remote System Operations
+
+
+
+Here is a comprehensive, production-grade engineering debrief of exactly what we achieved tonight, structured perfectly so you can paste it directly into your project docs or a post-mortem file.
+Engineering Log: Infrastructure Consolidation & IaC Validation
+
+Date: June 3, 2026
+
+Host: ubuntu@athena (Server) | Client: Artemis (Laptop)
+
+Status: Completed (Zero Technical Debt)
+🛠️ Summary of What We Did
+
+We successfully closed out the core infrastructure and automation phases of the homelab roadmap. The entire project repository was refactored away from isolated, messy application directories into a clean, unified, and enterprise-grade multi-stack layout. Additionally, we verified the Infrastructure-as-Code (IaC) pipeline, consolidated the telemetry suite, and secured the version control boundary.
+🏗️ Technical Execution: How We Did It
+1. IaC Verification & LocalStack Validation
+
+    Action: Executed local Terraform configuration blocks from Artemis targeting the remote LocalStack container running over the Tailscale network fabric.
+
+    Verification: Interrogated the local cloud sandbox using the AWS CLI inside a Fish shell to confirm stateful resource creation.
+
+    Confirmed Assets:
+
+        S3 Bucket: tf-homelab-storage-bucket
+
+        DynamoDB Table: tf-homelab-metadata
+
+2. File System Restructuring & Telemetry Fusion
+
+    Action: Dismantled fragmented legacy directories (~/homelab/core-services/ and ~/homelab/monitoring/) on Athena.
+
+    Consolidation: Merged Prometheus, Node-Exporter, Proxmox-Exporter, Loki, and Promtail into a single, unified Docker Compose workspace under ~/homelab/docker-compose/telemetry/.
+
+    Artemis Realignment: Renamed local directory structures to mirror Athena exactly, aligning the Git remote with actual server state.
+
+3. Repository Sanitation & Commit
+
+    Action: Hardened the root .gitignore to mask high-volume persistent storage volumes and state engines.
+
+    Commit: Staged all tracking updates, reconciled deletions, and pushed a clean tracking snapshot to origin main.
+
+⚡ Challenges Faced & Engineering Solutions
+Challenge 1: Permission Barrier During Directory Migration
+
+    Symptom: When running mkdir -p ~/homelab/docker-compose/telemetry, the system threw an explicit mkdir: cannot create directory ... Permission denied block.
+
+    Root Cause: Certain subdirectories inside the homelab tree had inherited root:root user ownership from prior decoupled sudo docker executions, blocking the standard ubuntu system user from modifying the tree.
+
+    Solution: Reclaimed absolute recursive user and group ownership of the workspace directory utilizing the change ownership binary:
+    Bash
+
+    sudo chown -R $USER:$USER ~/homelab
+
+Challenge 2: Docker Daemon Container Name Conflicts
+
+    Symptom: Initializing the new unified telemetry stack threw a fatal daemon error: Conflict. The container name "/proxmox-exporter" is already in use by... followed immediately by a similar block for /promtail.
+
+    Root Cause: Stale container footprints created by previous docker-compose files were still actively mapped inside the Docker engine daemon's memory namespace.
+
+    Solution: Forcefully purged the legacy runtime allocations by their explicit container identifiers before bringing up the new network bridge:
+    Bash
+
+    docker rm -f proxmox-exporter prometheus node-exporter grafana promtail loki
+    docker compose up -d
+
+📊 Current Container Architecture Status (docker ps)
+
+The unified telemetry workspace is fully initialized and isolated within a custom bridge network (telemetry_telemetry-net). All 6 microservices are healthy and operating concurrently:
+
+    ✅ loki (Port 3100) — Log aggregation engine
+
+    ✅ prometheus (Port 9090) — Time-series metric database
+
+    ✅ grafana (Port 3001 -> 3000) — Visual analytics dashboard
+
+    ✅ promtail (Host Log Agent) — Shipping container and system logs
+
+    ✅ node-exporter (Port 9100) — Host hardware metrics harvester
+
+    ✅ proxmox-exporter (Port 9221) — Virtualization layer hypervisor telemetry
+
+🎯 Next Objective: Priority 4 (Architecture Diagram)
+
+When you return to the lab, your workspace is perfectly clean and clear to start building out your Mermaid.js network and application architecture diagram inside your initialized docs/architecture-diagram.mmd file.
