@@ -25,7 +25,7 @@ echo "========================"
 echo "Docker Containers"
 echo "========================"
 
-docker ps
+sudo docker ps
 
 echo
 echo "========================"

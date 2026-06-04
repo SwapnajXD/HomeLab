@@ -1,169 +1,174 @@
 # HomeLab
 
-A production-inspired self-hosted infrastructure platform built on Proxmox VE for learning systems administration, virtualization, observability, Infrastructure as Code (IaC), and remote operations.
+![Platform](https://img.shields.io/badge/platform-Proxmox-blue)
+![OS](https://img.shields.io/badge/os-Ubuntu-orange)
+![Containers](https://img.shields.io/badge/containers-Docker-blue)
+![IaC](https://img.shields.io/badge/IaC-Terraform-purple)
+![Monitoring](https://img.shields.io/badge/monitoring-Grafana%20%7C%20Prometheus-green)
+![Logging](https://img.shields.io/badge/logging-Loki-yellow)
+![VPN](https://img.shields.io/badge/network-Tailscale-blue)
 
-The environment is designed to operate headlessly from a home network while being fully accessible through a secure Tailscale mesh network.
+A self-hosted homelab built on Proxmox VE for learning infrastructure engineering, observability, networking, automation, and disaster recovery practices.
+
+The environment is fully manageable remotely through Tailscale and is designed to remain operational without physical access.
 
 ---
 
-## Infrastructure Overview
+# Infrastructure Overview
 
 ```text
-Artemis (Arch Linux Laptop)
+Artemis (Management Workstation)
         │
-   Tailscale Mesh
+        ▼
+    Tailscale
         │
-      Apollo
-   (Proxmox VE)
-        │
- ┌──────┴──────┐
- │             │
-Hestia       Athena
- (LXC)      (Ubuntu VM)
+        ▼
+Apollo (Proxmox VE Host)
+├── Hestia (LXC)
+│   ├── Homepage Dashboard
+│   └── Vaultwarden
+│
+└── Athena (Ubuntu VM)
+    ├── Grafana
+    ├── Prometheus
+    ├── Loki
+    ├── Promtail
+    ├── Portainer
+    └── LocalStack
 ```
-
-### Hestia
-
-Services:
-
-* Homepage Dashboard
-* Vaultwarden
-
-### Athena
-
-Services:
-
-* Grafana
-* Prometheus
-* Loki
-* Promtail
-* Portainer
-* LocalStack
-
-### Artemis
-
-Management workstation used for:
-
-* Infrastructure administration
-* Terraform deployments
-* Git operations
-* Remote troubleshooting
-* Validation testing
 
 ---
 
-## Technologies
+# Key Achievements
 
-### Virtualization
+* Built a multi-node Proxmox homelab
+* Implemented remote management through Tailscale
+* Centralized monitoring using Prometheus and Grafana
+* Centralized log aggregation using Loki and Promtail
+* Automated cloud resource provisioning using Terraform
+* Validated infrastructure through reboot and disaster recovery testing
+* Maintained complete infrastructure documentation
+* Implemented Infrastructure as Code workflows using LocalStack and Terraform
+
+---
+
+# Technology Stack
+
+## Infrastructure
 
 * Proxmox VE
-* LXC Containers
-* Ubuntu Virtual Machines
-
-### Containers
-
+* Ubuntu Server
+* Linux Containers (LXC)
 * Docker
-* Docker Compose
-* Portainer
 
-### Monitoring & Observability
+## Networking
+
+* Tailscale
+* Linux Bridges
+* Proxmox Virtual Networking
+
+## Monitoring & Logging
 
 * Grafana
 * Prometheus
-* Node Exporter
-* Proxmox Exporter
 * Loki
 * Promtail
+* Node Exporter
+* Proxmox Exporter
 
-### Infrastructure as Code
+## Automation
 
 * Terraform
 * LocalStack
-
-### Networking
-
-* Tailscale
-* Linux Networking
-* Docker Networking
+* AWS CLI
 
 ---
 
-## Project Goals
-
-* Build a remotely managed headless infrastructure platform
-* Learn virtualization and container orchestration fundamentals
-* Implement centralized monitoring and log aggregation
-* Practice Infrastructure as Code workflows
-* Validate disaster recovery and service restoration procedures
-* Maintain operational documentation and runbooks
-
----
-
-## Repository Structure
+# Repository Structure
 
 ```text
 HomeLab/
 ├── architecture/
+├── configs/
+│   ├── apollo/
+│   ├── athena/
+│   └── hestia/
 ├── docker-compose/
 ├── docs/
 ├── screenshots/
 ├── scripts/
 ├── terraform/
 ├── README.md
-└── HOMELAB_ROADMAP.md
+├── LICENSE
+├── HOMELAB_ROADMAP.md
+└── tree.txt
 ```
 
 ---
 
-## Documentation
+# Documentation
 
-| File                 | Description                              |
-| -------------------- | ---------------------------------------- |
-| architecture.md      | Infrastructure design and service layout |
-| network.md           | Network topology and connectivity        |
-| runbook.md           | Operational procedures                   |
-| troubleshooting.md   | Incident investigations and resolutions  |
-| disaster-recovery.md | Recovery procedures and testing          |
-| validation-report.md | Infrastructure validation results        |
-| inventory.md         | Asset and service inventory              |
-| changelog.md         | Infrastructure change history            |
-
----
-
-## Validation Completed
-
-* Headless server operation
-* VM autostart verification
-* Docker service recovery testing
-* Tailscale remote management validation
-* Centralized logging deployment
-* Monitoring stack deployment
-* Terraform provisioning through LocalStack
-* Infrastructure destruction and recreation testing
-* Hypervisor reboot recovery validation
+| Document                  | Description                        |
+| ------------------------- | ---------------------------------- |
+| docs/architecture.md      | Infrastructure architecture        |
+| docs/network.md           | Network topology and routing       |
+| docs/inventory.md         | Infrastructure inventory           |
+| docs/runbook.md           | Operational procedures             |
+| docs/troubleshooting.md   | Issues encountered and resolutions |
+| docs/disaster-recovery.md | Recovery procedures                |
+| docs/validation-report.md | Validation and testing results     |
+| docs/changelog.md         | Infrastructure changes over time   |
 
 ---
 
-## Roadmap
+# Screenshots
 
-The complete build and validation roadmap is documented in:
+## Homepage Dashboard
 
-```text
+![Homepage](screenshots/homepage-dashboard.png)
+
+## Grafana Dashboard
+
+![Grafana](screenshots/grafana-dashboard.png)
+
+## Prometheus Targets
+
+![Prometheus](screenshots/prometheus-targets.png)
+
+## Loki Logs
+
+![Loki](screenshots/loki-logs.png)
+
+## Portainer
+
+![Portainer](screenshots/portainer.png)
+
+## Proxmox
+
+![Proxmox](screenshots/proxmox-summary.png)
+
+---
+
+# Project Goals
+
+* Learn infrastructure engineering fundamentals
+* Learn observability and monitoring practices
+* Learn Infrastructure as Code workflows
+* Practice disaster recovery procedures
+* Build operational experience with self-hosted services
+
+---
+
+# Roadmap
+
+See:
+
 HOMELAB_ROADMAP.md
-```
+
+for the complete project roadmap and milestones.
 
 ---
 
-## Skills Demonstrated
+# License
 
-* Linux Administration
-* Virtualization
-* Docker Operations
-* Infrastructure as Code
-* Monitoring and Observability
-* Incident Response
-* Disaster Recovery
-* Network Engineering
-* Documentation and Runbook Development
-* Git-based Infrastructure Management
-
+MIT License
