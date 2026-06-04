@@ -1,56 +1,171 @@
 # HomeLab
 
-This is my homelab project. I’m building a small home server setup that I can manage remotely before i go back to college.
+A production-inspired self-hosted infrastructure platform built on Proxmox VE for learning systems administration, virtualization, observability, Infrastructure as Code (IaC), and remote operations.
 
-## Goal
+The environment is designed to operate headlessly from a home network while being fully accessible through a secure Tailscale mesh network.
 
-My goal is to set up a headless home server I can reach through Tailscale, with a dashboard, monitoring, backups, and Terraform-managed infrastructure.
+---
 
-The full plan is in [HOMELAB_ROADMAP.md](HOMELAB_ROADMAP.md).
-
-## What I’m Keeping Here
-
-I’m using this repo to keep my plan, notes, and infrastructure files in one place.
-
-## Planned Structure
+## Infrastructure Overview
 
 ```text
-homelab/
-├── README.md
-├── HOMELAB_ROADMAP.md
-├── docs/
-│   ├── architecture.md
-│   ├── architecture-diagram.mmd
-│   ├── network.md
-│   └── troubleshooting.md
-├── docker-compose/
-│   └── README.md
-├── terraform/
-│   ├── README.md
-│   └── localstack/
-│       └── README.md
-├── scripts/
-│   └── README.md
-└── screenshots/
-    └── README.md
+Artemis (Arch Linux Laptop)
+        │
+   Tailscale Mesh
+        │
+      Apollo
+   (Proxmox VE)
+        │
+ ┌──────┴──────┐
+ │             │
+Hestia       Athena
+ (LXC)      (Ubuntu VM)
 ```
 
-## Key Areas
+### Hestia
 
-- Infrastructure: Proxmox, Ubuntu Server VM, Docker, and Tailscale
-- Operations: Homepage, Portainer, Prometheus, Grafana, and Loki
-- Automation: LocalStack and Terraform
-- Reliability: backups, recovery drills, and documentation
+Services:
+
+* Homepage Dashboard
+* Vaultwarden
+
+### Athena
+
+Services:
+
+* Grafana
+* Prometheus
+* Loki
+* Promtail
+* Portainer
+* LocalStack
+
+### Artemis
+
+Management workstation used for:
+
+* Infrastructure administration
+* Terraform deployments
+* Git operations
+* Remote troubleshooting
+* Validation testing
+
+---
+
+## Technologies
+
+### Virtualization
+
+* Proxmox VE
+* LXC Containers
+* Ubuntu Virtual Machines
+
+### Containers
+
+* Docker
+* Docker Compose
+* Portainer
+
+### Monitoring & Observability
+
+* Grafana
+* Prometheus
+* Node Exporter
+* Proxmox Exporter
+* Loki
+* Promtail
+
+### Infrastructure as Code
+
+* Terraform
+* LocalStack
+
+### Networking
+
+* Tailscale
+* Linux Networking
+* Docker Networking
+
+---
+
+## Project Goals
+
+* Build a remotely managed headless infrastructure platform
+* Learn virtualization and container orchestration fundamentals
+* Implement centralized monitoring and log aggregation
+* Practice Infrastructure as Code workflows
+* Validate disaster recovery and service restoration procedures
+* Maintain operational documentation and runbooks
+
+---
+
+## Repository Structure
+
+```text
+HomeLab/
+├── architecture/
+├── docker-compose/
+├── docs/
+├── screenshots/
+├── scripts/
+├── terraform/
+├── README.md
+└── HOMELAB_ROADMAP.md
+```
+
+---
 
 ## Documentation
 
-I’ll keep these files updated as the setup grows:
+| File                 | Description                              |
+| -------------------- | ---------------------------------------- |
+| architecture.md      | Infrastructure design and service layout |
+| network.md           | Network topology and connectivity        |
+| runbook.md           | Operational procedures                   |
+| troubleshooting.md   | Incident investigations and resolutions  |
+| disaster-recovery.md | Recovery procedures and testing          |
+| validation-report.md | Infrastructure validation results        |
+| inventory.md         | Asset and service inventory              |
+| changelog.md         | Infrastructure change history            |
 
-- `docs/architecture.md`
-- `docs/architecture-diagram.mmd`
-- `docs/network.md`
-- `docs/troubleshooting.md`
+---
 
-## Start Here
+## Validation Completed
 
-Read [HOMELAB_ROADMAP.md](HOMELAB_ROADMAP.md) for the full 30-day plan and checklist.
+* Headless server operation
+* VM autostart verification
+* Docker service recovery testing
+* Tailscale remote management validation
+* Centralized logging deployment
+* Monitoring stack deployment
+* Terraform provisioning through LocalStack
+* Infrastructure destruction and recreation testing
+* Hypervisor reboot recovery validation
+
+---
+
+## Roadmap
+
+The complete build and validation roadmap is documented in:
+
+```text
+HOMELAB_ROADMAP.md
+```
+
+---
+
+## Skills Demonstrated
+
+* Linux Administration
+* Virtualization
+* Docker Operations
+* Infrastructure as Code
+* Monitoring and Observability
+* Incident Response
+* Disaster Recovery
+* Network Engineering
+* Documentation and Runbook Development
+* Git-based Infrastructure Management
+
+```
+```
