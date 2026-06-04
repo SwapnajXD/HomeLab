@@ -1,0 +1,31 @@
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden 
+    restart: unless-stopped                    
+    environment:                           
+      - ROCKET_TLS={certs="/etc/vaultwarden/ssl/vault.crt",key="/etc/vaultwarden/ssl/vault.key"}
+    volumes:                                  
+      - ./vaultwarden-data:/data                                
+      - /etc/vaultwarden/ssl:/etc/vaultwarden/ssl:ro            
+    ports:                                                                    
+      - "8080:80"
+    logging: &logging-config
+      driver: loki
+      options:
+        loki-url: "http://10.10.10.10:3100/loki/api/v1/push"  # 👈 Directly maps to Athena
+        loki-batch-size: "409600"
+                                                                                
+  homepage:                                                                     
+    image: ghcr.io/gethomepage/homepage:latest                                  
+    container_name: homepage                                                    
+    restart: unless-stopped                                                     
+    environment:                                                                
+      - HOMEPAGE_ALLOWED_HOSTS=100.81.86.51:3000,10.10.10.2:3000                                                                                
+      - NODE_TLS_REJECT_UNAUTHORIZED=0                                          
+    ports:                                                                      
+      - "3000:3000"                                                             
+    volumes:                                                                    
+      - ./homepage-config:/app/config                                           
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    logging: *logging-config  # 👈 Reuses the exact same Loki configuration blueprint

@@ -1,0 +1,11 @@
+groups:
+  - name: infrastructure_alerts
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Infrastructure Target Down: {{ $labels.instance }}"
+          description: "The service container {{ $labels.instance }} has been unreachable for more than 1 minute on the telemetry network mesh."

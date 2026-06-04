@@ -167,5 +167,3 @@ HOMELAB_ROADMAP.md
 * Documentation and Runbook Development
 * Git-based Infrastructure Management
 
-```
-```

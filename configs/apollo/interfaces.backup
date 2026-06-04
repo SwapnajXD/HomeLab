@@ -1,0 +1,29 @@
+auto lo
+iface lo inet loopback
+
+iface nic0 inet manual
+
+auto wlx002e2df0393b
+iface wlx002e2df0392b inet static
+	address 192.168.1.150/24
+	gateway 192.168.1.1
+	dns-nameservers 8.8.8.8 1.1.1.1
+
+auto vmbr0
+iface vmbr0 inet static
+	address 10.10.10.1/24
+	bridge-ports none
+	bridge-stp off
+	bridge-fd 0
+	post-up echo 1 > /proc/sys/net/ipv4/ip_forward
+	post-up iptables -t nat -A POSTROUTING -s '10.10.10.0/24' -o wlx002e2df0393b -j MASQUERADE 
+	post-down iptables -t nat -D POSTROUTING -s '10.10.10.0/24' -o wlx002e2df393b -j MASQUERADE
+
+source /etc/network/interfaces.d/*
+
+auto vmbr1
+iface vmbr1 inet static
+        address 10.10.10.1/24
+        bridge-ports none
+        bridge-stp off
+        bridge-fd 0
