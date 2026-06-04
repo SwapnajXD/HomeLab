@@ -1,0 +1,36 @@
+```mermaid
+graph TD
+
+Artemis[Artemis<br>Arch Linux Laptop]
+
+Apollo[Apollo<br>Proxmox VE]
+
+Hestia[Hestia<br>LXC]
+
+Athena[Athena<br>Ubuntu VM]
+
+Homepage[Homepage]
+Vaultwarden[Vaultwarden]
+
+Grafana[Grafana]
+Prometheus[Prometheus]
+Loki[Loki]
+Promtail[Promtail]
+Portainer[Portainer]
+LocalStack[LocalStack]
+
+Artemis -->|Tailscale| Apollo
+
+Apollo --> Hestia
+Apollo --> Athena
+
+Hestia --> Homepage
+Hestia --> Vaultwarden
+
+Athena --> Grafana
+Athena --> Prometheus
+Athena --> Loki
+Athena --> Promtail
+Athena --> Portainer
+Athena --> LocalStack
+```
