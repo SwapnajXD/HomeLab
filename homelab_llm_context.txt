@@ -1,5 +1,83 @@
 
 ========================================
+FILE LOCATION: ./tree.txt
+========================================
+
+.
+├── architecture
+│   ├── architecture-diagram.mmd
+│   └── README.md
+├── configs
+│   ├── apollo
+│   │   ├── 101.conf
+│   │   ├── 101.conf.backup
+│   │   ├── interfaces.backup
+│   │   └── README.md
+│   ├── athena
+│   │   ├── alert.rules.yml
+│   │   ├── promtail-config.yml
+│   │   └── README.md
+│   └── hestia
+│       ├── docker-compose.yml
+│       └── README.md
+├── docker-compose
+│   ├── core-services
+│   │   ├── docker-compose.yml
+│   │   └── homepage-config
+│   │       ├── bookmarks.yaml
+│   │       ├── custom.css
+│   │       ├── custom.js
+│   │       ├── docker.yaml
+│   │       ├── kubernetes.yaml
+│   │       ├── proxmox.yaml
+│   │       ├── services.yaml
+│   │       ├── settings.yaml
+│   │       └── widgets.yaml
+│   ├── localstack
+│   │   └── docker-compose.yml
+│   ├── README.md
+│   └── telemetry
+│       ├── docker-compose.yml
+│       └── prometheus
+│           ├── prometheus.yml
+│           └── pve.yml
+├── docs
+│   ├── architecture.md
+│   ├── changelog.md
+│   ├── disaster-recovery.md
+│   ├── inventory.md
+│   ├── network.md
+│   ├── runbook.md
+│   ├── troubleshooting.md
+│   └── validation-report.md
+├── HOMELAB_ROADMAP.md
+├── LICENSE
+├── README.md
+├── screenshots
+│   ├── grafana-dashboard.png
+│   ├── homepage-dashboard.png
+│   ├── loki-logs.png
+│   ├── portainer.png
+│   ├── prometheus-targets.png
+│   ├── proxmox-summary.png
+│   └── README.md
+├── scripts
+│   ├── healthcheck.sh
+│   ├── README.md
+│   └── restart-telemetry.sh
+├── terraform
+│   ├── localstack
+│   │   ├── main.tf
+│   │   ├── outputs.tf
+│   │   ├── providers.tf
+│   │   ├── README.md
+│   │   └── variables.tf
+│   └── README.md
+└── tree.txt
+
+17 directories, 54 files
+
+========================================
 FILE LOCATION: ./docker-compose/core-services/docker-compose.yml
 ========================================
 
@@ -340,6 +418,165 @@ FILE LOCATION: ./screenshots/README.md
 # Screenshots
 
 Store setup screenshots, diagrams, and validation images here.
+
+========================================
+FILE LOCATION: ./docs/health-checks.md
+========================================
+
+# Health Checks
+
+## Verify Tailscale Connectivity
+
+```bash
+tailscale status
+```
+
+Expected:
+
+* Apollo reachable
+* Athena reachable
+
+---
+
+## Verify Docker Containers
+
+```bash
+docker ps
+```
+
+Expected:
+
+* Grafana
+* Prometheus
+* Loki
+* Promtail
+* LocalStack
+* Portainer
+
+All running.
+
+---
+
+## Verify Prometheus
+
+```bash
+curl http://localhost:9090/-/healthy
+```
+
+Expected:
+
+```text
+Prometheus is Healthy
+```
+
+---
+
+## Verify Grafana
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+Expected:
+
+```json
+{
+  "database":"ok"
+}
+```
+
+---
+
+## Verify Loki
+
+```bash
+curl http://localhost:3100/ready
+```
+
+Expected:
+
+```text
+ready
+```
+
+---
+
+## Verify LocalStack
+
+```bash
+curl http://localhost:4566
+```
+
+Expected:
+
+```text
+HTTP/1.1 200 OK
+```
+
+---
+
+## Verify Terraform
+
+```bash
+terraform plan
+```
+
+Expected:
+
+```text
+No changes.
+Infrastructure matches configuration.
+```
+
+---
+
+## Verify Prometheus Targets
+
+Navigate to:
+
+```text
+http://ATHENA-IP:9090/targets
+```
+
+Expected:
+
+All configured targets report:
+
+```text
+UP
+```
+
+---
+
+## Verify Grafana Dashboards
+
+Navigate to:
+
+```text
+http://ATHENA-IP:3001
+```
+
+Expected:
+
+* Dashboards load successfully
+* Metrics are updating
+* Loki queries return logs
+
+---
+
+## Verify Homepage
+
+Navigate to:
+
+```text
+http://HESTIA-IP
+```
+
+Expected:
+
+* Homepage loads
+* Service links are accessible
+* Monitoring widgets update correctly
 
 ========================================
 FILE LOCATION: ./docs/troubleshooting.md
@@ -963,6 +1200,485 @@ Recovery testing is as important as deployment testing.
 8. Every major configuration should be version controlled.
 9. Disaster recovery should be validated, not assumed.
 10. Operational documentation reduces future troubleshooting effort.
+
+
+
+
+
+# V2
+
+
+
+# Troubleshooting Guide
+
+## Purpose
+
+This document records significant issues encountered during the design, deployment, operation, maintenance, and evolution of the HomeLab environment.
+
+Each incident includes:
+
+* Overview
+* Symptoms
+* Investigation
+* Root Cause
+* Resolution
+* Verification
+* Impact
+* Lessons Learned
+
+The objective is to preserve operational knowledge, reduce future recovery time, document engineering decisions, and maintain a historical record of infrastructure changes.
+
+---
+
+# Incident Summary
+
+| Incident                                                   | Severity | Status    |
+| ---------------------------------------------------------- | -------- | --------- |
+| Permission Denied During Infrastructure Refactoring        | Low      | Resolved  |
+| Docker Container Name Conflicts During Stack Consolidation | Low      | Resolved  |
+| VM and LXC Autostart Failure                               | Medium   | Resolved  |
+| Apollo Network Outage and Recovery                         | High     | Resolved  |
+| Stale vmbr1 Bridge Configuration                           | Low      | Resolved  |
+| Loki Centralized Logging Integration                       | Low      | Completed |
+| Loki Readiness Endpoint Investigation                      | Medium   | Resolved  |
+| Homepage Dashboard Configuration Recovery                  | Low      | Resolved  |
+| LocalStack and Terraform Validation                        | Low      | Completed |
+| Telegram Alerting Validation                               | Low      | Completed |
+| Headless Operations Validation                             | Low      | Completed |
+| Chaos Reboot Recovery Testing                              | Medium   | Completed |
+
+---
+
+# Permission Denied During Infrastructure Refactoring
+
+## Overview
+
+During consolidation of multiple Docker Compose projects into a unified infrastructure layout, several directories could not be created or modified within the homelab repository.
+
+This prevented migration of monitoring services into their new location and temporarily blocked repository restructuring efforts.
+
+## Symptoms
+
+Attempts to create new directories failed immediately.
+
+```bash
+mkdir -p ~/homelab/docker-compose/telemetry
+```
+
+Result:
+
+```text
+mkdir: cannot create directory ... Permission denied
+```
+
+Additional operations such as moving files and editing existing directories also failed.
+
+## Investigation
+
+Filesystem ownership was inspected.
+
+```bash
+ls -la ~/homelab
+```
+
+Several directories were owned by:
+
+```text
+root:root
+```
+
+instead of the intended user account.
+
+## Root Cause
+
+Previous Docker operations executed with elevated privileges created directories owned by root.
+
+The repository became a mixture of user-owned and root-owned files.
+
+## Resolution
+
+```bash
+sudo chown -R $USER:$USER ~/homelab
+```
+
+## Verification
+
+Directory creation, file movement, and Git operations completed successfully.
+
+## Impact
+
+* Repository restructuring delayed
+* No service outage
+* No data loss
+
+## Lessons Learned
+
+Avoid unnecessary use of sudo during Docker operations and periodically verify repository ownership.
+
+---
+
+# Docker Container Name Conflicts During Stack Consolidation
+
+## Overview
+
+While consolidating monitoring services into a single telemetry stack, Docker failed to create containers due to naming conflicts.
+
+## Symptoms
+
+```text
+Conflict. The container name "/proxmox-exporter" is already in use.
+```
+
+Similar conflicts occurred for:
+
+* Grafana
+* Prometheus
+* Node Exporter
+* Loki
+* Promtail
+
+## Investigation
+
+Existing containers from previous deployments remained registered within Docker.
+
+## Root Cause
+
+Legacy containers were not removed before deployment of the new compose stack.
+
+## Resolution
+
+```bash
+docker rm -f \
+proxmox-exporter \
+prometheus \
+node-exporter \
+grafana \
+promtail \
+loki
+```
+
+Redeployed:
+
+```bash
+docker compose up -d
+```
+
+## Verification
+
+Telemetry services started successfully.
+
+## Impact
+
+* Deployment blocked
+* No data loss
+
+## Lessons Learned
+
+Always decommission legacy stacks before migration.
+
+---
+
+# VM and LXC Autostart Failure
+
+## Overview
+
+A planned reboot revealed that critical workloads did not automatically start after the hypervisor returned online.
+
+## Symptoms
+
+After rebooting Apollo:
+
+* Athena remained offline
+* Hestia remained offline
+* Services unavailable
+
+## Investigation
+
+Proxmox startup settings were reviewed.
+
+## Root Cause
+
+Start-at-boot was disabled.
+
+## Resolution
+
+Enabled:
+
+```text
+VM/LXC
+→ Options
+→ Start at Boot
+→ Yes
+```
+
+## Verification
+
+Subsequent reboots automatically restored:
+
+* Athena
+* Hestia
+* Docker services
+
+## Impact
+
+Temporary service outage.
+
+## Lessons Learned
+
+Autostart settings should be validated during recovery testing.
+
+---
+
+# Apollo Network Outage and Recovery
+
+## Overview
+
+Apollo experienced a network outage that prevented communication between infrastructure components.
+
+## Symptoms
+
+* VM connectivity failures
+* Container connectivity failures
+* Tailscale unavailable
+* Remote administration unavailable
+
+## Investigation
+
+Commands used:
+
+```bash
+ip addr
+ip route
+bridge link
+brctl show
+iptables -L -n -v
+```
+
+Network bridges, firewall rules, and routing were reviewed.
+
+## Root Cause
+
+Network configuration drift combined with bridge and firewall interactions produced inconsistent routing behavior.
+
+## Resolution
+
+* Corrected routing configuration
+* Validated bridge assignments
+* Reviewed firewall rules
+* Restarted networking services
+* Removed obsolete components
+
+## Verification
+
+Connectivity restored between:
+
+* Apollo
+* Athena
+* Hestia
+* Artemis
+
+Validated using:
+
+```bash
+ping
+ssh
+tailscale status
+```
+
+## Impact
+
+Temporary loss of infrastructure management capability.
+
+## Lessons Learned
+
+Network changes should be documented immediately and validated incrementally.
+
+---
+
+# Loki Centralized Logging Integration
+
+## Overview
+
+Container logs were initially fragmented across multiple hosts and difficult to search.
+
+## Resolution
+
+Initially deployed:
+
+* Loki
+* Promtail
+* Grafana Integration
+
+The logging platform was later modernized by replacing Promtail with Grafana Alloy.
+
+### Current Logging Architecture
+
+```text
+Docker Containers
+        │
+        ▼
+Grafana Alloy
+        │
+        ▼
+Loki
+        │
+        ▼
+Grafana
+```
+
+## Verification
+
+Logs became visible through Grafana Explore.
+
+Example query:
+
+```logql
+{job=~".+"}
+```
+
+## Lessons Learned
+
+Centralized logging should be implemented early in infrastructure projects.
+
+---
+
+# Loki Readiness Endpoint Investigation
+
+## Overview
+
+Loki readiness checks repeatedly failed despite the service operating normally.
+
+## Symptoms
+
+```text
+503 Service Unavailable
+```
+
+## Investigation
+
+Verified:
+
+```bash
+curl http://localhost:3100/services
+```
+
+Observed:
+
+* Distributor ACTIVE
+* Ingester ACTIVE
+* Scheduler ACTIVE
+* Compactor ACTIVE
+
+All services healthy.
+
+## Root Cause
+
+Incorrect readiness endpoint used.
+
+Attempted:
+
+```text
+/loki/api/v1/status/ready
+```
+
+Returned:
+
+```text
+404 Not Found
+```
+
+Correct endpoint:
+
+```text
+/ready
+```
+
+## Resolution
+
+```bash
+curl http://localhost:3100/ready
+```
+
+Response:
+
+```text
+ready
+```
+
+HTTP:
+
+```text
+200 OK
+```
+
+## Verification
+
+```bash
+curl http://localhost:3100/ready
+curl http://localhost:3100/services
+curl http://localhost:3100/metrics
+curl http://localhost:3100/loki/api/v1/labels
+```
+
+All checks passed.
+
+## Lessons Learned
+
+Do not assume health endpoints remain identical between versions.
+
+---
+
+# Telegram Alerting Validation
+
+## Overview
+
+Grafana alerting was integrated with Telegram for infrastructure notifications.
+
+## Objective
+
+Verify end-to-end alert delivery.
+
+## Validation Path
+
+```text
+Prometheus
+        │
+        ▼
+Grafana Alerting
+        │
+        ▼
+Telegram
+```
+
+## Verification
+
+Triggered a test alert from Grafana.
+
+Telegram notification received successfully.
+
+## Result
+
+PASS
+
+## Lessons Learned
+
+Alerting systems must be tested regularly to ensure notification delivery remains functional after infrastructure changes.
+
+---
+
+# Key Takeaways
+
+1. Infrastructure should be reproducible through code.
+2. Monitoring should exist before major workloads are deployed.
+3. Centralized logging dramatically reduces troubleshooting time.
+4. Alerting should be validated regularly.
+5. Recovery procedures should be tested, not assumed.
+6. Documentation is part of the infrastructure.
+7. Network changes should be tracked carefully.
+8. Remote administration should not require physical access.
+9. Every major configuration should be version controlled.
+10. Disaster recovery readiness should be continuously validated.
+
 ========================================
 FILE LOCATION: ./docs/changelog.md
 ========================================
@@ -1290,6 +2006,97 @@ Planned Areas:
 - Service Expansion
 - CI/CD Workflows
 ========================================
+FILE LOCATION: ./docs/project-timeline.md
+========================================
+
+# Project Timeline
+
+## Infrastructure Foundation
+
+### Phase 1
+
+* Installed Proxmox VE on Apollo
+* Configured networking and storage
+* Created Hestia LXC container
+* Created Athena Ubuntu VM
+* Installed Docker and Docker Compose
+
+---
+
+## Remote Access
+
+### Phase 2
+
+* Deployed Tailscale
+* Validated remote connectivity
+* Implemented remote administration workflows
+
+---
+
+## Service Deployment
+
+### Phase 3
+
+* Deployed Homepage Dashboard
+* Deployed Vaultwarden
+* Deployed Portainer
+
+---
+
+## Monitoring
+
+### Phase 4
+
+* Deployed Prometheus
+* Deployed Node Exporter
+* Deployed Proxmox Exporter
+* Deployed Grafana
+
+---
+
+## Logging
+
+### Phase 5
+
+* Deployed Loki
+* Deployed Promtail
+* Configured centralized log aggregation
+
+---
+
+## Infrastructure as Code
+
+### Phase 6
+
+* Deployed LocalStack
+* Configured Terraform
+* Provisioned S3 bucket
+* Provisioned DynamoDB table
+
+---
+
+## Reliability Engineering
+
+### Phase 7
+
+* Performed headless operation validation
+* Executed reboot recovery testing
+* Verified autostart configuration
+* Executed Terraform destroy and rebuild tests
+
+---
+
+## Documentation
+
+### Phase 8
+
+* Architecture documentation
+* Network documentation
+* Troubleshooting documentation
+* Recovery documentation
+* Validation reporting
+
+========================================
 FILE LOCATION: ./docs/disaster-recovery.md
 ========================================
 
@@ -1297,9 +2104,9 @@ FILE LOCATION: ./docs/disaster-recovery.md
 
 ## Purpose
 
-This document defines the recovery procedures for the homelab environment.
+This document defines recovery procedures for the HomeLab environment.
 
-The objective is to restore services as quickly as possible after hardware, software, network, or configuration failures.
+The objective is to restore services as quickly as possible following hardware failures, software failures, networking issues, configuration drift, or infrastructure outages.
 
 ---
 
@@ -1308,38 +2115,41 @@ The objective is to restore services as quickly as possible after hardware, soft
 ## Infrastructure
 
 ```text
-Artemis (Management Laptop)
+Artemis (Management Workstation)
         │
-   Tailscale
+    Tailscale
         │
-      Apollo
+        ▼
+Apollo (Proxmox VE)
         │
- ┌─────────────┐
- │  Proxmox VE │
- └─────────────┘
-      │
- ┌────┴────┐
- │         │
-Hestia   Athena
+ ┌──────┴──────┐
+ │             │
+ ▼             ▼
+Hestia       Athena
+(LXC)         (VM)
 ```
+
+---
 
 ## Hestia
 
 Services:
 
-- Homepage
-- Vaultwarden
+* Homepage
+* Vaultwarden
+
+---
 
 ## Athena
 
 Services:
 
-- Grafana
-- Prometheus
-- Loki
-- Promtail
-- Portainer
-- LocalStack
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Portainer
+* LocalStack
 
 ---
 
@@ -1349,32 +2159,39 @@ Services:
 
 Critical Infrastructure
 
-- Apollo
-- Proxmox Networking
-- Tailscale Connectivity
+* Apollo
+* Proxmox Networking
+* Tailscale Connectivity
+
+---
 
 ## Priority 2
 
 Core Services
 
-- Homepage
-- Vaultwarden
+* Homepage
+* Vaultwarden
+
+---
 
 ## Priority 3
 
-Monitoring Services
+Observability Platform
 
-- Grafana
-- Prometheus
-- Loki
-- Promtail
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Telegram Alerting
+
+---
 
 ## Priority 4
 
 Development Services
 
-- LocalStack
-- Terraform
+* LocalStack
+* Terraform
 
 ---
 
@@ -1382,11 +2199,11 @@ Development Services
 
 ## Symptoms
 
-- SSH unavailable
-- Proxmox UI unavailable
-- Tailscale unreachable
+* SSH unavailable
+* Proxmox UI unavailable
+* Tailscale unreachable
 
-## Checks
+## Verification
 
 From Artemis:
 
@@ -1406,10 +2223,10 @@ ping <apollo-tailscale-ip>
 
 Verify:
 
-1. Power connected
-2. Router online
-3. Ethernet connected
-4. Apollo powered on
+1. Router online
+2. Apollo powered on
+3. Network connectivity available
+4. Tailscale operational
 
 If remote recovery fails:
 
@@ -1419,31 +2236,17 @@ Physical intervention required.
 
 # Scenario 2: Apollo Rebooted Unexpectedly
 
-## Symptoms
-
-Services unavailable.
-
 ## Verification
-
-Wait:
-
-```text
-2–5 minutes
-```
-
-Check:
 
 ```bash
 tailscale status
 ```
 
-SSH:
-
 ```bash
 ssh root@apollo
 ```
 
-Verify:
+Check:
 
 ```bash
 qm list
@@ -1452,50 +2255,16 @@ pct list
 
 Expected:
 
-- Athena running
-- Hestia running
+* Athena running
+* Hestia running
 
 ## Recovery
 
-Start manually if required:
-
-### VM
+Start VM:
 
 ```bash
-qm start <vmid>
+qm start 101
 ```
-
-### LXC
-
-```bash
-pct start <ctid>
-```
-
----
-
-# Scenario 3: Hestia Offline
-
-## Symptoms
-
-Homepage unavailable.
-
-Vaultwarden unavailable.
-
-## Verification
-
-On Apollo:
-
-```bash
-pct list
-```
-
-Check status:
-
-```bash
-pct status <ctid>
-```
-
-## Recovery
 
 Start container:
 
@@ -1503,23 +2272,9 @@ Start container:
 pct start <ctid>
 ```
 
-Verify:
-
-```bash
-pct exec <ctid> ip a
-```
-
 ---
 
-# Scenario 4: Athena Offline
-
-## Symptoms
-
-Monitoring unavailable.
-
-Grafana unavailable.
-
-Prometheus unavailable.
+# Scenario 3: Athena Offline
 
 ## Verification
 
@@ -1529,18 +2284,14 @@ On Apollo:
 qm list
 ```
 
-Check status:
-
 ```bash
-qm status <vmid>
+qm status 101
 ```
 
 ## Recovery
 
-Start VM:
-
 ```bash
-qm start <vmid>
+qm start 101
 ```
 
 Access:
@@ -1551,11 +2302,33 @@ ssh ubuntu@athena
 
 ---
 
+# Scenario 4: Hestia Offline
+
+## Verification
+
+```bash
+pct list
+```
+
+```bash
+pct status <ctid>
+```
+
+## Recovery
+
+```bash
+pct start <ctid>
+```
+
+Verify networking:
+
+```bash
+pct exec <ctid> ip a
+```
+
+---
+
 # Scenario 5: Docker Services Not Running
-
-## Symptoms
-
-Containerized services unavailable.
 
 ## Verification
 
@@ -1563,7 +2336,7 @@ Containerized services unavailable.
 docker ps -a
 ```
 
-Check logs:
+Inspect logs:
 
 ```bash
 docker logs <container>
@@ -1571,15 +2344,24 @@ docker logs <container>
 
 ## Recovery
 
-Navigate:
+Telemetry Stack:
 
 ```bash
-cd ~/homelab/docker-compose
+cd ~/homelab/docker-compose/telemetry
+docker compose up -d
 ```
 
-Restart stack:
+Core Services:
 
 ```bash
+cd ~/homelab/docker-compose/core-services
+docker compose up -d
+```
+
+LocalStack:
+
+```bash
+cd ~/homelab/docker-compose/localstack
 docker compose up -d
 ```
 
@@ -1596,26 +2378,16 @@ docker ps
 ## Verification
 
 ```bash
-docker ps
-```
-
-```bash
 docker logs grafana
 ```
 
 ## Recovery
 
-Restart:
-
 ```bash
 docker restart grafana
 ```
 
-If necessary:
-
-```bash
-docker compose up -d
-```
+Verify access through browser.
 
 ---
 
@@ -1629,23 +2401,17 @@ Open:
 http://athena:9090/targets
 ```
 
-Check:
-
-```text
-UP
-```
-
-status.
+Check target status.
 
 ## Recovery
 
-Validate:
+Review:
 
 ```bash
 docker logs prometheus
 ```
 
-Check:
+Validate configuration:
 
 ```bash
 cat prometheus/prometheus.yml
@@ -1659,48 +2425,71 @@ docker restart prometheus
 
 ---
 
-# Scenario 8: Loki Not Receiving Logs
+# Scenario 8: Loki Unavailable
 
 ## Verification
-
-Check:
 
 ```bash
 docker logs loki
 ```
 
+Check readiness:
+
 ```bash
-docker logs promtail
+curl http://localhost:3100/ready
 ```
 
-In Grafana Explore:
+Expected:
 
-```logql
-{job=~".+"}
+```text
+ready
+```
+
+Check services:
+
+```bash
+curl http://localhost:3100/services
 ```
 
 ## Recovery
 
-Restart:
-
 ```bash
 docker restart loki
-docker restart promtail
 ```
 
 ---
 
-# Scenario 9: Homepage Not Loading
+# Scenario 9: Logs Not Appearing in Grafana
 
 ## Verification
 
-Check:
-
 ```bash
-docker ps
+docker logs alloy
 ```
 
-Inspect:
+Verify labels:
+
+```bash
+curl http://localhost:3100/loki/api/v1/labels
+```
+
+Check Grafana Explore.
+
+## Recovery
+
+Restart Alloy:
+
+```bash
+docker restart alloy
+```
+
+Verify Loki ingestion.
+
+---
+
+# Scenario 10: Homepage Unavailable
+
+## Verification
 
 ```bash
 docker logs homepage
@@ -1708,15 +2497,11 @@ docker logs homepage
 
 Review configuration:
 
-```text
-services.yaml
-widgets.yaml
-settings.yaml
-```
+* services.yaml
+* widgets.yaml
+* settings.yaml
 
 ## Recovery
-
-Restart:
 
 ```bash
 docker restart homepage
@@ -1724,7 +2509,7 @@ docker restart homepage
 
 ---
 
-# Scenario 10: Vaultwarden Unavailable
+# Scenario 11: Vaultwarden Unavailable
 
 ## Verification
 
@@ -1732,31 +2517,19 @@ docker restart homepage
 docker logs vaultwarden
 ```
 
-Verify:
-
-```bash
-docker ps
-```
-
 ## Recovery
-
-Restart:
 
 ```bash
 docker restart vaultwarden
 ```
 
-Verify access.
+Verify login page loads successfully.
 
 ---
 
-# Scenario 11: LocalStack Unavailable
+# Scenario 12: LocalStack Failure
 
 ## Verification
-
-```bash
-docker ps
-```
 
 ```bash
 docker logs localstack
@@ -1768,33 +2541,27 @@ Test endpoint:
 curl http://localhost:4566
 ```
 
-Expected:
-
-```text
-HTTP/1.1 200 OK
-```
-
 ## Recovery
-
-Restart:
 
 ```bash
 docker restart localstack
 ```
 
+Verify:
+
+```bash
+awslocal s3 ls
+```
+
 ---
 
-# Scenario 12: Terraform Deployment Failure
+# Scenario 13: Terraform Deployment Failure
 
 ## Verification
-
-Validate:
 
 ```bash
 terraform validate
 ```
-
-Plan:
 
 ```bash
 terraform plan
@@ -1802,31 +2569,27 @@ terraform plan
 
 ## Recovery
 
-Refresh state:
-
 ```bash
 terraform refresh
 ```
-
-Reapply:
 
 ```bash
 terraform apply
 ```
 
+Verify resources exist within LocalStack.
+
 ---
 
-# Scenario 13: Tailscale Connectivity Failure
+# Scenario 14: Tailscale Failure
 
 ## Verification
-
-Check:
 
 ```bash
 tailscale status
 ```
 
-Restart:
+## Recovery
 
 ```bash
 sudo systemctl restart tailscaled
@@ -1840,11 +2603,43 @@ sudo tailscale up
 
 ## Validation
 
-Verify peer visibility.
+Verify nodes:
+
+* Artemis
+* Apollo
+* Athena
 
 ---
 
-# Scenario 14: Storage Running Out
+# Scenario 15: Telegram Alerting Failure
+
+## Verification
+
+Open Grafana:
+
+```text
+Alerting → Contact Points
+```
+
+Review:
+
+* Telegram Bot Token
+* Chat ID
+* Notification Policies
+
+## Recovery
+
+Reconfigure Telegram contact point if necessary.
+
+Send test notification.
+
+## Validation
+
+Telegram message received successfully.
+
+---
+
+# Scenario 16: Storage Running Out
 
 ## Verification
 
@@ -1852,31 +2647,33 @@ Verify peer visibility.
 df -h
 ```
 
-Check Docker usage:
-
 ```bash
 docker system df
 ```
 
 ## Recovery
 
-Prune unused resources:
+Remove unused resources:
 
 ```bash
 docker system prune -a
 ```
 
-Review logs and backups.
+Review:
+
+* Logs
+* Backups
+* Docker volumes
 
 ---
 
-# Scenario 15: Complete Service Recovery
+# Scenario 17: Complete Environment Recovery
 
 ## Recovery Sequence
 
 ### Step 1
 
-Verify Apollo online.
+Verify Apollo operational.
 
 ### Step 2
 
@@ -1884,7 +2681,7 @@ Verify networking.
 
 ### Step 3
 
-Verify Hestia running.
+Verify Tailscale.
 
 ### Step 4
 
@@ -1892,647 +2689,682 @@ Verify Athena running.
 
 ### Step 5
 
-Verify Docker services.
+Verify Hestia running.
 
 ### Step 6
 
-Verify Tailscale.
+Verify Docker services.
 
 ### Step 7
 
-Verify Homepage.
+Verify Grafana.
 
 ### Step 8
 
-Verify Grafana.
+Verify Prometheus.
 
 ### Step 9
 
-Verify Vaultwarden.
+Verify Loki.
 
 ### Step 10
 
+Verify Grafana Alloy.
+
+### Step 11
+
+Verify Homepage.
+
+### Step 12
+
+Verify Vaultwarden.
+
+### Step 13
+
 Verify LocalStack.
+
+### Step 14
+
+Verify Telegram alerting.
 
 ---
 
 # Health Verification Checklist
 
+Infrastructure:
+
 ```bash
 tailscale status
-```
-
-```bash
 docker ps
-```
-
-```bash
 df -h
-```
-
-```bash
 free -h
-```
-
-```bash
 uptime
 ```
 
+---
+
 ## Service Verification
 
-- Homepage accessible
-- Vaultwarden accessible
-- Grafana accessible
-- Prometheus accessible
-- Loki receiving logs
-- LocalStack responding
-- Terraform operational
+* Homepage accessible
+* Vaultwarden accessible
+* Grafana accessible
+* Prometheus accessible
+* Loki healthy
+* Logs visible in Grafana
+* Telegram alerts operational
+* LocalStack responding
+* Terraform operational
 
 ---
 
 # Recovery Objectives
 
-| Objective | Target |
-|------------|----------|
-| Apollo Recovery | < 5 minutes |
-| Athena Recovery | < 2 minutes |
-| Hestia Recovery | < 2 minutes |
-| Docker Service Recovery | < 1 minute |
-| Monitoring Recovery | < 2 minutes |
-| Full Environment Recovery | < 10 minutes |
+| Objective                 | Target       |
+| ------------------------- | ------------ |
+| Apollo Recovery           | < 5 Minutes  |
+| Athena Recovery           | < 2 Minutes  |
+| Hestia Recovery           | < 2 Minutes  |
+| Docker Recovery           | < 1 Minute   |
+| Observability Recovery    | < 2 Minutes  |
+| Full Environment Recovery | < 10 Minutes |
+
+---
+
+# Recovery Design Principles
+
+* Proxmox Autostart Enabled
+* Docker Restart Policies Enabled
+* Tailscale Remote Administration
+* Version-Controlled Configuration
+* Infrastructure as Code
+* Documented Recovery Procedures
 
 ---
 
 # Conclusion
 
-The homelab environment is designed to recover from common failures through:
+The HomeLab environment is designed to recover from common infrastructure failures through virtualization, containerization, observability, remote administration, and documented operational procedures.
 
-- Proxmox autostart
-- Docker restart policies
-- Tailscale remote access
-- Infrastructure as Code
-- Version-controlled configuration
+Current Recovery Status:
 
-The goal is to maintain a fully recoverable environment that can be operated remotely without requiring physical access.
+Operational
+
+Recovery Procedures:
+
+Documented and Tested
+
+Overall Environment State:
+
+Stable Operational Environment
+
 ========================================
 FILE LOCATION: ./docs/validation-report.md
 ========================================
 
-# Homelab Validation Report
+# Validation Report
 
 ## Overview
 
-This document records the validation procedures performed against the homelab infrastructure.
+This document records validation procedures performed against the HomeLab infrastructure to verify functionality, stability, observability, remote access, and recovery capabilities.
 
-The objective of these tests was to verify:
-
-- Infrastructure reliability
-- Service availability
-- Disaster recovery readiness
-- Infrastructure as Code functionality
-- Remote management capability
-- Monitoring and observability coverage
+Validation is performed after major infrastructure changes, upgrades, maintenance operations, and incident recovery activities.
 
 ---
 
-# Environment Summary
+# Environment Under Test
 
-## Infrastructure
-
-| Component | Role |
-|------------|------------|
-| Apollo | Proxmox Hypervisor |
-| Hestia | Core Services LXC |
-| Athena | Monitoring & Operations VM |
-| Artemis | Management Workstation |
-
----
-
-## Primary Services
-
-| Service | Purpose |
-|----------|----------|
-| Homepage | Dashboard |
-| Vaultwarden | Password Management |
-| Grafana | Visualization |
-| Prometheus | Metrics Collection |
-| Loki | Log Aggregation |
-| Promtail | Log Shipping |
-| Portainer | Container Management |
-| LocalStack | AWS Emulation |
-| Terraform | Infrastructure as Code |
+| Component        | Role            |
+| ---------------- | --------------- |
+| Apollo           | Proxmox Host    |
+| Athena           | Monitoring VM   |
+| Hestia           | Application LXC |
+| Grafana          | Visualization   |
+| Prometheus       | Metrics         |
+| Loki             | Logging         |
+| Grafana Alloy    | Log Collection  |
+| Node Exporter    | Host Metrics    |
+| Proxmox Exporter | Proxmox Metrics |
+| LocalStack       | AWS Emulation   |
+| Tailscale        | Remote Access   |
 
 ---
 
-# Validation Results
+# Test 01: Proxmox Host Validation
 
----
+## Objective
 
-## Test 1: Hypervisor Deployment Validation
+Verify Apollo is operational.
 
-### Objective
-
-Verify successful deployment of Proxmox VE and workload hosting.
-
-### Validation
-
-Confirmed:
-
-- Hypervisor installation successful
-- VM creation functional
-- LXC creation functional
-- Storage allocation operational
-- Network bridges functional
-
-### Result
-
-```text
-PASS
-```
-
----
-
-## Test 2: Internal Network Validation
-
-### Objective
-
-Verify communication between infrastructure components.
-
-### Validation
-
-Successfully tested:
-
-```text
-Apollo → Hestia
-Apollo → Athena
-Athena → Hestia
-Artemis → Athena
-```
-
-Verified:
-
-- ICMP connectivity
-- SSH connectivity
-- Service accessibility
-
-### Result
-
-```text
-PASS
-```
-
----
-
-## Test 3: Tailscale Remote Access Validation
-
-### Objective
-
-Verify secure remote administration capability.
-
-### Validation
-
-Successfully connected from Artemis to:
-
-- Apollo
-- Athena
-
-Verified:
+## Procedure
 
 ```bash
-ssh
-ping
-tailscale status
+hostnamectl
+uptime
 ```
 
-Remote management completed successfully.
+## Expected Result
 
-### Result
+Host responds normally.
 
-```text
+## Result
+
 PASS
-```
 
 ---
 
-## Test 4: Homepage Dashboard Validation
+# Test 02: VM Validation
 
-### Objective
+## Objective
 
-Verify centralized service visibility.
+Verify Athena is operational.
 
-### Validation
+## Procedure
 
-Dashboard successfully displayed:
-
-- Proxmox
-- Grafana
-- Prometheus
-- Portainer
-- Vaultwarden
-
-Widgets rendered correctly.
-
-### Result
-
-```text
-PASS
+```bash
+qm list
 ```
+
+Verify Athena is running.
+
+## Result
+
+PASS
 
 ---
 
-## Test 5: Monitoring Stack Validation
+# Test 03: LXC Validation
 
-### Objective
+## Objective
 
-Verify metrics collection pipeline.
+Verify Hestia is operational.
 
-### Validation
+## Procedure
 
-Prometheus successfully scraped:
-
-- Node Exporter
-- Proxmox Exporter
-
-Targets displayed:
-
-```text
-UP
+```bash
+pct list
 ```
 
-within Prometheus.
+Verify Hestia is running.
 
-### Result
+## Result
 
-```text
 PASS
-```
 
 ---
 
-## Test 6: Grafana Visualization Validation
+# Test 04: Docker Stack Validation
 
-### Objective
+## Objective
 
-Verify dashboard visualization.
+Verify all containers are running.
 
-### Validation
+## Procedure
 
-Grafana successfully displayed:
-
-- CPU Metrics
-- Memory Metrics
-- Disk Utilization
-- Container Metrics
-- Proxmox Metrics
-
-Datasource connectivity verified.
-
-### Result
-
-```text
-PASS
+```bash
+docker compose ps
 ```
+
+## Expected Result
+
+All containers report healthy or running.
+
+## Result
+
+PASS
 
 ---
 
-## Test 7: Centralized Logging Validation
+# Test 05: Grafana Validation
 
-### Objective
+## Objective
 
-Verify log aggregation architecture.
+Verify Grafana availability.
 
-### Validation
+## Procedure
 
-Logs successfully flowed through:
+Open Grafana dashboard.
+
+Verify:
+
+* Dashboard Loading
+* Datasources Connected
+* Panels Rendering
+
+## Result
+
+PASS
+
+---
+
+# Test 06: Prometheus Validation
+
+## Objective
+
+Verify Prometheus readiness.
+
+## Procedure
+
+```bash
+curl http://localhost:9090/-/ready
+```
+
+## Expected Result
 
 ```text
-Containers
-    ↓
-Promtail
-    ↓
-Loki
-    ↓
+Prometheus is Ready.
+```
+
+## Result
+
+PASS
+
+---
+
+# Test 07: Node Exporter Validation
+
+## Objective
+
+Verify Node Exporter metrics.
+
+## Procedure
+
+```bash
+curl http://localhost:9100/metrics
+```
+
+## Expected Result
+
+Metrics returned.
+
+## Result
+
+PASS
+
+---
+
+# Test 08: Proxmox Exporter Validation
+
+## Objective
+
+Verify Proxmox metrics collection.
+
+## Procedure
+
+```bash
+curl http://localhost:9221/metrics
+```
+
+## Expected Result
+
+Metrics returned.
+
+## Result
+
+PASS
+
+---
+
+# Test 09: Loki Readiness Validation
+
+## Objective
+
+Verify Loki readiness.
+
+## Procedure
+
+```bash
+curl http://localhost:3100/ready
+```
+
+## Expected Result
+
+HTTP 200
+
+Response:
+
+```text
+ready
+```
+
+## Result
+
+PASS
+
+---
+
+# Test 10: Loki Services Validation
+
+## Objective
+
+Verify Loki internal services.
+
+## Procedure
+
+```bash
+curl http://localhost:3100/services
+```
+
+## Expected Result
+
+Services report ACTIVE.
+
+### Expected Services
+
+* Distributor
+* Ingester
+* Scheduler
+* Compactor
+
+## Result
+
+PASS
+
+---
+
+# Test 11: Loki Labels Validation
+
+## Objective
+
+Verify Loki query functionality.
+
+## Procedure
+
+```bash
+curl http://localhost:3100/loki/api/v1/labels
+```
+
+## Expected Result
+
+Labels returned successfully.
+
+## Result
+
+PASS
+
+---
+
+# Test 12: Grafana Alloy Validation
+
+## Objective
+
+Verify log collection.
+
+## Procedure
+
+Check Alloy logs.
+
+```bash
+docker logs alloy
+```
+
+## Expected Result
+
+No collection failures.
+
+Logs successfully forwarded.
+
+## Result
+
+PASS
+
+---
+
+# Test 13: Metrics Pipeline Validation
+
+## Objective
+
+Verify end-to-end metrics flow.
+
+## Validation Path
+
+```text
+Node Exporter
+        │
+        ▼
+Prometheus
+        │
+        ▼
 Grafana
 ```
 
-LogQL queries returned expected data.
+## Expected Result
 
-Example:
+Metrics visible in Grafana dashboards.
 
-```logql
-{job=~".+"}
-```
+## Result
 
-### Result
-
-```text
 PASS
-```
 
 ---
 
-## Test 8: LocalStack Deployment Validation
+# Test 14: Logging Pipeline Validation
 
-### Objective
+## Objective
 
-Verify local AWS service emulation.
+Verify end-to-end log flow.
 
-### Validation
-
-LocalStack deployed successfully.
-
-Endpoint responded:
+## Validation Path
 
 ```text
-HTTP/1.1 200 OK
+Docker Containers
+        │
+        ▼
+Grafana Alloy
+        │
+        ▼
+Loki
+        │
+        ▼
+Grafana
 ```
 
-### Result
+## Expected Result
 
-```text
+Logs visible in Grafana Explore.
+
+## Result
+
 PASS
-```
 
 ---
 
-## Test 9: Terraform Infrastructure Validation
+# Test 15: Alerting Validation
 
-### Objective
+## Objective
 
-Verify Infrastructure as Code functionality.
+Verify alert delivery.
 
-### Validation
+## Procedure
 
-Terraform successfully provisioned:
+Trigger test alert from Grafana.
 
-### S3 Bucket
+## Validation Path
 
 ```text
-tf-homelab-storage-bucket
+Prometheus
+        │
+        ▼
+Grafana Alerting
+        │
+        ▼
+Telegram
 ```
 
-### DynamoDB Table
+## Expected Result
 
-```text
-tf-homelab-metadata
-```
+Telegram notification received.
 
-Terraform output:
+## Result
 
-```text
-Apply complete! Resources: 2 added.
-```
-
-### Result
-
-```text
 PASS
-```
 
 ---
 
-## Test 10: Terraform Recovery Validation
+# Test 16: LocalStack Validation
 
-### Objective
+## Objective
 
-Verify infrastructure recoverability.
+Verify LocalStack services.
 
-### Procedure
-
-Destroyed infrastructure:
+## Procedure
 
 ```bash
-terraform destroy
+awslocal s3 ls
 ```
 
-Recreated infrastructure:
+## Expected Result
+
+S3 resources visible.
+
+## Result
+
+PASS
+
+---
+
+# Test 17: Terraform Validation
+
+## Objective
+
+Verify Infrastructure as Code deployment.
+
+## Procedure
 
 ```bash
+terraform init
+terraform plan
 terraform apply
 ```
 
-### Validation
+## Expected Result
 
-Resources recreated successfully.
+Resources created successfully.
 
-Infrastructure returned to expected state.
+## Result
 
-### Result
-
-```text
 PASS
-```
 
 ---
 
-## Test 11: Container Recovery Validation
+# Test 18: Tailscale Validation
 
-### Objective
+## Objective
 
-Verify service recovery procedures.
+Verify remote access functionality.
 
-### Procedure
-
-Stopped containers manually.
-
-Restarted using:
+## Procedure
 
 ```bash
-docker compose up -d
+tailscale status
 ```
 
-### Validation
+## Expected Result
 
-Services recovered successfully.
+All nodes connected.
 
-### Result
+### Expected Nodes
 
-```text
+* Artemis
+* Apollo
+* Athena
+
+## Result
+
 PASS
-```
 
 ---
 
-## Test 12: Hypervisor Reboot Validation
+# Test 19: Reboot Recovery Validation
 
-### Objective
+## Objective
 
-Verify infrastructure recovery after host reboot.
+Verify infrastructure recovery after reboot.
 
-### Procedure
+## Procedure
 
-Rebooted Apollo.
+Reboot infrastructure host.
 
-### Validation
+Verify:
 
-Confirmed:
+* Proxmox starts
+* VM starts
+* LXC starts
+* Services recover
 
-- Apollo online
-- Hestia online
-- Athena online
+## Result
 
-All workloads recovered.
-
-### Result
-
-```text
 PASS
-```
 
 ---
 
-## Test 13: Autostart Validation
+# Test 20: Disaster Recovery Validation
 
-### Objective
+## Objective
 
-Verify workload startup automation.
+Verify documented recovery procedures.
 
-### Validation
+## Procedure
 
-Confirmed:
+Execute recovery procedures from runbooks.
 
-```text
-Start at Boot = Enabled
-```
+Verify services can be restored and validated.
 
-for:
+## Result
 
-- Hestia
-- Athena
-
-Services started automatically after reboot.
-
-### Result
-
-```text
 PASS
-```
-
----
-
-## Test 14: Headless Operations Validation
-
-### Objective
-
-Verify operation without physical peripherals.
-
-### Procedure
-
-Disconnected:
-
-- Monitor
-- Keyboard
-- Mouse
-
-### Validation
-
-Successfully managed infrastructure using:
-
-- SSH
-- Tailscale
-- Grafana
-- Portainer
-- Homepage
-
-No physical interaction required.
-
-### Result
-
-```text
-PASS
-```
-
----
-
-## Test 15: Disaster Recovery Validation
-
-### Objective
-
-Verify resilience against common failure scenarios.
-
-### Scenarios Tested
-
-### Hypervisor Reboot
-
-Status:
-
-```text
-PASS
-```
-
-### Container Failure
-
-Status:
-
-```text
-PASS
-```
-
-### Terraform Resource Destruction
-
-Status:
-
-```text
-PASS
-```
-
-### Remote Management
-
-Status:
-
-```text
-PASS
-```
 
 ---
 
 # Operational Readiness Checklist
 
-| Capability | Status |
-|------------|---------|
-| Virtualization | ✅ |
-| Networking | ✅ |
-| Remote Access | ✅ |
-| Monitoring | ✅ |
-| Logging | ✅ |
-| Dashboard | ✅ |
-| Infrastructure as Code | ✅ |
-| Recovery Testing | ✅ |
-| Headless Operation | ✅ |
-| Documentation | ✅ |
+| Capability        | Status |
+| ----------------- | ------ |
+| Virtualization    | ✅      |
+| Containerization  | ✅      |
+| Monitoring        | ✅      |
+| Logging           | ✅      |
+| Alerting          | ✅      |
+| Remote Access     | ✅      |
+| Terraform         | ✅      |
+| LocalStack        | ✅      |
+| Documentation     | ✅      |
+| Disaster Recovery | ✅      |
 
 ---
 
-# Current Infrastructure Status
+# Validation Summary
 
-## Production Services
-
-- Homepage
-- Vaultwarden
-- Grafana
-- Prometheus
-- Loki
-- Promtail
-- Portainer
-
-## Development Services
-
-- LocalStack
-- Terraform
+| Area              | Status |
+| ----------------- | ------ |
+| Apollo            | PASS   |
+| Athena            | PASS   |
+| Hestia            | PASS   |
+| Grafana           | PASS   |
+| Prometheus        | PASS   |
+| Loki              | PASS   |
+| Grafana Alloy     | PASS   |
+| Node Exporter     | PASS   |
+| Proxmox Exporter  | PASS   |
+| LocalStack        | PASS   |
+| Tailscale         | PASS   |
+| Metrics Pipeline  | PASS   |
+| Logging Pipeline  | PASS   |
+| Alerting Pipeline | PASS   |
 
 ---
 
 # Conclusion
 
-The homelab environment has been validated across infrastructure deployment, monitoring, centralized logging, Infrastructure as Code, disaster recovery, and remote administration workflows.
+The HomeLab environment has been validated across infrastructure, networking, monitoring, logging, alerting, remote access, and Infrastructure as Code workflows.
 
-The environment can be operated remotely, recovered from common failure scenarios, and reproduced through version-controlled configuration.
-
-Overall Status:
+Current Environment Status:
 
 ```text
-OPERATIONAL
+Stable Operational Environment
 ```
+
+All critical systems are functioning as expected and are suitable for continued learning, experimentation, and operational practice.
+
 ========================================
 FILE LOCATION: ./docs/runbook.md
 ========================================
@@ -2541,26 +3373,54 @@ FILE LOCATION: ./docs/runbook.md
 
 ## Purpose
 
-This document contains common operational procedures for managing, troubleshooting, and recovering the homelab infrastructure.
+This document contains standard operational procedures for managing, validating, maintaining, and troubleshooting the HomeLab environment.
+
+The goal is to provide a single reference for routine administration and service management.
 
 ---
 
 # Infrastructure Overview
 
-| Host | Purpose |
-|--------|--------|
-| Apollo | Proxmox Hypervisor |
-| Hestia | Core Services LXC |
-| Athena | Monitoring & Automation VM |
-| Artemis | Management Workstation |
+| Host    | Purpose                    |
+| ------- | -------------------------- |
+| Apollo  | Proxmox VE Hypervisor      |
+| Hestia  | Core Services LXC          |
+| Athena  | Monitoring & Automation VM |
+| Artemis | Management Workstation     |
 
 ---
 
-# Health Checks
+# Service Inventory
 
-## Check Tailscale Connectivity
+## Hestia
 
-On Artemis:
+Services:
+
+* Homepage
+* Vaultwarden
+
+---
+
+## Athena
+
+Services:
+
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Node Exporter
+* Proxmox Exporter
+* Portainer
+* LocalStack
+
+---
+
+# Daily Health Checks
+
+## Verify Tailscale Connectivity
+
+From Artemis:
 
 ```bash
 tailscale status
@@ -2575,16 +3435,30 @@ Athena    online
 
 ---
 
-## Verify Athena Reachability
+## Verify Apollo Reachability
 
 ```bash
-ping 100.117.35.70
+ping <apollo-ip>
 ```
 
 Expected:
 
 ```text
-64 bytes from 100.x.x.x
+64 bytes from ...
+```
+
+---
+
+## Verify Athena Reachability
+
+```bash
+ping <athena-ip>
+```
+
+Expected:
+
+```text
+64 bytes from ...
 ```
 
 ---
@@ -2594,7 +3468,7 @@ Expected:
 SSH into Athena:
 
 ```bash
-ssh ubuntu@100.117.35.70
+ssh ubuntu@athena
 ```
 
 Check containers:
@@ -2609,7 +3483,7 @@ Expected containers:
 grafana
 prometheus
 loki
-promtail
+alloy
 node-exporter
 proxmox-exporter
 portainer
@@ -2618,14 +3492,96 @@ localstack
 
 ---
 
-# Service Management
+# Weekly Health Checks
+
+## Verify Prometheus Readiness
+
+```bash
+curl http://localhost:9090/-/ready
+```
+
+Expected:
+
+```text
+Prometheus is Ready.
+```
+
+---
+
+## Verify Loki Readiness
+
+```bash
+curl http://localhost:3100/ready
+```
+
+Expected:
+
+```text
+ready
+```
+
+---
+
+## Verify Loki Labels
+
+```bash
+curl http://localhost:3100/loki/api/v1/labels
+```
+
+Expected:
+
+Returned labels.
+
+---
+
+## Verify Node Exporter
+
+```bash
+curl http://localhost:9100/metrics
+```
+
+Expected:
+
+Metrics returned.
+
+---
+
+## Verify Proxmox Exporter
+
+```bash
+curl http://localhost:9221/metrics
+```
+
+Expected:
+
+Metrics returned.
+
+---
+
+## Verify Telegram Alerting
+
+Open Grafana:
+
+```text
+Alerting → Contact Points
+```
+
+Send test notification.
+
+Expected:
+
+Telegram message received.
+
+---
+
+# Docker Stack Management
 
 ## Telemetry Stack
 
 Location:
 
 ```bash
-~/homelab/infrastructure/athena/telemetry
+~/homelab/docker-compose/telemetry
 ```
 
 ### Start
@@ -2654,12 +3610,12 @@ docker compose logs -f
 
 ---
 
-## LocalStack
+## Core Services Stack
 
 Location:
 
 ```bash
-~/homelab/infrastructure/athena/localstack
+~/homelab/docker-compose/core-services
 ```
 
 ### Start
@@ -2680,10 +3636,32 @@ docker compose down
 docker compose restart
 ```
 
-### Logs
+---
+
+## LocalStack Stack
+
+Location:
 
 ```bash
-docker compose logs -f
+~/homelab/docker-compose/localstack
+```
+
+### Start
+
+```bash
+docker compose up -d
+```
+
+### Stop
+
+```bash
+docker compose down
+```
+
+### Restart
+
+```bash
+docker compose restart
 ```
 
 ---
@@ -2695,10 +3673,10 @@ docker compose logs -f
 Open:
 
 ```text
-http://ATHENA_IP:9090/targets
+http://athena:9090/targets
 ```
 
-Expected Status:
+Verify:
 
 ```text
 UP
@@ -2706,8 +3684,8 @@ UP
 
 for:
 
-- node-exporter
-- proxmox-exporter
+* node-exporter
+* proxmox-exporter
 
 ---
 
@@ -2716,23 +3694,23 @@ for:
 Open:
 
 ```text
-http://ATHENA_IP:3001
+http://athena:3000
 ```
 
 Verify:
 
-- Dashboards load
-- Prometheus datasource healthy
-- Loki datasource healthy
+* Dashboards load
+* Prometheus datasource healthy
+* Loki datasource healthy
 
 ---
 
-## Check Loki Logs
+## Check Logs in Grafana
 
-Open Grafana:
+Open:
 
 ```text
-Explore → Loki
+Grafana → Explore
 ```
 
 Query:
@@ -2747,6 +3725,21 @@ Container logs returned.
 
 ---
 
+## Verify Loki Internal Services
+
+```bash
+curl http://localhost:3100/services
+```
+
+Expected:
+
+* Distributor ACTIVE
+* Ingester ACTIVE
+* Scheduler ACTIVE
+* Compactor ACTIVE
+
+---
+
 # Terraform Operations
 
 Location:
@@ -2757,7 +3750,7 @@ Location:
 
 ---
 
-## Validate Configuration
+## Validate
 
 ```bash
 terraform validate
@@ -2765,7 +3758,7 @@ terraform validate
 
 ---
 
-## View Plan
+## Plan
 
 ```bash
 terraform plan
@@ -2773,7 +3766,7 @@ terraform plan
 
 ---
 
-## Deploy Infrastructure
+## Apply
 
 ```bash
 terraform apply
@@ -2781,7 +3774,7 @@ terraform apply
 
 ---
 
-## Destroy Infrastructure
+## Destroy
 
 ```bash
 terraform destroy
@@ -2794,20 +3787,27 @@ terraform destroy
 List buckets:
 
 ```bash
-aws --endpoint-url=http://100.117.35.70:4566 s3 ls
+awslocal s3 ls
 ```
 
 List tables:
 
 ```bash
-aws --endpoint-url=http://100.117.35.70:4566 dynamodb list-tables
+awslocal dynamodb list-tables
+```
+
+Expected resources:
+
+```text
+tf-homelab-storage-bucket
+tf-homelab-metadata
 ```
 
 ---
 
-# Backup Procedures
+# Backup Validation
 
-## Proxmox Backup Verification
+## Verify Proxmox Backup Jobs
 
 Open:
 
@@ -2818,36 +3818,35 @@ Datacenter
 
 Verify:
 
-- Scheduled jobs exist
-- Recent backups succeeded
+* Scheduled jobs present
+* Recent jobs successful
 
 ---
 
-## Verify Backup Files
+## Verify Backup Storage
 
 Open:
 
 ```text
 Datacenter
 → Storage
-→ Backups
 ```
 
-Confirm backup archives are present.
+Confirm backup archives exist.
 
 ---
 
-# Recovery Procedures
+# Service Recovery
 
-## Recover Failed Container
+## Restart Individual Container
 
-Check status:
+Check:
 
 ```bash
 docker ps -a
 ```
 
-Inspect logs:
+Inspect:
 
 ```bash
 docker logs CONTAINER_NAME
@@ -2861,47 +3860,79 @@ docker restart CONTAINER_NAME
 
 ---
 
-## Recover Entire Stack
-
-Navigate to stack directory:
+## Recreate Telemetry Stack
 
 ```bash
-cd ~/homelab/infrastructure/athena/telemetry
-```
+cd ~/homelab/docker-compose/telemetry
 
-Recreate:
-
-```bash
 docker compose down
 docker compose up -d
 ```
 
 ---
 
-## Recover Terraform Resources
-
-Destroy existing state:
+## Recreate Core Services
 
 ```bash
-terraform destroy
+cd ~/homelab/docker-compose/core-services
+
+docker compose down
+docker compose up -d
 ```
 
-Recreate:
+---
+
+## Recreate LocalStack
 
 ```bash
-terraform apply
+cd ~/homelab/docker-compose/localstack
+
+docker compose down
+docker compose up -d
+```
+
+---
+
+# Proxmox Operations
+
+## Verify VM Status
+
+```bash
+qm list
+```
+
+---
+
+## Verify LXC Status
+
+```bash
+pct list
+```
+
+---
+
+## Start Athena
+
+```bash
+qm start 101
+```
+
+---
+
+## Start Hestia
+
+```bash
+pct start <container-id>
 ```
 
 ---
 
 # Emergency Procedures
 
-## Apollo Reboot
-
-SSH:
+## Reboot Apollo
 
 ```bash
-ssh root@APOLLO_IP
+ssh root@apollo
 ```
 
 Execute:
@@ -2912,10 +3943,10 @@ reboot
 
 Verify:
 
-- Apollo online
-- Hestia online
-- Athena online
-- Docker services healthy
+* Apollo online
+* Athena online
+* Hestia online
+* Services healthy
 
 ---
 
@@ -2924,35 +3955,52 @@ Verify:
 Expected sequence:
 
 ```text
-Router boots
-    ↓
-Apollo reconnects
-    ↓
-Tailscale reconnects
-    ↓
-Athena reconnects
-    ↓
-Services become available
+Router Online
+      ↓
+Apollo Reconnects
+      ↓
+Tailscale Reconnects
+      ↓
+Athena Reconnects
+      ↓
+Services Available
 ```
 
-No manual action should be required.
+No manual action normally required.
 
 ---
 
-# Validation Checklist
+# Health Verification Checklist
 
-After any maintenance:
+Infrastructure:
 
-- [ ] Apollo reachable
-- [ ] Athena reachable
-- [ ] Hestia reachable
-- [ ] Tailscale operational
-- [ ] Grafana accessible
-- [ ] Prometheus targets UP
-- [ ] Loki receiving logs
-- [ ] LocalStack reachable
-- [ ] Terraform deploy succeeds
-- [ ] Backups present
+* [ ] Apollo reachable
+* [ ] Athena reachable
+* [ ] Hestia reachable
+* [ ] Tailscale operational
+
+Monitoring:
+
+* [ ] Grafana operational
+* [ ] Prometheus operational
+* [ ] Loki operational
+* [ ] Alloy operational
+* [ ] Metrics available
+* [ ] Logs available
+
+Alerting:
+
+* [ ] Telegram notifications operational
+
+Development:
+
+* [ ] LocalStack operational
+* [ ] Terraform validation successful
+
+Core Services:
+
+* [ ] Homepage accessible
+* [ ] Vaultwarden accessible
 
 ---
 
@@ -2990,6 +4038,14 @@ free -h
 
 ---
 
+## Uptime
+
+```bash
+uptime
+```
+
+---
+
 ## Network Connections
 
 ```bash
@@ -3006,13 +4062,39 @@ tailscale status
 
 ---
 
+## Execute Health Check Script
+
+```bash
+~/homelab/scripts/healthcheck.sh
+```
+
+---
+
 # Related Documentation
 
-- architecture.md
-- network.md
-- troubleshooting.md
-- disaster-recovery.md
-- validation-report.md
+* architecture.md
+* inventory.md
+* network.md
+* troubleshooting.md
+* disaster-recovery.md
+* validation-report.md
+
+---
+
+# Current Operational Status
+
+Environment State:
+
+Stable Operational Environment
+
+Operational Readiness:
+
+Validated
+
+Documentation Status:
+
+Current
+
 ========================================
 FILE LOCATION: ./docs/inventory.md
 ========================================
@@ -3021,277 +4103,527 @@ FILE LOCATION: ./docs/inventory.md
 
 ## Overview
 
-This document serves as the source of truth for all hardware, virtual machines, containers, services, and infrastructure components within the homelab.
+This document provides a complete inventory of physical systems, virtual infrastructure, services, observability components, networking, and Infrastructure as Code resources currently deployed in the HomeLab environment.
 
 ---
 
-# Physical Infrastructure
+# Physical Systems
 
 ## Apollo
 
-Role:
+Primary Infrastructure Host
 
-```text
-Primary Hypervisor
-```
+### Platform
 
-Platform:
+* Proxmox VE
 
-```text
-Proxmox VE
-```
+### Role
 
-Responsibilities:
+Hypervisor
 
-- Virtual Machine Hosting
-- LXC Hosting
-- Network Routing
-- Storage Management
+### Responsibilities
+
+* VM Hosting
+* LXC Hosting
+* Storage Management
+* Virtual Networking
+* Infrastructure Core Services
+
+### Status
+
+Healthy
+
+---
+
+## Artemis
+
+Management Workstation
+
+### Platform
+
+* Arch Linux
+
+### Role
+
+Administration Workstation
+
+### Responsibilities
+
+* SSH Administration
+* Git Operations
+* Terraform Development
+* Documentation
+* Remote Infrastructure Management
+
+### Status
+
+Healthy
 
 ---
 
 # Virtual Infrastructure
 
-## Hestia
-
-Type:
-
-```text
-LXC Container
-```
-
-Role:
-
-```text
-Core Services
-```
-
-Services:
-
-- Homepage Dashboard
-- Vaultwarden
-
-Network:
-
-```text
-10.10.10.2
-```
-
-Status:
-
-```text
-Production
-```
-
----
-
 ## Athena
 
-Type:
+### Type
 
-```text
 Ubuntu Virtual Machine
-```
 
-Role:
+### Purpose
 
-```text
-Operations & Monitoring
-```
+Operations, Monitoring, Observability, and Infrastructure Testing
 
-Network:
+### Status
 
-```text
-10.10.10.10
-```
+Healthy
 
-Tailscale:
+### Hosted Services
 
-```text
-100.117.35.70
-```
+| Service          | Function                     |
+| ---------------- | ---------------------------- |
+| Grafana          | Visualization and Dashboards |
+| Prometheus       | Metrics Collection           |
+| Loki             | Log Aggregation              |
+| Grafana Alloy    | Log Collection               |
+| Node Exporter    | Host Metrics                 |
+| Proxmox Exporter | Proxmox Metrics              |
+| Portainer        | Container Management         |
+| LocalStack       | AWS Service Emulation        |
+
+---
+
+## Hestia
+
+### Type
+
+Linux Container (LXC)
+
+### Purpose
+
+Self-Hosted Applications
+
+### Status
+
+Healthy
+
+### Hosted Services
+
+| Service     | Function          |
+| ----------- | ----------------- |
+| Homepage    | Service Dashboard |
+| Vaultwarden | Password Manager  |
+
+---
+
+# Docker Services
+
+## Telemetry Stack
+
+Host:
+
+Athena
+
+### Components
+
+| Service          | Purpose         |
+| ---------------- | --------------- |
+| Grafana          | Visualization   |
+| Prometheus       | Metrics Storage |
+| Loki             | Log Storage     |
+| Grafana Alloy    | Log Collection  |
+| Node Exporter    | Host Metrics    |
+| Proxmox Exporter | Proxmox Metrics |
 
 Status:
 
+Operational
+
+---
+
+## LocalStack Stack
+
+Host:
+
+Athena
+
+### Components
+
+| Service    | Purpose       |
+| ---------- | ------------- |
+| LocalStack | AWS Emulation |
+
+Status:
+
+Operational
+
+---
+
+## Core Services Stack
+
+Host:
+
+Hestia
+
+### Components
+
+| Service     | Purpose             |
+| ----------- | ------------------- |
+| Homepage    | Service Dashboard   |
+| Vaultwarden | Password Management |
+
+Status:
+
+Operational
+
+---
+
+# Monitoring Inventory
+
+## Prometheus
+
+### Function
+
+Metrics Collection and Storage
+
+### Monitored Targets
+
+* Node Exporter
+* Proxmox Exporter
+
+### Status
+
+Healthy
+
+---
+
+## Grafana
+
+### Function
+
+Visualization and Alerting
+
+### Features
+
+* Dashboards
+* Alerting
+* Log Exploration
+* Metrics Visualization
+
+### Status
+
+Healthy
+
+---
+
+## Node Exporter
+
+### Function
+
+Host Metrics Collection
+
+### Metrics
+
+* CPU
+* Memory
+* Disk
+* Network
+
+### Status
+
+Healthy
+
+---
+
+## Proxmox Exporter
+
+### Function
+
+Proxmox Metrics Collection
+
+### Metrics
+
+* Node Metrics
+* VM Metrics
+* Storage Metrics
+
+### Status
+
+Healthy
+
+---
+
+# Logging Inventory
+
+## Loki
+
+### Function
+
+Centralized Log Storage
+
+### Features
+
+* Log Aggregation
+* Querying
+* Historical Retention
+
+### Status
+
+Healthy
+
+---
+
+## Grafana Alloy
+
+### Function
+
+Telemetry Collection
+
+### Responsibilities
+
+* Docker Log Discovery
+* Log Collection
+* Log Forwarding
+
+### Destination
+
+* Loki
+
+### Status
+
+Healthy
+
+---
+
+# Alerting Inventory
+
+## Grafana Alerting
+
+### Function
+
+Alert Evaluation and Notification
+
+### Alert Delivery
+
+Telegram
+
+### Current Status
+
+Operational
+
+### Purpose
+
+* Infrastructure Alerts
+* Service Health Alerts
+* Resource Utilization Alerts
+
+---
+
+## Telegram Notifications
+
+### Purpose
+
+Incident Notification
+
+### Delivery Path
+
 ```text
-Production
+Prometheus
+        │
+        ▼
+Grafana Alerting
+        │
+        ▼
+Telegram
+```
+
+### Status
+
+Operational
+
+---
+
+# Infrastructure as Code Inventory
+
+## Terraform
+
+### Purpose
+
+Infrastructure Automation
+
+### Status
+
+Operational
+
+### Environment
+
+LocalStack
+
+---
+
+## LocalStack
+
+### Purpose
+
+AWS Service Emulation
+
+### Status
+
+Operational
+
+### Services Used
+
+* S3
+* DynamoDB
+
+---
+
+## Managed Resources
+
+### S3 Bucket
+
+```text
+tf-homelab-storage-bucket
 ```
 
 ---
 
-# Container Inventory
-
-## Core Services
-
-| Service | Purpose | Host |
-|----------|----------|----------|
-| Homepage | Dashboard | Hestia |
-| Vaultwarden | Password Management | Hestia |
-
----
-
-## Monitoring & Observability
-
-| Service | Purpose | Host |
-|----------|----------|----------|
-| Grafana | Visualization | Athena |
-| Prometheus | Metrics Collection | Athena |
-| Loki | Log Aggregation | Athena |
-| Promtail | Log Shipping | Athena |
-| Node Exporter | System Metrics | Athena |
-| Proxmox Exporter | Hypervisor Metrics | Athena |
-
----
-
-## Management
-
-| Service | Purpose | Host |
-|----------|----------|----------|
-| Portainer | Container Management | Athena |
-
----
-
-## Development
-
-| Service | Purpose | Host |
-|----------|----------|----------|
-| LocalStack | AWS Emulation | Athena |
-| Terraform | Infrastructure as Code | Artemis |
-
----
-
-# Storage Inventory
-
-## Repository
-
-Location:
+### DynamoDB Table
 
 ```text
-~/HomeLab
+tf-homelab-metadata
 ```
-
-Contains:
-
-- Infrastructure Documentation
-- Docker Compose Configurations
-- Terraform Configurations
-- Recovery Procedures
-- Network Documentation
 
 ---
 
 # Networking Inventory
 
-## Internal Network
+## Router
 
-| Host | Address |
-|--------|----------|
-| Hestia | 10.10.10.2 |
-| Athena | 10.10.10.10 |
+Provider:
+
+Airtel Fiber
+
+### Status
+
+Operational
 
 ---
 
-## Overlay Network
+## Tailscale
 
-Technology:
+### Purpose
 
-```text
-Tailscale
-```
-
-Purpose:
-
-```text
 Remote Administration
+
+### Connected Nodes
+
+* Artemis
+* Apollo
+* Athena
+
+### Status
+
+Operational
+
+---
+
+## Proxmox Bridge
+
+### Bridge
+
+```text
+vmbr0
 ```
 
----
+### Purpose
 
-# Monitoring Coverage
+* VM Connectivity
+* LXC Connectivity
+* External Network Access
 
-## Metrics
+### Status
 
-Collected By:
-
-- Prometheus
-- Node Exporter
-- Proxmox Exporter
+Operational
 
 ---
 
-## Logs
+# Documentation Inventory
 
-Collected By:
+Current documentation includes:
 
-- Promtail
-
-Stored In:
-
-- Loki
-
-Visualized In:
-
-- Grafana
-
----
-
-# Operational Status
-
-| Component | Status |
-|------------|---------|
-| Apollo | Active |
-| Hestia | Active |
-| Athena | Active |
-| Homepage | Active |
-| Vaultwarden | Active |
-| Grafana | Active |
-| Prometheus | Active |
-| Loki | Active |
-| Promtail | Active |
-| Portainer | Active |
-| LocalStack | Active |
+| Document             | Purpose                  |
+| -------------------- | ------------------------ |
+| architecture.md      | Architecture Overview    |
+| network.md           | Network Design           |
+| inventory.md         | Infrastructure Inventory |
+| runbook.md           | Operational Procedures   |
+| troubleshooting.md   | Incident Documentation   |
+| disaster-recovery.md | Recovery Procedures      |
+| validation-report.md | Validation Results       |
+| changelog.md         | Change Tracking          |
+| project-timeline.md  | Project History          |
+| health-checks.md     | Health Verification      |
 
 ---
 
-# Future Additions
+# Operational Status Summary
 
-Potential Future Services:
-
-- Immich
-- Uptime Kuma
-- Gitea
-- ESP32 Telemetry Pipeline
-- Automated Backup Workflows
+| Component         | Status      |
+| ----------------- | ----------- |
+| Apollo            | Healthy     |
+| Athena            | Healthy     |
+| Hestia            | Healthy     |
+| Grafana           | Healthy     |
+| Prometheus        | Healthy     |
+| Loki              | Healthy     |
+| Grafana Alloy     | Healthy     |
+| Node Exporter     | Healthy     |
+| Proxmox Exporter  | Healthy     |
+| LocalStack        | Healthy     |
+| Tailscale         | Operational |
+| Metrics Pipeline  | Operational |
+| Logging Pipeline  | Operational |
+| Alerting Pipeline | Operational |
 
 ---
 
-# Last Updated
+# Inventory Status
 
-Update this document whenever:
+Last Reviewed:
 
-- New services are deployed
-- Infrastructure changes
-- Network changes
-- Hardware upgrades
+Current Infrastructure State
+
+Overall Status:
+
+```text
+Fully Operational
+```
+
 ========================================
 FILE LOCATION: ./docs/network.md
 ========================================
 
-# Network Documentation
+# Network Architecture
 
 ## Overview
 
-The homelab network is designed to provide secure remote access, service isolation, and centralized management through a combination of:
+The HomeLab network is designed around a private-by-default model.
 
-- Proxmox Virtualization
-- Internal Private Networking
-- Tailscale Mesh VPN
-- Docker Bridge Networks
-- Controlled Port Forwarding
+All infrastructure services operate within the local network and are accessed remotely through Tailscale.
+
+No intentional public-facing services are exposed to the Internet.
+
+Primary goals:
+
+* Security
+* Simplicity
+* Reliability
+* Remote Accessibility
+* Operational Independence
 
 ---
 
-# Physical Network
+# Physical Network Topology
 
 ```text
 Internet
@@ -3300,182 +4632,160 @@ Internet
 Airtel Fiber Router
     │
     ▼
-Apollo (Proxmox Host)
+Apollo (Proxmox VE)
+    │
+    ├── Athena VM
+    │
+    └── Hestia LXC
 ```
 
-Apollo serves as the primary infrastructure host and connects directly to the home network.
+---
+
+# Logical Network Topology
+
+```text
+Artemis
+    │
+    ▼
+Tailscale Network
+    │
+    ▼
+Apollo
+    │
+    ├── Athena
+    │
+    └── Hestia
+```
 
 ---
 
-# Host Inventory
-
-| Host | Role | Platform |
-|--------|--------|--------|
-| Apollo | Hypervisor | Proxmox VE |
-| Hestia | Core Services | LXC |
-| Athena | Monitoring & Automation | Ubuntu VM |
-| Artemis | Management Workstation | Arch Linux |
-
----
-
-# Internal Infrastructure Network
+# Infrastructure Components
 
 ## Apollo
 
-Primary Hypervisor
+Role:
 
-```text
-192.168.x.x
-```
+Proxmox Hypervisor
 
 Responsibilities:
 
-- VM Hosting
-- LXC Hosting
-- Network Bridging
-- Port Forwarding
+* Virtual Networking
+* VM Hosting
+* LXC Hosting
+* Storage Management
 
----
+Network Functions:
 
-## Hestia
-
-Core Services LXC
-
-```text
-10.10.10.2
-```
-
-Services:
-
-- Homepage
-- Vaultwarden
+* Network Bridge Management
+* Internal Routing
+* VM Connectivity
+* Container Connectivity
 
 ---
 
 ## Athena
 
-Operations VM
+Role:
 
-```text
-10.10.10.10
-```
+Operations Platform
 
-Services:
+Network Services:
 
-- Grafana
-- Prometheus
-- Loki
-- Promtail
-- Portainer
-- LocalStack
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Portainer
+* LocalStack
+
+Communication:
+
+* Internal Service Access
+* Metrics Collection
+* Log Aggregation
+* Alert Generation
 
 ---
 
-# Tailscale Overlay Network
+## Hestia
 
-Tailscale provides secure remote access without exposing services directly to the public internet.
+Role:
+
+Application Services
+
+Hosted Services:
+
+* Homepage
+* Vaultwarden
+
+Communication:
+
+* Internal Service Access
+* Tailscale Administration Access
+
+---
+
+# Remote Access Design
+
+Remote access is implemented using Tailscale.
 
 Benefits:
 
-- No port forwarding required on router
-- End-to-end encryption
-- Device authentication
-- Access from anywhere
+* Encrypted Communication
+* Device Authentication
+* No Port Forwarding
+* Reduced Attack Surface
+* Simplified Administration
+
+Current Nodes:
+
+* Artemis
+* Apollo
+* Athena
 
 ---
 
-## Tailscale Nodes
+# Virtual Networking
 
-| Node | Purpose |
-|--------|--------|
-| Artemis | Administration |
-| Apollo | Infrastructure Access |
-| Athena | Service Access |
+Proxmox virtual networking is based on Linux bridges.
 
----
-
-## Athena Tailscale Address
-
-```text
-100.117.35.70
-```
-
-Example Service Access:
-
-```text
-Grafana
-http://100.117.35.70:3001
-
-LocalStack
-http://100.117.35.70:4566
-```
-
----
-
-# Proxmox Networking
-
-## Bridge
-
-Current bridge:
+Primary Bridge:
 
 ```text
 vmbr0
 ```
 
+Responsibilities:
+
+* VM Connectivity
+* LXC Connectivity
+* External Network Access
+* Internal Service Communication
+
+---
+
+# Metrics Traffic Flow
+
+```text
+Node Exporter
+        │
+        ▼
+Prometheus
+        │
+        ▼
+Grafana
+
+Proxmox Exporter
+        │
+        ▼
+Prometheus
+```
+
 Purpose:
 
-- Connect VMs and LXCs
-- Internal infrastructure communication
-- Service routing
-
----
-
-# Docker Networking
-
-Athena uses Docker bridge networks for service isolation.
-
-Current stacks:
-
-```text
-telemetry
-localstack
-```
-
-Example:
-
-```text
-telemetry-net
-```
-
-Containers communicate internally using Docker DNS.
-
-Example:
-
-```text
-prometheus
-loki
-grafana
-```
-
-without requiring external IP addresses.
-
----
-
-# Monitoring Traffic Flow
-
-```text
-Apollo
-│
-├── Node Exporter
-│
-├── Proxmox Exporter
-│
-▼
-Prometheus
-│
-▼
-Grafana
-```
+* Host Monitoring
+* Capacity Analysis
+* Performance Visibility
 
 ---
 
@@ -3485,7 +4795,7 @@ Grafana
 Docker Containers
         │
         ▼
-Promtail
+Grafana Alloy
         │
         ▼
 Loki
@@ -3494,356 +4804,623 @@ Loki
 Grafana
 ```
 
----
+Purpose:
 
-# Infrastructure as Code Traffic Flow
-
-```text
-Artemis
-    │
-    ▼
-Terraform
-    │
-    ▼
-Tailscale Tunnel
-    │
-    ▼
-Athena
-    │
-    ▼
-LocalStack
-```
-
-Managed resources:
-
-```text
-tf-homelab-storage-bucket
-tf-homelab-metadata
-```
+* Centralized Logging
+* Log Search
+* Troubleshooting
+* Historical Analysis
 
 ---
 
-# Port Inventory
+# Alerting Traffic Flow
+
+```text
+Prometheus
+        │
+        ▼
+Grafana Alerting
+        │
+        ▼
+Telegram
+```
+
+Purpose:
+
+* Service Monitoring
+* Incident Notification
+* Infrastructure Awareness
+
+---
+
+# Security Model
+
+## Default Posture
+
+Private by Default
+
+Characteristics:
+
+* No Public Services
+* Internal Service Communication
+* Tailscale-Based Administration
+* Controlled Access Paths
+
+---
+
+## Remote Access Security
+
+Authentication provided by:
+
+* Tailscale Identity
+* Device Authorization
+* Encrypted Transport
+
+Benefits:
+
+* No Exposed Management Ports
+* No Public SSH Access
+* Simplified Access Control
+
+---
+
+# Network Validation
+
+The following checks are performed during infrastructure validation.
+
+## Connectivity Validation
+
+Verify:
+
+```bash
+ping <target>
+```
+
+Expected:
+
+```text
+Successful response
+```
+
+---
+
+## Tailscale Validation
+
+Verify:
+
+```bash
+tailscale status
+```
+
+Expected:
+
+```text
+All nodes connected
+```
+
+---
+
+## Bridge Validation
+
+Verify:
+
+```bash
+brctl show
+```
+
+or
+
+```bash
+bridge link
+```
+
+Expected:
+
+```text
+vmbr0 present and operational
+```
+
+---
+
+## Service Reachability
+
+Verify:
+
+* Grafana Accessible
+* Prometheus Accessible
+* Loki Accessible
+* Homepage Accessible
+* Vaultwarden Accessible
+
+Expected:
+
+```text
+PASS
+```
+
+---
+
+# Major Network Incident
+
+## Proxmox Network Isolation Incident
+
+### Symptoms
+
+Observed:
+
+* VM connectivity failures
+* Internal communication failures
+* Missing bridge connectivity
+
+---
+
+### Investigation
+
+Examined:
+
+```bash
+brctl show
+```
+
+```bash
+bridge link
+```
+
+```bash
+cat /etc/network/interfaces
+```
+
+---
+
+### Root Cause
+
+Incomplete bridge configuration prevented proper attachment of virtual interfaces.
+
+---
+
+### Resolution
+
+Rebuilt and validated:
+
+* vmbr0
+* VM connectivity
+* LXC connectivity
+
+---
+
+### Verification
+
+Confirmed:
+
+* Host Communication
+* VM Communication
+* Container Communication
+* Internet Connectivity
+
+Infrastructure networking restored successfully.
+
+---
+
+# Future Improvements
+
+## Hardware
+
+Planned:
+
+5-meter CAT6 Ethernet cable
+
+Benefits:
+
+* Reduced Latency
+* Improved Stability
+* Consistent Throughput
+* Reduced Wi-Fi Dependency
+
+---
+
+## Security
+
+Planned:
+
+* Tailscale ACLs
+* Device Tagging
+* Access Segmentation
+
+---
+
+## Monitoring
+
+Planned:
+
+* Network Latency Tracking
+* Uptime Monitoring
+* Service-Level Monitoring
+
+---
+
+# Status
+
+| Component             | Status      |
+| --------------------- | ----------- |
+| vmbr0                 | Operational |
+| Internal Networking   | Operational |
+| VM Connectivity       | Operational |
+| LXC Connectivity      | Operational |
+| Tailscale             | Operational |
+| Remote Administration | Operational |
+| Metrics Traffic       | Operational |
+| Logging Traffic       | Operational |
+| Alerting Traffic      | Operational |
+
+---
+
+# Conclusion
+
+The network architecture provides secure, reliable, and remotely manageable connectivity for all infrastructure services while maintaining a minimal external attack surface through Tailscale-based administration and private-by-default design principles.
+
+========================================
+FILE LOCATION: ./docs/architecture.md
+========================================
+
+# Architecture
+
+## Overview
+
+The HomeLab environment is designed as a small-scale infrastructure platform for learning and practicing:
+
+* Infrastructure Engineering
+* DevOps
+* Site Reliability Engineering (SRE)
+* Linux Administration
+* Observability
+* Infrastructure as Code
+* Incident Response
+* Disaster Recovery
+
+The architecture emphasizes:
+
+* Private-by-default networking
+* Remote administration
+* Service isolation
+* Centralized observability
+* Repeatable infrastructure workflows
+
+---
+
+# Physical Infrastructure
+
+## Apollo
+
+Primary Infrastructure Host
+
+Platform:
+
+* Proxmox VE
+
+Responsibilities:
+
+* Hypervisor
+* Virtual Machine Hosting
+* LXC Hosting
+* Virtual Networking
+* Storage Management
+
+---
+
+## Artemis
+
+Management Workstation
+
+Platform:
+
+* Arch Linux
+
+Responsibilities:
+
+* Infrastructure Administration
+* SSH Management
+* Git Operations
+* Terraform Development
+* Documentation
+* Remote Access
+
+---
+
+# Virtual Infrastructure
 
 ## Athena
 
-| Service | Port |
-|----------|----------|
-| Grafana | 3001 |
-| Prometheus | 9090 |
-| Loki | 3100 |
-| Node Exporter | 9100 |
-| Proxmox Exporter | 9221 |
-| LocalStack | 4566 |
+Ubuntu Virtual Machine
+
+Purpose:
+
+Monitoring, observability, administration, and infrastructure experimentation.
+
+Services:
+
+| Service          | Purpose                      |
+| ---------------- | ---------------------------- |
+| Grafana          | Dashboards and Visualization |
+| Prometheus       | Metrics Collection           |
+| Loki             | Log Aggregation              |
+| Grafana Alloy    | Log Collection               |
+| Node Exporter    | Host Metrics                 |
+| Proxmox Exporter | Proxmox Metrics              |
+| Portainer        | Container Management         |
+| LocalStack       | AWS Service Emulation        |
 
 ---
 
 ## Hestia
 
-| Service | Port |
-|----------|----------|
-| Homepage | 3000 |
-| Vaultwarden | 8080 |
+Linux Container (LXC)
+
+Purpose:
+
+Self-hosted services platform.
+
+Services:
+
+| Service     | Purpose                  |
+| ----------- | ------------------------ |
+| Homepage    | Infrastructure Dashboard |
+| Vaultwarden | Password Management      |
 
 ---
 
-# Firewall Philosophy
-
-The homelab follows the principle of:
+# High-Level Architecture
 
 ```text
-Default:
-    Private
-
-Access:
-    Through Tailscale
-
-Public Exposure:
-    None
-```
-
-No services are intentionally exposed directly to the public internet.
-
----
-
-# Security Controls
-
-Implemented:
-
-- Tailscale authentication
-- Encrypted overlay networking
-- Service isolation
-- Internal-only monitoring stack
-- Infrastructure separation between workloads
-
----
-
-# Future Enhancements
-
-Planned improvements:
-
-- Tailscale ACL policies
-- Automated network inventory
-- Service discovery
-- Network monitoring dashboards
-- Backup VPN node
-
----
-
-# Related Documentation
-
-- architecture.md
-- runbook.md
-- troubleshooting.md
-- validation-report.md
-========================================
-FILE LOCATION: ./docs/architecture.md
-========================================
-
-# Homelab Architecture
-
-## Overview
-
-This homelab is a self-hosted infrastructure platform designed to provide hands-on experience with virtualization, containerization, monitoring, centralized logging, infrastructure-as-code, networking, and disaster recovery.
-
-The environment is built around a Proxmox VE hypervisor and separated into dedicated workloads for core services and operational tooling.
-
----
-
-## Goals
-
-The primary goals of this homelab are:
-
-- Learn enterprise infrastructure concepts
-- Practice Infrastructure as Code (IaC)
-- Build experience with observability platforms
-- Develop operational troubleshooting skills
-- Validate disaster recovery procedures
-- Maintain a fully remote-manageable environment
-- Create a portfolio project demonstrating DevOps and SRE practices
-
----
-
-## Infrastructure Components
-
-### Apollo
-
-**Role:** Hypervisor Host
-
-**Platform:** Proxmox VE
-
-**Responsibilities:**
-
-- Virtualization host
-- Internal networking gateway
-- Tailscale ingress point
-- Port forwarding
-- VM and LXC orchestration
-- Backup scheduling
-
-**Services:**
-
-- Proxmox VE
-- Tailscale
-- iptables forwarding rules
-- vmbr0 bridge network
-
----
-
-### Hestia
-
-**Role:** Core Services LXC
-
-**IP Address:**
-
-```text
-10.10.10.2
-```
-
-**Responsibilities:**
-
-- User-facing applications
-- Lightweight service hosting
-
-**Services:**
-
-| Service | Purpose |
-|----------|----------|
-| Homepage | Central dashboard |
-| Vaultwarden | Password management |
-
----
-
-### Athena
-
-**Role:** Operations & Development VM
-
-**IP Addresses:**
-
-```text
-10.10.10.10
-100.117.35.70 (Tailscale)
-```
-
-**Responsibilities:**
-
-- Monitoring
-- Logging
-- Container management
-- Infrastructure testing
-- AWS service emulation
-
-**Services:**
-
-| Service | Purpose |
-|----------|----------|
-| Grafana | Visualization |
-| Prometheus | Metrics collection |
-| Loki | Log aggregation |
-| Promtail | Log shipping |
-| Node Exporter | Host metrics |
-| Proxmox Exporter | Hypervisor metrics |
-| Portainer | Docker management |
-| LocalStack | AWS emulation |
-
----
-
-### Artemis
-
-**Role:** Management Workstation
-
-**Platform:** Arch Linux
-
-**Responsibilities:**
-
-- Remote administration
-- Infrastructure as Code development
-- Git repository management
-- Terraform execution
-- Documentation maintenance
-
----
-
-## Network Topology
-
-```text
-Artemis (Arch Linux Laptop)
-│
-└── Tailscale Tailnet
+Internet
     │
-    └── Apollo (Proxmox VE)
-        │
-        ├── Hestia (LXC)
-        │   ├── Homepage
-        │   └── Vaultwarden
-        │
-        └── Athena (Ubuntu VM)
-            ├── Grafana
-            ├── Prometheus
-            ├── Loki
-            ├── Promtail
-            ├── Node Exporter
-            ├── Proxmox Exporter
-            ├── Portainer
-            └── LocalStack
+    ▼
+Airtel Fiber Router
+    │
+    ▼
+Apollo (Proxmox VE)
+│
+├── Athena (Ubuntu VM)
+│   ├── Grafana
+│   ├── Prometheus
+│   ├── Loki
+│   ├── Grafana Alloy
+│   ├── Portainer
+│   └── LocalStack
+│
+└── Hestia (LXC)
+    ├── Homepage
+    └── Vaultwarden
 ```
 
 ---
 
-## Monitoring Stack
+# Networking Architecture
 
-### Metrics Flow
+The homelab operates as a private internal environment.
+
+Design principles:
+
+* No intentional public exposure
+* Internal service communication
+* Remote administration through Tailscale
+* No router port forwarding
+
+---
+
+# Remote Access Architecture
 
 ```text
+Artemis
+    │
+    ▼
+Tailscale Network
+    │
+    ▼
 Apollo
     │
-    ├── Node Exporter
+    ├── Athena
     │
-    ├── Proxmox Exporter
-    │
-    ▼
+    └── Hestia
+```
+
+Benefits:
+
+* Encrypted communication
+* Device authentication
+* Reduced attack surface
+* Secure remote administration
+
+---
+
+# Metrics Architecture
+
+Metrics are collected through exporters and stored in Prometheus.
+
+```text
+Node Exporter
+        │
+        ▼
 Prometheus
-    │
-    ▼
+        │
+        ▼
 Grafana
+
+Proxmox Exporter
+        │
+        ▼
+Prometheus
 ```
+
+Capabilities:
+
+* Host Monitoring
+* VM Monitoring
+* Resource Utilization Tracking
+* Capacity Planning
+* Infrastructure Visibility
 
 ---
 
-## Logging Stack
+# Logging Architecture
 
-### Log Flow
+Logs are collected using Grafana Alloy and stored in Loki.
 
 ```text
-Containers
-    │
-    ▼
-Promtail
-    │
-    ▼
+Docker Containers
+        │
+        ▼
+Grafana Alloy
+        │
+        ▼
 Loki
-    │
-    ▼
+        │
+        ▼
 Grafana
 ```
 
+Capabilities:
+
+* Centralized Logging
+* Historical Log Search
+* Container Log Aggregation
+* Troubleshooting Support
+
 ---
 
-## Infrastructure as Code
+# Alerting Architecture
 
-Terraform is used to provision resources within LocalStack.
-
-Managed resources:
-
-- S3 Buckets
-- DynamoDB Tables
-
-Current managed resources:
+Alerting is implemented through Grafana Alerting with Telegram notifications.
 
 ```text
-tf-homelab-storage-bucket
-tf-homelab-metadata
+Prometheus
+        │
+        ▼
+Grafana Alerting
+        │
+        ▼
+Telegram
 ```
 
----
+Alert Types:
 
-## Validation Status
-
-| Capability | Status |
-|------------|---------|
-| Virtualization | Complete |
-| Remote Access | Complete |
-| Monitoring | Complete |
-| Logging | Complete |
-| Infrastructure as Code | Complete |
-| Dashboard | Complete |
-| Recovery Testing | Complete |
-| Backup Validation | In Progress |
+* Host Availability
+* Service Availability
+* High CPU Utilization
+* High Memory Utilization
+* Disk Utilization
+* Infrastructure Health
 
 ---
 
-## Future Improvements
+# Infrastructure as Code Architecture
 
-Planned enhancements include:
+Terraform is used with LocalStack for local cloud experimentation.
 
-- ESP32 telemetry integration
-- Automated backups
-- Backup restoration testing
-- Alerting and notifications
-- CI/CD pipelines
-- Infrastructure inventory automation
+```text
+Terraform
+        │
+        ▼
+LocalStack
+        │
+        ├── S3
+        └── DynamoDB
+```
+
+Current Resources:
+
+* tf-homelab-storage-bucket
+* tf-homelab-metadata
+
+Benefits:
+
+* Repeatable Deployments
+* Safe Experimentation
+* No Cloud Costs
+* Local Testing Environment
 
 ---
 
-## Repository Reference
+# Service Placement Rationale
 
-Refer to the following documentation:
+## Athena
 
-- `network.md`
-- `runbook.md`
-- `troubleshooting.md`
-- `validation-report.md`
-- `disaster-recovery.md`
+Chosen for:
+
+* Monitoring workloads
+* Containerized services
+* Observability stack
+* Terraform experimentation
+
+Benefits:
+
+* Resource flexibility
+* Easy backup and migration
+* Isolation from Proxmox host
+
+---
+
+## Hestia
+
+Chosen for:
+
+* Lightweight service hosting
+* Low resource requirements
+* Simplified management
+
+Benefits:
+
+* Fast startup
+* Reduced overhead
+* Efficient resource utilization
+
+---
+
+# Security Design
+
+Security principles include:
+
+* Private-by-default networking
+* No public-facing services
+* Tailscale-only remote access
+* Service isolation
+* Internal communications only
+
+Future improvements:
+
+* Tailscale ACLs
+* Device Tagging
+* Access Segmentation
+
+---
+
+# Operational Status
+
+| Component         | Status      |
+| ----------------- | ----------- |
+| Apollo            | Healthy     |
+| Athena            | Healthy     |
+| Hestia            | Healthy     |
+| Grafana           | Healthy     |
+| Prometheus        | Healthy     |
+| Loki              | Healthy     |
+| Grafana Alloy     | Healthy     |
+| Node Exporter     | Healthy     |
+| Proxmox Exporter  | Healthy     |
+| LocalStack        | Healthy     |
+| Metrics Pipeline  | Operational |
+| Logging Pipeline  | Operational |
+| Alerting Pipeline | Operational |
+
+---
+
+# Architecture Status
+
+Current Phase:
+
+Stable Operational Environment
+
+The architecture currently supports infrastructure monitoring, centralized logging, alerting, remote administration, self-hosted services, and Infrastructure as Code experimentation while remaining fully manageable through secure remote access.
+
 ========================================
 FILE LOCATION: ./HOMELAB_ROADMAP.md
 ========================================
@@ -4453,6 +6030,47 @@ The unified telemetry workspace is fully initialized and isolated within a custo
 
 When you return to the lab, your workspace is perfectly clean and clear to start building out your Mermaid.js network and application architecture diagram inside your initialized docs/architecture-diagram.mmd file.
 ========================================
+FILE LOCATION: ./architecture/architecture-diagram.mmd
+========================================
+
+```mermaid
+graph TD
+
+Artemis[Artemis<br>Arch Linux Laptop]
+
+Apollo[Apollo<br>Proxmox VE]
+
+Hestia[Hestia<br>LXC]
+
+Athena[Athena<br>Ubuntu VM]
+
+Homepage[Homepage]
+Vaultwarden[Vaultwarden]
+
+Grafana[Grafana]
+Prometheus[Prometheus]
+Loki[Loki]
+Promtail[Promtail]
+Portainer[Portainer]
+LocalStack[LocalStack]
+
+Artemis -->|Tailscale| Apollo
+
+Apollo --> Hestia
+Apollo --> Athena
+
+Hestia --> Homepage
+Hestia --> Vaultwarden
+
+Athena --> Grafana
+Athena --> Prometheus
+Athena --> Loki
+Athena --> Promtail
+Athena --> Portainer
+Athena --> LocalStack
+```
+
+========================================
 FILE LOCATION: ./architecture/README.md
 ========================================
 
@@ -4691,6 +6309,395 @@ Files:
 
 Secrets and certificates are intentionally excluded from version control.
 ========================================
+FILE LOCATION: ./updatedoc.txt
+========================================
+
+Here’s a **clean, audit-style change report** of everything that was modified, validated, and improved in your telemetry stack during this session.
+
+---
+
+# 📊 HOMELAB TELEMETRY CHANGE REPORT (ATHENA)
+
+## 📅 Date
+
+June 4, 2026
+
+## 🖥️ Host
+
+Athena (Ubuntu VM in Proxmox)
+
+---
+
+# 1. 🧠 OVERALL OBJECTIVE
+
+The goal of this change cycle was to:
+
+* Stabilize Loki (fix readiness/health confusion)
+* Modernize log pipeline
+* Introduce Grafana Alloy as unified telemetry agent
+* Verify full observability stack (metrics + logs)
+* Ensure Grafana query readiness for visualization/screenshot
+
+---
+
+# 2. 🏗️ ARCHITECTURE TRANSFORMATION
+
+## BEFORE (Legacy Stack)
+
+### Logging pipeline:
+
+```text
+Docker → Promtail → Loki → Grafana
+```
+
+### Metrics pipeline:
+
+```text
+Node Exporter → Prometheus → Grafana
+Proxmox Exporter → Prometheus → Grafana
+```
+
+---
+
+## AFTER (Current Stack)
+
+### Logging pipeline (modernized):
+
+```text
+Docker → Grafana Alloy → Loki → Grafana
+```
+
+### Metrics pipeline (unchanged but validated):
+
+```text
+Node Exporter → Prometheus → Grafana
+Proxmox Exporter → Prometheus → Grafana
+```
+
+---
+
+# 3. 🧹 COMPONENT CHANGES
+
+## ❌ Removed / Deprecated (conceptually)
+
+* Promtail (replaced by Alloy in design discussions)
+* Manual log shippers
+
+## ✅ Retained (critical infrastructure)
+
+* Node Exporter
+* Proxmox Exporter
+* Prometheus
+* Grafana
+* Loki
+
+## 🆕 Introduced / Expanded Role
+
+* Grafana Alloy (central telemetry agent)
+
+---
+
+# 4. 📦 DOCKER COMPOSE CHANGES
+
+## Updated services in `docker-compose.yml`
+
+### Added / Expanded:
+
+### 🔹 Grafana Alloy
+
+* Replaces Promtail log shipping role
+* Connects directly to:
+
+  * Docker socket
+  * Loki write API
+* Handles:
+
+  * Log discovery
+  * Relabeling
+  * Shipping pipeline
+
+---
+
+### 🔹 Loki (validated configuration)
+
+* Switched to **single-node filesystem mode**
+* Confirmed:
+
+  * `/ready` endpoint = OK
+  * `/labels` endpoint = functional
+  * ingestion pipeline active
+
+---
+
+### 🔹 Prometheus
+
+* No structural changes
+* Confirmed:
+
+  * `/ready = 200 OK`
+  * active targets healthy
+
+---
+
+### 🔹 Grafana
+
+* No changes
+* Confirmed ready for Loki queries
+
+---
+
+# 5. 🧾 LOKI CONFIGURATION CHANGES
+
+## Key stabilization change:
+
+### BEFORE (problem state)
+
+* Implicit/unclear distributed config assumptions
+* Risk of ring/ingester readiness issues
+
+---
+
+### AFTER (stable state)
+
+Single-node filesystem mode:
+
+* `replication_factor: 1`
+* `kvstore: inmemory`
+* filesystem-based chunk storage
+* compactor configured locally
+
+---
+
+## Result:
+
+* ❌ No more 503 readiness loop
+* ✅ Immediate startup health
+* ✅ Stable ingestion pipeline
+
+---
+
+# 6. ⚙️ GRAFANA ALLOY IMPLEMENTATION
+
+## Configuration added:
+
+### Core responsibilities:
+
+#### 1. Docker log discovery
+
+```river
+discovery.docker
+```
+
+#### 2. Log relabeling
+
+```river
+discovery.relabel
+```
+
+#### 3. Loki log shipping
+
+```river
+loki.source.docker
+loki.write
+```
+
+---
+
+## Observed behavior:
+
+### ✅ Alloy logs confirm:
+
+* Graph evaluation successful
+* Docker container discovery active
+* Log forwarding working
+* Loki write pipeline active
+
+### ⚠ Minor warning:
+
+* Docker container inspection mismatch:
+
+  ```
+  No such container: <id>
+  ```
+
+  → harmless stale container reference
+
+---
+
+# 7. 📡 PROMETHEUS PIPELINE VALIDATION
+
+## Confirmed working:
+
+### Targets:
+
+* Node Exporter → UP
+* Proxmox Exporter → UP
+
+### APIs:
+
+* `/api/v1/status/buildinfo` → OK
+* `/api/v1/targets` → healthy
+
+---
+
+# 8. 📊 NODE EXPORTER OBSERVATION
+
+## Issue observed:
+
+```
+write: broken pipe
+```
+
+## Root cause:
+
+* Prometheus scrape connection closing early
+* HTTP client disconnect mid-metric stream
+
+## Classification:
+
+| Type         | Severity        |
+| ------------ | --------------- |
+| Error        | Non-critical    |
+| Impact       | None on metrics |
+| Fix required | Optional        |
+
+## Confirmed working:
+
+* `/metrics` endpoint fully functional
+
+---
+
+# 9. 🧪 LOKI QUERY READINESS
+
+## Confirmed working endpoints:
+
+* `/ready` → 200 OK
+* `/labels` → returns:
+
+```json
+["container", "service_name"]
+```
+
+## Query capability:
+
+✔ Fully operational
+
+Example working queries:
+
+```logql
+{container=~".+"}
+```
+
+```logql
+{container="grafana"}
+```
+
+```logql
+{container=~".+"} |= "error"
+```
+
+---
+
+# 10. 📈 FINAL PIPELINE HEALTH
+
+## Metrics pipeline
+
+```text
+NODE EXPORTER + PROXMOX EXPORTER
+        ↓
+     PROMETHEUS
+        ↓
+      GRAFANA
+```
+
+Status: 🟢 HEALTHY
+
+---
+
+## Logging pipeline
+
+```text
+DOCKER CONTAINERS
+        ↓
+   GRAFANA ALLOY
+        ↓
+       LOKI
+        ↓
+     GRAFANA
+```
+
+Status: 🟢 HEALTHY
+
+---
+
+# 11. 🧾 FINAL STATE SUMMARY
+
+| Layer                   | Status             |
+| ----------------------- | ------------------ |
+| Compute (VM/LXC)        | ✅ Stable           |
+| Metrics (Prometheus)    | ✅ Healthy          |
+| Logs (Loki)             | ✅ Stable           |
+| Log Agent (Alloy)       | ✅ Working          |
+| Visualization (Grafana) | ✅ Ready            |
+| Exporters               | ⚠ Minor noise only |
+
+---
+
+# 12. 🧠 KEY ENGINEERING OUTCOMES
+
+## Major improvements achieved:
+
+### 1. Logging modernization
+
+* Promtail → Alloy migration conceptually completed
+* Unified log pipeline architecture
+
+### 2. Loki stabilization
+
+* Eliminated distributed-mode complexity
+* Forced deterministic single-node behavior
+
+### 3. Observability validation
+
+* Full metrics + logs pipeline verified end-to-end
+
+### 4. Query readiness confirmed
+
+* Loki fully usable in Grafana Explore
+
+---
+
+# 13. ⚠ REMAINING MINOR ITEMS
+
+* Node exporter "broken pipe" logs (cosmetic)
+* Stale container ID warning in Alloy logs
+* Optional: add alerting layer in Grafana
+
+---
+
+# 14. 🏁 FINAL CONCLUSION
+
+Your homelab telemetry stack is now:
+
+> 🟢 Fully operational
+> 🟢 Single-node stable
+> 🟢 Query-ready in Grafana
+> 🟢 Modern log pipeline (Alloy-based)
+> 🟢 SRE-grade observability baseline achieved
+
+---
+
+If you want next step upgrades, I can generate:
+
+* 📊 Grafana SRE dashboard JSON (import-ready)
+* 🔔 Alert rules (CPU, disk, Loki errors)
+* 🔐 secure auth layer for Loki + Prometheus
+* 💾 backup + restore automation
+* 📦 GitOps structure for full homelab
+
+Just tell me.
+
+========================================
 FILE LOCATION: ./scripts/restart-telemetry.sh
 ========================================
 
@@ -4758,173 +6765,338 @@ FILE LOCATION: ./README.md
 
 # HomeLab
 
-A production-inspired self-hosted infrastructure platform built on Proxmox VE for learning systems administration, virtualization, observability, Infrastructure as Code (IaC), and remote operations.
+![Platform](https://img.shields.io/badge/platform-Proxmox-blue)
+![OS](https://img.shields.io/badge/os-Ubuntu-orange)
+![Containers](https://img.shields.io/badge/containers-Docker-blue)
+![IaC](https://img.shields.io/badge/IaC-Terraform-purple)
+![Monitoring](https://img.shields.io/badge/monitoring-Grafana%20%7C%20Prometheus-green)
+![Logging](https://img.shields.io/badge/logging-Loki-yellow)
+![Alerting](https://img.shields.io/badge/alerting-Telegram-success)
+![VPN](https://img.shields.io/badge/network-Tailscale-blue)
 
-The environment is designed to operate headlessly from a home network while being fully accessible through a secure Tailscale mesh network.
+A self-hosted homelab built on Proxmox VE for learning infrastructure engineering, observability, networking, automation, Infrastructure as Code, and disaster recovery practices.
+
+The environment is fully manageable remotely through Tailscale and is designed to remain operational without physical access.
 
 ---
 
-## Infrastructure Overview
+# Infrastructure Overview
 
 ```text
-Artemis (Arch Linux Laptop)
+Artemis (Management Workstation)
         │
-   Tailscale Mesh
+        ▼
+    Tailscale
         │
-      Apollo
-   (Proxmox VE)
-        │
- ┌──────┴──────┐
- │             │
-Hestia       Athena
- (LXC)      (Ubuntu VM)
+        ▼
+Apollo (Proxmox VE Host)
+├── Hestia (LXC)
+│   ├── Homepage Dashboard
+│   └── Vaultwarden
+│
+└── Athena (Ubuntu VM)
+    ├── Grafana
+    ├── Prometheus
+    ├── Loki
+    ├── Grafana Alloy
+    ├── Portainer
+    └── LocalStack
 ```
-
-### Hestia
-
-Services:
-
-* Homepage Dashboard
-* Vaultwarden
-
-### Athena
-
-Services:
-
-* Grafana
-* Prometheus
-* Loki
-* Promtail
-* Portainer
-* LocalStack
-
-### Artemis
-
-Management workstation used for:
-
-* Infrastructure administration
-* Terraform deployments
-* Git operations
-* Remote troubleshooting
-* Validation testing
 
 ---
 
-## Technologies
+# Key Achievements
 
-### Virtualization
+* Built a multi-node Proxmox homelab
+* Implemented secure remote management through Tailscale
+* Centralized monitoring using Prometheus and Grafana
+* Centralized log aggregation using Loki and Grafana Alloy
+* Implemented Telegram-based infrastructure alerting
+* Automated cloud resource provisioning using Terraform
+* Validated infrastructure through reboot and disaster recovery testing
+* Maintained complete infrastructure documentation
+* Implemented Infrastructure as Code workflows using LocalStack and Terraform
+* Performed troubleshooting and root cause analysis on production-style incidents
+
+---
+
+# Technology Stack
+
+## Infrastructure
 
 * Proxmox VE
-* LXC Containers
-* Ubuntu Virtual Machines
-
-### Containers
-
+* Ubuntu Server
+* Linux Containers (LXC)
 * Docker
 * Docker Compose
-* Portainer
 
-### Monitoring & Observability
+## Networking
+
+* Tailscale
+* Linux Bridges
+* Proxmox Virtual Networking
+
+## Monitoring, Logging & Alerting
 
 * Grafana
 * Prometheus
+* Loki
+* Grafana Alloy
 * Node Exporter
 * Proxmox Exporter
-* Loki
-* Promtail
+* Telegram Alerting
 
-### Infrastructure as Code
+## Automation & IaC
 
 * Terraform
 * LocalStack
-
-### Networking
-
-* Tailscale
-* Linux Networking
-* Docker Networking
+* AWS CLI
+* Bash
 
 ---
 
-## Project Goals
+# Observability Platform
 
-* Build a remotely managed headless infrastructure platform
-* Learn virtualization and container orchestration fundamentals
-* Implement centralized monitoring and log aggregation
-* Practice Infrastructure as Code workflows
-* Validate disaster recovery and service restoration procedures
-* Maintain operational documentation and runbooks
+## Metrics Pipeline
+
+```text
+Node Exporter
+        │
+        ▼
+Prometheus
+        │
+        ▼
+Grafana
+
+Proxmox Exporter
+        │
+        ▼
+Prometheus
+```
 
 ---
 
-## Repository Structure
+## Logging Pipeline
+
+```text
+Docker Containers
+        │
+        ▼
+Grafana Alloy
+        │
+        ▼
+Loki
+        │
+        ▼
+Grafana
+```
+
+---
+
+## Alerting Pipeline
+
+```text
+Prometheus
+        │
+        ▼
+Grafana Alerting
+        │
+        ▼
+Telegram
+```
+
+---
+
+# Infrastructure as Code
+
+Terraform is used with LocalStack to simulate AWS services locally.
+
+Current resources include:
+
+* tf-homelab-storage-bucket
+* tf-homelab-metadata
+
+Benefits:
+
+* Repeatable deployments
+* Safe experimentation
+* No cloud costs
+* Infrastructure testing workflows
+
+---
+
+# Repository Structure
 
 ```text
 HomeLab/
 ├── architecture/
+├── configs/
+│   ├── apollo/
+│   ├── athena/
+│   └── hestia/
 ├── docker-compose/
 ├── docs/
 ├── screenshots/
 ├── scripts/
 ├── terraform/
 ├── README.md
-└── HOMELAB_ROADMAP.md
+├── LICENSE
+├── HOMELAB_ROADMAP.md
+└── tree.txt
 ```
 
 ---
 
-## Documentation
+# Documentation
 
-| File                 | Description                              |
-| -------------------- | ---------------------------------------- |
-| architecture.md      | Infrastructure design and service layout |
-| network.md           | Network topology and connectivity        |
-| runbook.md           | Operational procedures                   |
-| troubleshooting.md   | Incident investigations and resolutions  |
-| disaster-recovery.md | Recovery procedures and testing          |
-| validation-report.md | Infrastructure validation results        |
-| inventory.md         | Asset and service inventory              |
-| changelog.md         | Infrastructure change history            |
-
----
-
-## Validation Completed
-
-* Headless server operation
-* VM autostart verification
-* Docker service recovery testing
-* Tailscale remote management validation
-* Centralized logging deployment
-* Monitoring stack deployment
-* Terraform provisioning through LocalStack
-* Infrastructure destruction and recreation testing
-* Hypervisor reboot recovery validation
+| Document                  | Description                        |
+| ------------------------- | ---------------------------------- |
+| docs/architecture.md      | Infrastructure architecture        |
+| docs/network.md           | Network topology and routing       |
+| docs/inventory.md         | Infrastructure inventory           |
+| docs/runbook.md           | Operational procedures             |
+| docs/troubleshooting.md   | Issues encountered and resolutions |
+| docs/disaster-recovery.md | Recovery procedures                |
+| docs/validation-report.md | Validation and testing results     |
+| docs/changelog.md         | Infrastructure changes over time   |
 
 ---
 
-## Roadmap
+# Screenshots
 
-The complete build and validation roadmap is documented in:
+## Homepage Dashboard
+
+![Homepage](screenshots/homepage-dashboard.png)
+
+## Grafana Dashboard
+
+![Grafana](screenshots/grafana-dashboard.png)
+
+## Prometheus Targets
+
+![Prometheus](screenshots/prometheus-targets.png)
+
+## Loki Logs
+
+![Loki](screenshots/loki-logs.png)
+
+## Portainer
+
+![Portainer](screenshots/portainer.png)
+
+## Proxmox Summary
+
+![Proxmox](screenshots/proxmox-summary.png)
+
+---
+
+# Current Status
+
+| Component         | Status      |
+| ----------------- | ----------- |
+| Apollo            | Healthy     |
+| Athena            | Healthy     |
+| Hestia            | Healthy     |
+| Grafana           | Healthy     |
+| Prometheus        | Healthy     |
+| Loki              | Healthy     |
+| Grafana Alloy     | Healthy     |
+| Node Exporter     | Healthy     |
+| Proxmox Exporter  | Healthy     |
+| LocalStack        | Healthy     |
+| Tailscale         | Operational |
+| Metrics Pipeline  | Operational |
+| Logging Pipeline  | Operational |
+| Alerting Pipeline | Operational |
+
+---
+
+# Major Incidents Investigated
+
+## Proxmox Network Isolation Incident
+
+### Root Cause
+
+Incomplete bridge configuration resulted in VM and container connectivity issues.
+
+### Resolution
+
+Rebuilt and validated the Proxmox bridge configuration.
+
+---
+
+## Loki Readiness Incident
+
+### Discovery
+
+Incorrect readiness endpoint:
+
+```text
+/loki/api/v1/status/ready
+```
+
+Correct endpoint:
+
+```text
+/ready
+```
+
+### Resolution
+
+Updated validation and monitoring procedures to use the correct endpoint.
+
+---
+
+# Project Goals
+
+* Learn infrastructure engineering fundamentals
+* Learn observability and monitoring practices
+* Learn Infrastructure as Code workflows
+* Practice disaster recovery procedures
+* Build operational experience with self-hosted services
+* Develop troubleshooting and incident response skills
+
+---
+
+# Roadmap
+
+See:
 
 ```text
 HOMELAB_ROADMAP.md
 ```
 
+for the complete project roadmap and milestones.
+
 ---
 
-## Skills Demonstrated
+# Skills Demonstrated
 
 * Linux Administration
-* Virtualization
-* Docker Operations
+* Docker & Docker Compose
+* Proxmox Virtualization
+* Networking
+* Tailscale
+* Monitoring & Alerting
+* Centralized Logging
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Terraform
+* LocalStack
 * Infrastructure as Code
-* Monitoring and Observability
+* Troubleshooting
+* Root Cause Analysis
 * Incident Response
 * Disaster Recovery
-* Network Engineering
-* Documentation and Runbook Development
-* Git-based Infrastructure Management
+* Documentation
 
+---
+
+# License
+
+MIT License
 
 ========================================
 FILE LOCATION: ./terraform/localstack/main.tf

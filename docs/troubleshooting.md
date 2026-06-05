@@ -616,3 +616,481 @@ Recovery testing is as important as deployment testing.
 8. Every major configuration should be version controlled.
 9. Disaster recovery should be validated, not assumed.
 10. Operational documentation reduces future troubleshooting effort.
+
+
+
+
+
+# V2
+
+
+
+# Troubleshooting Guide
+
+## Purpose
+
+This document records significant issues encountered during the design, deployment, operation, maintenance, and evolution of the HomeLab environment.
+
+Each incident includes:
+
+* Overview
+* Symptoms
+* Investigation
+* Root Cause
+* Resolution
+* Verification
+* Impact
+* Lessons Learned
+
+The objective is to preserve operational knowledge, reduce future recovery time, document engineering decisions, and maintain a historical record of infrastructure changes.
+
+---
+
+# Incident Summary
+
+| Incident                                                   | Severity | Status    |
+| ---------------------------------------------------------- | -------- | --------- |
+| Permission Denied During Infrastructure Refactoring        | Low      | Resolved  |
+| Docker Container Name Conflicts During Stack Consolidation | Low      | Resolved  |
+| VM and LXC Autostart Failure                               | Medium   | Resolved  |
+| Apollo Network Outage and Recovery                         | High     | Resolved  |
+| Stale vmbr1 Bridge Configuration                           | Low      | Resolved  |
+| Loki Centralized Logging Integration                       | Low      | Completed |
+| Loki Readiness Endpoint Investigation                      | Medium   | Resolved  |
+| Homepage Dashboard Configuration Recovery                  | Low      | Resolved  |
+| LocalStack and Terraform Validation                        | Low      | Completed |
+| Telegram Alerting Validation                               | Low      | Completed |
+| Headless Operations Validation                             | Low      | Completed |
+| Chaos Reboot Recovery Testing                              | Medium   | Completed |
+
+---
+
+# Permission Denied During Infrastructure Refactoring
+
+## Overview
+
+During consolidation of multiple Docker Compose projects into a unified infrastructure layout, several directories could not be created or modified within the homelab repository.
+
+This prevented migration of monitoring services into their new location and temporarily blocked repository restructuring efforts.
+
+## Symptoms
+
+Attempts to create new directories failed immediately.
+
+```bash
+mkdir -p ~/homelab/docker-compose/telemetry
+```
+
+Result:
+
+```text
+mkdir: cannot create directory ... Permission denied
+```
+
+Additional operations such as moving files and editing existing directories also failed.
+
+## Investigation
+
+Filesystem ownership was inspected.
+
+```bash
+ls -la ~/homelab
+```
+
+Several directories were owned by:
+
+```text
+root:root
+```
+
+instead of the intended user account.
+
+## Root Cause
+
+Previous Docker operations executed with elevated privileges created directories owned by root.
+
+The repository became a mixture of user-owned and root-owned files.
+
+## Resolution
+
+```bash
+sudo chown -R $USER:$USER ~/homelab
+```
+
+## Verification
+
+Directory creation, file movement, and Git operations completed successfully.
+
+## Impact
+
+* Repository restructuring delayed
+* No service outage
+* No data loss
+
+## Lessons Learned
+
+Avoid unnecessary use of sudo during Docker operations and periodically verify repository ownership.
+
+---
+
+# Docker Container Name Conflicts During Stack Consolidation
+
+## Overview
+
+While consolidating monitoring services into a single telemetry stack, Docker failed to create containers due to naming conflicts.
+
+## Symptoms
+
+```text
+Conflict. The container name "/proxmox-exporter" is already in use.
+```
+
+Similar conflicts occurred for:
+
+* Grafana
+* Prometheus
+* Node Exporter
+* Loki
+* Promtail
+
+## Investigation
+
+Existing containers from previous deployments remained registered within Docker.
+
+## Root Cause
+
+Legacy containers were not removed before deployment of the new compose stack.
+
+## Resolution
+
+```bash
+docker rm -f \
+proxmox-exporter \
+prometheus \
+node-exporter \
+grafana \
+promtail \
+loki
+```
+
+Redeployed:
+
+```bash
+docker compose up -d
+```
+
+## Verification
+
+Telemetry services started successfully.
+
+## Impact
+
+* Deployment blocked
+* No data loss
+
+## Lessons Learned
+
+Always decommission legacy stacks before migration.
+
+---
+
+# VM and LXC Autostart Failure
+
+## Overview
+
+A planned reboot revealed that critical workloads did not automatically start after the hypervisor returned online.
+
+## Symptoms
+
+After rebooting Apollo:
+
+* Athena remained offline
+* Hestia remained offline
+* Services unavailable
+
+## Investigation
+
+Proxmox startup settings were reviewed.
+
+## Root Cause
+
+Start-at-boot was disabled.
+
+## Resolution
+
+Enabled:
+
+```text
+VM/LXC
+→ Options
+→ Start at Boot
+→ Yes
+```
+
+## Verification
+
+Subsequent reboots automatically restored:
+
+* Athena
+* Hestia
+* Docker services
+
+## Impact
+
+Temporary service outage.
+
+## Lessons Learned
+
+Autostart settings should be validated during recovery testing.
+
+---
+
+# Apollo Network Outage and Recovery
+
+## Overview
+
+Apollo experienced a network outage that prevented communication between infrastructure components.
+
+## Symptoms
+
+* VM connectivity failures
+* Container connectivity failures
+* Tailscale unavailable
+* Remote administration unavailable
+
+## Investigation
+
+Commands used:
+
+```bash
+ip addr
+ip route
+bridge link
+brctl show
+iptables -L -n -v
+```
+
+Network bridges, firewall rules, and routing were reviewed.
+
+## Root Cause
+
+Network configuration drift combined with bridge and firewall interactions produced inconsistent routing behavior.
+
+## Resolution
+
+* Corrected routing configuration
+* Validated bridge assignments
+* Reviewed firewall rules
+* Restarted networking services
+* Removed obsolete components
+
+## Verification
+
+Connectivity restored between:
+
+* Apollo
+* Athena
+* Hestia
+* Artemis
+
+Validated using:
+
+```bash
+ping
+ssh
+tailscale status
+```
+
+## Impact
+
+Temporary loss of infrastructure management capability.
+
+## Lessons Learned
+
+Network changes should be documented immediately and validated incrementally.
+
+---
+
+# Loki Centralized Logging Integration
+
+## Overview
+
+Container logs were initially fragmented across multiple hosts and difficult to search.
+
+## Resolution
+
+Initially deployed:
+
+* Loki
+* Promtail
+* Grafana Integration
+
+The logging platform was later modernized by replacing Promtail with Grafana Alloy.
+
+### Current Logging Architecture
+
+```text
+Docker Containers
+        │
+        ▼
+Grafana Alloy
+        │
+        ▼
+Loki
+        │
+        ▼
+Grafana
+```
+
+## Verification
+
+Logs became visible through Grafana Explore.
+
+Example query:
+
+```logql
+{job=~".+"}
+```
+
+## Lessons Learned
+
+Centralized logging should be implemented early in infrastructure projects.
+
+---
+
+# Loki Readiness Endpoint Investigation
+
+## Overview
+
+Loki readiness checks repeatedly failed despite the service operating normally.
+
+## Symptoms
+
+```text
+503 Service Unavailable
+```
+
+## Investigation
+
+Verified:
+
+```bash
+curl http://localhost:3100/services
+```
+
+Observed:
+
+* Distributor ACTIVE
+* Ingester ACTIVE
+* Scheduler ACTIVE
+* Compactor ACTIVE
+
+All services healthy.
+
+## Root Cause
+
+Incorrect readiness endpoint used.
+
+Attempted:
+
+```text
+/loki/api/v1/status/ready
+```
+
+Returned:
+
+```text
+404 Not Found
+```
+
+Correct endpoint:
+
+```text
+/ready
+```
+
+## Resolution
+
+```bash
+curl http://localhost:3100/ready
+```
+
+Response:
+
+```text
+ready
+```
+
+HTTP:
+
+```text
+200 OK
+```
+
+## Verification
+
+```bash
+curl http://localhost:3100/ready
+curl http://localhost:3100/services
+curl http://localhost:3100/metrics
+curl http://localhost:3100/loki/api/v1/labels
+```
+
+All checks passed.
+
+## Lessons Learned
+
+Do not assume health endpoints remain identical between versions.
+
+---
+
+# Telegram Alerting Validation
+
+## Overview
+
+Grafana alerting was integrated with Telegram for infrastructure notifications.
+
+## Objective
+
+Verify end-to-end alert delivery.
+
+## Validation Path
+
+```text
+Prometheus
+        │
+        ▼
+Grafana Alerting
+        │
+        ▼
+Telegram
+```
+
+## Verification
+
+Triggered a test alert from Grafana.
+
+Telegram notification received successfully.
+
+## Result
+
+PASS
+
+## Lessons Learned
+
+Alerting systems must be tested regularly to ensure notification delivery remains functional after infrastructure changes.
+
+---
+
+# Key Takeaways
+
+1. Infrastructure should be reproducible through code.
+2. Monitoring should exist before major workloads are deployed.
+3. Centralized logging dramatically reduces troubleshooting time.
+4. Alerting should be validated regularly.
+5. Recovery procedures should be tested, not assumed.
+6. Documentation is part of the infrastructure.
+7. Network changes should be tracked carefully.
+8. Remote administration should not require physical access.
+9. Every major configuration should be version controlled.
+10. Disaster recovery readiness should be continuously validated.

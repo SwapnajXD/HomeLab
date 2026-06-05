@@ -1,18 +1,24 @@
-# Network Documentation
+# Network Architecture
 
 ## Overview
 
-The homelab network is designed to provide secure remote access, service isolation, and centralized management through a combination of:
+The HomeLab network is designed around a private-by-default model.
 
-- Proxmox Virtualization
-- Internal Private Networking
-- Tailscale Mesh VPN
-- Docker Bridge Networks
-- Controlled Port Forwarding
+All infrastructure services operate within the local network and are accessed remotely through Tailscale.
+
+No intentional public-facing services are exposed to the Internet.
+
+Primary goals:
+
+* Security
+* Simplicity
+* Reliability
+* Remote Accessibility
+* Operational Independence
 
 ---
 
-# Physical Network
+# Physical Network Topology
 
 ```text
 Internet
@@ -21,182 +27,160 @@ Internet
 Airtel Fiber Router
     │
     ▼
-Apollo (Proxmox Host)
+Apollo (Proxmox VE)
+    │
+    ├── Athena VM
+    │
+    └── Hestia LXC
 ```
 
-Apollo serves as the primary infrastructure host and connects directly to the home network.
+---
+
+# Logical Network Topology
+
+```text
+Artemis
+    │
+    ▼
+Tailscale Network
+    │
+    ▼
+Apollo
+    │
+    ├── Athena
+    │
+    └── Hestia
+```
 
 ---
 
-# Host Inventory
-
-| Host | Role | Platform |
-|--------|--------|--------|
-| Apollo | Hypervisor | Proxmox VE |
-| Hestia | Core Services | LXC |
-| Athena | Monitoring & Automation | Ubuntu VM |
-| Artemis | Management Workstation | Arch Linux |
-
----
-
-# Internal Infrastructure Network
+# Infrastructure Components
 
 ## Apollo
 
-Primary Hypervisor
+Role:
 
-```text
-192.168.x.x
-```
+Proxmox Hypervisor
 
 Responsibilities:
 
-- VM Hosting
-- LXC Hosting
-- Network Bridging
-- Port Forwarding
+* Virtual Networking
+* VM Hosting
+* LXC Hosting
+* Storage Management
 
----
+Network Functions:
 
-## Hestia
-
-Core Services LXC
-
-```text
-10.10.10.2
-```
-
-Services:
-
-- Homepage
-- Vaultwarden
+* Network Bridge Management
+* Internal Routing
+* VM Connectivity
+* Container Connectivity
 
 ---
 
 ## Athena
 
-Operations VM
+Role:
 
-```text
-10.10.10.10
-```
+Operations Platform
 
-Services:
+Network Services:
 
-- Grafana
-- Prometheus
-- Loki
-- Promtail
-- Portainer
-- LocalStack
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Portainer
+* LocalStack
+
+Communication:
+
+* Internal Service Access
+* Metrics Collection
+* Log Aggregation
+* Alert Generation
 
 ---
 
-# Tailscale Overlay Network
+## Hestia
 
-Tailscale provides secure remote access without exposing services directly to the public internet.
+Role:
+
+Application Services
+
+Hosted Services:
+
+* Homepage
+* Vaultwarden
+
+Communication:
+
+* Internal Service Access
+* Tailscale Administration Access
+
+---
+
+# Remote Access Design
+
+Remote access is implemented using Tailscale.
 
 Benefits:
 
-- No port forwarding required on router
-- End-to-end encryption
-- Device authentication
-- Access from anywhere
+* Encrypted Communication
+* Device Authentication
+* No Port Forwarding
+* Reduced Attack Surface
+* Simplified Administration
+
+Current Nodes:
+
+* Artemis
+* Apollo
+* Athena
 
 ---
 
-## Tailscale Nodes
+# Virtual Networking
 
-| Node | Purpose |
-|--------|--------|
-| Artemis | Administration |
-| Apollo | Infrastructure Access |
-| Athena | Service Access |
+Proxmox virtual networking is based on Linux bridges.
 
----
-
-## Athena Tailscale Address
-
-```text
-100.117.35.70
-```
-
-Example Service Access:
-
-```text
-Grafana
-http://100.117.35.70:3001
-
-LocalStack
-http://100.117.35.70:4566
-```
-
----
-
-# Proxmox Networking
-
-## Bridge
-
-Current bridge:
+Primary Bridge:
 
 ```text
 vmbr0
 ```
 
+Responsibilities:
+
+* VM Connectivity
+* LXC Connectivity
+* External Network Access
+* Internal Service Communication
+
+---
+
+# Metrics Traffic Flow
+
+```text
+Node Exporter
+        │
+        ▼
+Prometheus
+        │
+        ▼
+Grafana
+
+Proxmox Exporter
+        │
+        ▼
+Prometheus
+```
+
 Purpose:
 
-- Connect VMs and LXCs
-- Internal infrastructure communication
-- Service routing
-
----
-
-# Docker Networking
-
-Athena uses Docker bridge networks for service isolation.
-
-Current stacks:
-
-```text
-telemetry
-localstack
-```
-
-Example:
-
-```text
-telemetry-net
-```
-
-Containers communicate internally using Docker DNS.
-
-Example:
-
-```text
-prometheus
-loki
-grafana
-```
-
-without requiring external IP addresses.
-
----
-
-# Monitoring Traffic Flow
-
-```text
-Apollo
-│
-├── Node Exporter
-│
-├── Proxmox Exporter
-│
-▼
-Prometheus
-│
-▼
-Grafana
-```
+* Host Monitoring
+* Capacity Analysis
+* Performance Visibility
 
 ---
 
@@ -206,7 +190,7 @@ Grafana
 Docker Containers
         │
         ▼
-Promtail
+Grafana Alloy
         │
         ▼
 Loki
@@ -215,105 +199,256 @@ Loki
 Grafana
 ```
 
+Purpose:
+
+* Centralized Logging
+* Log Search
+* Troubleshooting
+* Historical Analysis
+
 ---
 
-# Infrastructure as Code Traffic Flow
+# Alerting Traffic Flow
 
 ```text
-Artemis
-    │
-    ▼
-Terraform
-    │
-    ▼
-Tailscale Tunnel
-    │
-    ▼
-Athena
-    │
-    ▼
-LocalStack
+Prometheus
+        │
+        ▼
+Grafana Alerting
+        │
+        ▼
+Telegram
 ```
 
-Managed resources:
+Purpose:
+
+* Service Monitoring
+* Incident Notification
+* Infrastructure Awareness
+
+---
+
+# Security Model
+
+## Default Posture
+
+Private by Default
+
+Characteristics:
+
+* No Public Services
+* Internal Service Communication
+* Tailscale-Based Administration
+* Controlled Access Paths
+
+---
+
+## Remote Access Security
+
+Authentication provided by:
+
+* Tailscale Identity
+* Device Authorization
+* Encrypted Transport
+
+Benefits:
+
+* No Exposed Management Ports
+* No Public SSH Access
+* Simplified Access Control
+
+---
+
+# Network Validation
+
+The following checks are performed during infrastructure validation.
+
+## Connectivity Validation
+
+Verify:
+
+```bash
+ping <target>
+```
+
+Expected:
 
 ```text
-tf-homelab-storage-bucket
-tf-homelab-metadata
+Successful response
 ```
 
 ---
 
-# Port Inventory
+## Tailscale Validation
 
-## Athena
+Verify:
 
-| Service | Port |
-|----------|----------|
-| Grafana | 3001 |
-| Prometheus | 9090 |
-| Loki | 3100 |
-| Node Exporter | 9100 |
-| Proxmox Exporter | 9221 |
-| LocalStack | 4566 |
+```bash
+tailscale status
+```
 
----
-
-## Hestia
-
-| Service | Port |
-|----------|----------|
-| Homepage | 3000 |
-| Vaultwarden | 8080 |
-
----
-
-# Firewall Philosophy
-
-The homelab follows the principle of:
+Expected:
 
 ```text
-Default:
-    Private
-
-Access:
-    Through Tailscale
-
-Public Exposure:
-    None
+All nodes connected
 ```
 
-No services are intentionally exposed directly to the public internet.
+---
+
+## Bridge Validation
+
+Verify:
+
+```bash
+brctl show
+```
+
+or
+
+```bash
+bridge link
+```
+
+Expected:
+
+```text
+vmbr0 present and operational
+```
 
 ---
 
-# Security Controls
+## Service Reachability
 
-Implemented:
+Verify:
 
-- Tailscale authentication
-- Encrypted overlay networking
-- Service isolation
-- Internal-only monitoring stack
-- Infrastructure separation between workloads
+* Grafana Accessible
+* Prometheus Accessible
+* Loki Accessible
+* Homepage Accessible
+* Vaultwarden Accessible
 
----
+Expected:
 
-# Future Enhancements
-
-Planned improvements:
-
-- Tailscale ACL policies
-- Automated network inventory
-- Service discovery
-- Network monitoring dashboards
-- Backup VPN node
+```text
+PASS
+```
 
 ---
 
-# Related Documentation
+# Major Network Incident
 
-- architecture.md
-- runbook.md
-- troubleshooting.md
-- validation-report.md
+## Proxmox Network Isolation Incident
+
+### Symptoms
+
+Observed:
+
+* VM connectivity failures
+* Internal communication failures
+* Missing bridge connectivity
+
+---
+
+### Investigation
+
+Examined:
+
+```bash
+brctl show
+```
+
+```bash
+bridge link
+```
+
+```bash
+cat /etc/network/interfaces
+```
+
+---
+
+### Root Cause
+
+Incomplete bridge configuration prevented proper attachment of virtual interfaces.
+
+---
+
+### Resolution
+
+Rebuilt and validated:
+
+* vmbr0
+* VM connectivity
+* LXC connectivity
+
+---
+
+### Verification
+
+Confirmed:
+
+* Host Communication
+* VM Communication
+* Container Communication
+* Internet Connectivity
+
+Infrastructure networking restored successfully.
+
+---
+
+# Future Improvements
+
+## Hardware
+
+Planned:
+
+5-meter CAT6 Ethernet cable
+
+Benefits:
+
+* Reduced Latency
+* Improved Stability
+* Consistent Throughput
+* Reduced Wi-Fi Dependency
+
+---
+
+## Security
+
+Planned:
+
+* Tailscale ACLs
+* Device Tagging
+* Access Segmentation
+
+---
+
+## Monitoring
+
+Planned:
+
+* Network Latency Tracking
+* Uptime Monitoring
+* Service-Level Monitoring
+
+---
+
+# Status
+
+| Component             | Status      |
+| --------------------- | ----------- |
+| vmbr0                 | Operational |
+| Internal Networking   | Operational |
+| VM Connectivity       | Operational |
+| LXC Connectivity      | Operational |
+| Tailscale             | Operational |
+| Remote Administration | Operational |
+| Metrics Traffic       | Operational |
+| Logging Traffic       | Operational |
+| Alerting Traffic      | Operational |
+
+---
+
+# Conclusion
+
+The network architecture provides secure, reliable, and remotely manageable connectivity for all infrastructure services while maintaining a minimal external attack surface through Tailscale-based administration and private-by-default design principles.

@@ -1,244 +1,358 @@
-# Homelab Architecture
+# Architecture
 
 ## Overview
 
-This homelab is a self-hosted infrastructure platform designed to provide hands-on experience with virtualization, containerization, monitoring, centralized logging, infrastructure-as-code, networking, and disaster recovery.
+The HomeLab environment is designed as a small-scale infrastructure platform for learning and practicing:
 
-The environment is built around a Proxmox VE hypervisor and separated into dedicated workloads for core services and operational tooling.
+* Infrastructure Engineering
+* DevOps
+* Site Reliability Engineering (SRE)
+* Linux Administration
+* Observability
+* Infrastructure as Code
+* Incident Response
+* Disaster Recovery
 
----
+The architecture emphasizes:
 
-## Goals
-
-The primary goals of this homelab are:
-
-- Learn enterprise infrastructure concepts
-- Practice Infrastructure as Code (IaC)
-- Build experience with observability platforms
-- Develop operational troubleshooting skills
-- Validate disaster recovery procedures
-- Maintain a fully remote-manageable environment
-- Create a portfolio project demonstrating DevOps and SRE practices
-
----
-
-## Infrastructure Components
-
-### Apollo
-
-**Role:** Hypervisor Host
-
-**Platform:** Proxmox VE
-
-**Responsibilities:**
-
-- Virtualization host
-- Internal networking gateway
-- Tailscale ingress point
-- Port forwarding
-- VM and LXC orchestration
-- Backup scheduling
-
-**Services:**
-
-- Proxmox VE
-- Tailscale
-- iptables forwarding rules
-- vmbr0 bridge network
+* Private-by-default networking
+* Remote administration
+* Service isolation
+* Centralized observability
+* Repeatable infrastructure workflows
 
 ---
 
-### Hestia
+# Physical Infrastructure
 
-**Role:** Core Services LXC
+## Apollo
 
-**IP Address:**
+Primary Infrastructure Host
+
+Platform:
+
+* Proxmox VE
+
+Responsibilities:
+
+* Hypervisor
+* Virtual Machine Hosting
+* LXC Hosting
+* Virtual Networking
+* Storage Management
+
+---
+
+## Artemis
+
+Management Workstation
+
+Platform:
+
+* Arch Linux
+
+Responsibilities:
+
+* Infrastructure Administration
+* SSH Management
+* Git Operations
+* Terraform Development
+* Documentation
+* Remote Access
+
+---
+
+# Virtual Infrastructure
+
+## Athena
+
+Ubuntu Virtual Machine
+
+Purpose:
+
+Monitoring, observability, administration, and infrastructure experimentation.
+
+Services:
+
+| Service          | Purpose                      |
+| ---------------- | ---------------------------- |
+| Grafana          | Dashboards and Visualization |
+| Prometheus       | Metrics Collection           |
+| Loki             | Log Aggregation              |
+| Grafana Alloy    | Log Collection               |
+| Node Exporter    | Host Metrics                 |
+| Proxmox Exporter | Proxmox Metrics              |
+| Portainer        | Container Management         |
+| LocalStack       | AWS Service Emulation        |
+
+---
+
+## Hestia
+
+Linux Container (LXC)
+
+Purpose:
+
+Self-hosted services platform.
+
+Services:
+
+| Service     | Purpose                  |
+| ----------- | ------------------------ |
+| Homepage    | Infrastructure Dashboard |
+| Vaultwarden | Password Management      |
+
+---
+
+# High-Level Architecture
 
 ```text
-10.10.10.2
-```
-
-**Responsibilities:**
-
-- User-facing applications
-- Lightweight service hosting
-
-**Services:**
-
-| Service | Purpose |
-|----------|----------|
-| Homepage | Central dashboard |
-| Vaultwarden | Password management |
-
----
-
-### Athena
-
-**Role:** Operations & Development VM
-
-**IP Addresses:**
-
-```text
-10.10.10.10
-100.117.35.70 (Tailscale)
-```
-
-**Responsibilities:**
-
-- Monitoring
-- Logging
-- Container management
-- Infrastructure testing
-- AWS service emulation
-
-**Services:**
-
-| Service | Purpose |
-|----------|----------|
-| Grafana | Visualization |
-| Prometheus | Metrics collection |
-| Loki | Log aggregation |
-| Promtail | Log shipping |
-| Node Exporter | Host metrics |
-| Proxmox Exporter | Hypervisor metrics |
-| Portainer | Docker management |
-| LocalStack | AWS emulation |
-
----
-
-### Artemis
-
-**Role:** Management Workstation
-
-**Platform:** Arch Linux
-
-**Responsibilities:**
-
-- Remote administration
-- Infrastructure as Code development
-- Git repository management
-- Terraform execution
-- Documentation maintenance
-
----
-
-## Network Topology
-
-```text
-Artemis (Arch Linux Laptop)
-│
-└── Tailscale Tailnet
+Internet
     │
-    └── Apollo (Proxmox VE)
-        │
-        ├── Hestia (LXC)
-        │   ├── Homepage
-        │   └── Vaultwarden
-        │
-        └── Athena (Ubuntu VM)
-            ├── Grafana
-            ├── Prometheus
-            ├── Loki
-            ├── Promtail
-            ├── Node Exporter
-            ├── Proxmox Exporter
-            ├── Portainer
-            └── LocalStack
+    ▼
+Airtel Fiber Router
+    │
+    ▼
+Apollo (Proxmox VE)
+│
+├── Athena (Ubuntu VM)
+│   ├── Grafana
+│   ├── Prometheus
+│   ├── Loki
+│   ├── Grafana Alloy
+│   ├── Portainer
+│   └── LocalStack
+│
+└── Hestia (LXC)
+    ├── Homepage
+    └── Vaultwarden
 ```
 
 ---
 
-## Monitoring Stack
+# Networking Architecture
 
-### Metrics Flow
+The homelab operates as a private internal environment.
+
+Design principles:
+
+* No intentional public exposure
+* Internal service communication
+* Remote administration through Tailscale
+* No router port forwarding
+
+---
+
+# Remote Access Architecture
 
 ```text
+Artemis
+    │
+    ▼
+Tailscale Network
+    │
+    ▼
 Apollo
     │
-    ├── Node Exporter
+    ├── Athena
     │
-    ├── Proxmox Exporter
-    │
-    ▼
+    └── Hestia
+```
+
+Benefits:
+
+* Encrypted communication
+* Device authentication
+* Reduced attack surface
+* Secure remote administration
+
+---
+
+# Metrics Architecture
+
+Metrics are collected through exporters and stored in Prometheus.
+
+```text
+Node Exporter
+        │
+        ▼
 Prometheus
-    │
-    ▼
+        │
+        ▼
 Grafana
+
+Proxmox Exporter
+        │
+        ▼
+Prometheus
 ```
+
+Capabilities:
+
+* Host Monitoring
+* VM Monitoring
+* Resource Utilization Tracking
+* Capacity Planning
+* Infrastructure Visibility
 
 ---
 
-## Logging Stack
+# Logging Architecture
 
-### Log Flow
+Logs are collected using Grafana Alloy and stored in Loki.
 
 ```text
-Containers
-    │
-    ▼
-Promtail
-    │
-    ▼
+Docker Containers
+        │
+        ▼
+Grafana Alloy
+        │
+        ▼
 Loki
-    │
-    ▼
+        │
+        ▼
 Grafana
 ```
 
+Capabilities:
+
+* Centralized Logging
+* Historical Log Search
+* Container Log Aggregation
+* Troubleshooting Support
+
 ---
 
-## Infrastructure as Code
+# Alerting Architecture
 
-Terraform is used to provision resources within LocalStack.
-
-Managed resources:
-
-- S3 Buckets
-- DynamoDB Tables
-
-Current managed resources:
+Alerting is implemented through Grafana Alerting with Telegram notifications.
 
 ```text
-tf-homelab-storage-bucket
-tf-homelab-metadata
+Prometheus
+        │
+        ▼
+Grafana Alerting
+        │
+        ▼
+Telegram
 ```
 
----
+Alert Types:
 
-## Validation Status
-
-| Capability | Status |
-|------------|---------|
-| Virtualization | Complete |
-| Remote Access | Complete |
-| Monitoring | Complete |
-| Logging | Complete |
-| Infrastructure as Code | Complete |
-| Dashboard | Complete |
-| Recovery Testing | Complete |
-| Backup Validation | In Progress |
+* Host Availability
+* Service Availability
+* High CPU Utilization
+* High Memory Utilization
+* Disk Utilization
+* Infrastructure Health
 
 ---
 
-## Future Improvements
+# Infrastructure as Code Architecture
 
-Planned enhancements include:
+Terraform is used with LocalStack for local cloud experimentation.
 
-- ESP32 telemetry integration
-- Automated backups
-- Backup restoration testing
-- Alerting and notifications
-- CI/CD pipelines
-- Infrastructure inventory automation
+```text
+Terraform
+        │
+        ▼
+LocalStack
+        │
+        ├── S3
+        └── DynamoDB
+```
+
+Current Resources:
+
+* tf-homelab-storage-bucket
+* tf-homelab-metadata
+
+Benefits:
+
+* Repeatable Deployments
+* Safe Experimentation
+* No Cloud Costs
+* Local Testing Environment
 
 ---
 
-## Repository Reference
+# Service Placement Rationale
 
-Refer to the following documentation:
+## Athena
 
-- `network.md`
-- `runbook.md`
-- `troubleshooting.md`
-- `validation-report.md`
-- `disaster-recovery.md`
+Chosen for:
+
+* Monitoring workloads
+* Containerized services
+* Observability stack
+* Terraform experimentation
+
+Benefits:
+
+* Resource flexibility
+* Easy backup and migration
+* Isolation from Proxmox host
+
+---
+
+## Hestia
+
+Chosen for:
+
+* Lightweight service hosting
+* Low resource requirements
+* Simplified management
+
+Benefits:
+
+* Fast startup
+* Reduced overhead
+* Efficient resource utilization
+
+---
+
+# Security Design
+
+Security principles include:
+
+* Private-by-default networking
+* No public-facing services
+* Tailscale-only remote access
+* Service isolation
+* Internal communications only
+
+Future improvements:
+
+* Tailscale ACLs
+* Device Tagging
+* Access Segmentation
+
+---
+
+# Operational Status
+
+| Component         | Status      |
+| ----------------- | ----------- |
+| Apollo            | Healthy     |
+| Athena            | Healthy     |
+| Hestia            | Healthy     |
+| Grafana           | Healthy     |
+| Prometheus        | Healthy     |
+| Loki              | Healthy     |
+| Grafana Alloy     | Healthy     |
+| Node Exporter     | Healthy     |
+| Proxmox Exporter  | Healthy     |
+| LocalStack        | Healthy     |
+| Metrics Pipeline  | Operational |
+| Logging Pipeline  | Operational |
+| Alerting Pipeline | Operational |
+
+---
+
+# Architecture Status
+
+Current Phase:
+
+Stable Operational Environment
+
+The architecture currently supports infrastructure monitoring, centralized logging, alerting, remote administration, self-hosted services, and Infrastructure as Code experimentation while remaining fully manageable through secure remote access.

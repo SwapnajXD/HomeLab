@@ -2,26 +2,54 @@
 
 ## Purpose
 
-This document contains common operational procedures for managing, troubleshooting, and recovering the homelab infrastructure.
+This document contains standard operational procedures for managing, validating, maintaining, and troubleshooting the HomeLab environment.
+
+The goal is to provide a single reference for routine administration and service management.
 
 ---
 
 # Infrastructure Overview
 
-| Host | Purpose |
-|--------|--------|
-| Apollo | Proxmox Hypervisor |
-| Hestia | Core Services LXC |
-| Athena | Monitoring & Automation VM |
-| Artemis | Management Workstation |
+| Host    | Purpose                    |
+| ------- | -------------------------- |
+| Apollo  | Proxmox VE Hypervisor      |
+| Hestia  | Core Services LXC          |
+| Athena  | Monitoring & Automation VM |
+| Artemis | Management Workstation     |
 
 ---
 
-# Health Checks
+# Service Inventory
 
-## Check Tailscale Connectivity
+## Hestia
 
-On Artemis:
+Services:
+
+* Homepage
+* Vaultwarden
+
+---
+
+## Athena
+
+Services:
+
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Node Exporter
+* Proxmox Exporter
+* Portainer
+* LocalStack
+
+---
+
+# Daily Health Checks
+
+## Verify Tailscale Connectivity
+
+From Artemis:
 
 ```bash
 tailscale status
@@ -36,16 +64,30 @@ Athena    online
 
 ---
 
-## Verify Athena Reachability
+## Verify Apollo Reachability
 
 ```bash
-ping 100.117.35.70
+ping <apollo-ip>
 ```
 
 Expected:
 
 ```text
-64 bytes from 100.x.x.x
+64 bytes from ...
+```
+
+---
+
+## Verify Athena Reachability
+
+```bash
+ping <athena-ip>
+```
+
+Expected:
+
+```text
+64 bytes from ...
 ```
 
 ---
@@ -55,7 +97,7 @@ Expected:
 SSH into Athena:
 
 ```bash
-ssh ubuntu@100.117.35.70
+ssh ubuntu@athena
 ```
 
 Check containers:
@@ -70,7 +112,7 @@ Expected containers:
 grafana
 prometheus
 loki
-promtail
+alloy
 node-exporter
 proxmox-exporter
 portainer
@@ -79,14 +121,96 @@ localstack
 
 ---
 
-# Service Management
+# Weekly Health Checks
+
+## Verify Prometheus Readiness
+
+```bash
+curl http://localhost:9090/-/ready
+```
+
+Expected:
+
+```text
+Prometheus is Ready.
+```
+
+---
+
+## Verify Loki Readiness
+
+```bash
+curl http://localhost:3100/ready
+```
+
+Expected:
+
+```text
+ready
+```
+
+---
+
+## Verify Loki Labels
+
+```bash
+curl http://localhost:3100/loki/api/v1/labels
+```
+
+Expected:
+
+Returned labels.
+
+---
+
+## Verify Node Exporter
+
+```bash
+curl http://localhost:9100/metrics
+```
+
+Expected:
+
+Metrics returned.
+
+---
+
+## Verify Proxmox Exporter
+
+```bash
+curl http://localhost:9221/metrics
+```
+
+Expected:
+
+Metrics returned.
+
+---
+
+## Verify Telegram Alerting
+
+Open Grafana:
+
+```text
+Alerting → Contact Points
+```
+
+Send test notification.
+
+Expected:
+
+Telegram message received.
+
+---
+
+# Docker Stack Management
 
 ## Telemetry Stack
 
 Location:
 
 ```bash
-~/homelab/infrastructure/athena/telemetry
+~/homelab/docker-compose/telemetry
 ```
 
 ### Start
@@ -115,12 +239,12 @@ docker compose logs -f
 
 ---
 
-## LocalStack
+## Core Services Stack
 
 Location:
 
 ```bash
-~/homelab/infrastructure/athena/localstack
+~/homelab/docker-compose/core-services
 ```
 
 ### Start
@@ -141,10 +265,32 @@ docker compose down
 docker compose restart
 ```
 
-### Logs
+---
+
+## LocalStack Stack
+
+Location:
 
 ```bash
-docker compose logs -f
+~/homelab/docker-compose/localstack
+```
+
+### Start
+
+```bash
+docker compose up -d
+```
+
+### Stop
+
+```bash
+docker compose down
+```
+
+### Restart
+
+```bash
+docker compose restart
 ```
 
 ---
@@ -156,10 +302,10 @@ docker compose logs -f
 Open:
 
 ```text
-http://ATHENA_IP:9090/targets
+http://athena:9090/targets
 ```
 
-Expected Status:
+Verify:
 
 ```text
 UP
@@ -167,8 +313,8 @@ UP
 
 for:
 
-- node-exporter
-- proxmox-exporter
+* node-exporter
+* proxmox-exporter
 
 ---
 
@@ -177,23 +323,23 @@ for:
 Open:
 
 ```text
-http://ATHENA_IP:3001
+http://athena:3000
 ```
 
 Verify:
 
-- Dashboards load
-- Prometheus datasource healthy
-- Loki datasource healthy
+* Dashboards load
+* Prometheus datasource healthy
+* Loki datasource healthy
 
 ---
 
-## Check Loki Logs
+## Check Logs in Grafana
 
-Open Grafana:
+Open:
 
 ```text
-Explore → Loki
+Grafana → Explore
 ```
 
 Query:
@@ -208,6 +354,21 @@ Container logs returned.
 
 ---
 
+## Verify Loki Internal Services
+
+```bash
+curl http://localhost:3100/services
+```
+
+Expected:
+
+* Distributor ACTIVE
+* Ingester ACTIVE
+* Scheduler ACTIVE
+* Compactor ACTIVE
+
+---
+
 # Terraform Operations
 
 Location:
@@ -218,7 +379,7 @@ Location:
 
 ---
 
-## Validate Configuration
+## Validate
 
 ```bash
 terraform validate
@@ -226,7 +387,7 @@ terraform validate
 
 ---
 
-## View Plan
+## Plan
 
 ```bash
 terraform plan
@@ -234,7 +395,7 @@ terraform plan
 
 ---
 
-## Deploy Infrastructure
+## Apply
 
 ```bash
 terraform apply
@@ -242,7 +403,7 @@ terraform apply
 
 ---
 
-## Destroy Infrastructure
+## Destroy
 
 ```bash
 terraform destroy
@@ -255,20 +416,27 @@ terraform destroy
 List buckets:
 
 ```bash
-aws --endpoint-url=http://100.117.35.70:4566 s3 ls
+awslocal s3 ls
 ```
 
 List tables:
 
 ```bash
-aws --endpoint-url=http://100.117.35.70:4566 dynamodb list-tables
+awslocal dynamodb list-tables
+```
+
+Expected resources:
+
+```text
+tf-homelab-storage-bucket
+tf-homelab-metadata
 ```
 
 ---
 
-# Backup Procedures
+# Backup Validation
 
-## Proxmox Backup Verification
+## Verify Proxmox Backup Jobs
 
 Open:
 
@@ -279,36 +447,35 @@ Datacenter
 
 Verify:
 
-- Scheduled jobs exist
-- Recent backups succeeded
+* Scheduled jobs present
+* Recent jobs successful
 
 ---
 
-## Verify Backup Files
+## Verify Backup Storage
 
 Open:
 
 ```text
 Datacenter
 → Storage
-→ Backups
 ```
 
-Confirm backup archives are present.
+Confirm backup archives exist.
 
 ---
 
-# Recovery Procedures
+# Service Recovery
 
-## Recover Failed Container
+## Restart Individual Container
 
-Check status:
+Check:
 
 ```bash
 docker ps -a
 ```
 
-Inspect logs:
+Inspect:
 
 ```bash
 docker logs CONTAINER_NAME
@@ -322,47 +489,79 @@ docker restart CONTAINER_NAME
 
 ---
 
-## Recover Entire Stack
-
-Navigate to stack directory:
+## Recreate Telemetry Stack
 
 ```bash
-cd ~/homelab/infrastructure/athena/telemetry
-```
+cd ~/homelab/docker-compose/telemetry
 
-Recreate:
-
-```bash
 docker compose down
 docker compose up -d
 ```
 
 ---
 
-## Recover Terraform Resources
-
-Destroy existing state:
+## Recreate Core Services
 
 ```bash
-terraform destroy
+cd ~/homelab/docker-compose/core-services
+
+docker compose down
+docker compose up -d
 ```
 
-Recreate:
+---
+
+## Recreate LocalStack
 
 ```bash
-terraform apply
+cd ~/homelab/docker-compose/localstack
+
+docker compose down
+docker compose up -d
+```
+
+---
+
+# Proxmox Operations
+
+## Verify VM Status
+
+```bash
+qm list
+```
+
+---
+
+## Verify LXC Status
+
+```bash
+pct list
+```
+
+---
+
+## Start Athena
+
+```bash
+qm start 101
+```
+
+---
+
+## Start Hestia
+
+```bash
+pct start <container-id>
 ```
 
 ---
 
 # Emergency Procedures
 
-## Apollo Reboot
-
-SSH:
+## Reboot Apollo
 
 ```bash
-ssh root@APOLLO_IP
+ssh root@apollo
 ```
 
 Execute:
@@ -373,10 +572,10 @@ reboot
 
 Verify:
 
-- Apollo online
-- Hestia online
-- Athena online
-- Docker services healthy
+* Apollo online
+* Athena online
+* Hestia online
+* Services healthy
 
 ---
 
@@ -385,35 +584,52 @@ Verify:
 Expected sequence:
 
 ```text
-Router boots
-    ↓
-Apollo reconnects
-    ↓
-Tailscale reconnects
-    ↓
-Athena reconnects
-    ↓
-Services become available
+Router Online
+      ↓
+Apollo Reconnects
+      ↓
+Tailscale Reconnects
+      ↓
+Athena Reconnects
+      ↓
+Services Available
 ```
 
-No manual action should be required.
+No manual action normally required.
 
 ---
 
-# Validation Checklist
+# Health Verification Checklist
 
-After any maintenance:
+Infrastructure:
 
-- [ ] Apollo reachable
-- [ ] Athena reachable
-- [ ] Hestia reachable
-- [ ] Tailscale operational
-- [ ] Grafana accessible
-- [ ] Prometheus targets UP
-- [ ] Loki receiving logs
-- [ ] LocalStack reachable
-- [ ] Terraform deploy succeeds
-- [ ] Backups present
+* [ ] Apollo reachable
+* [ ] Athena reachable
+* [ ] Hestia reachable
+* [ ] Tailscale operational
+
+Monitoring:
+
+* [ ] Grafana operational
+* [ ] Prometheus operational
+* [ ] Loki operational
+* [ ] Alloy operational
+* [ ] Metrics available
+* [ ] Logs available
+
+Alerting:
+
+* [ ] Telegram notifications operational
+
+Development:
+
+* [ ] LocalStack operational
+* [ ] Terraform validation successful
+
+Core Services:
+
+* [ ] Homepage accessible
+* [ ] Vaultwarden accessible
 
 ---
 
@@ -451,6 +667,14 @@ free -h
 
 ---
 
+## Uptime
+
+```bash
+uptime
+```
+
+---
+
 ## Network Connections
 
 ```bash
@@ -467,10 +691,35 @@ tailscale status
 
 ---
 
+## Execute Health Check Script
+
+```bash
+~/homelab/scripts/healthcheck.sh
+```
+
+---
+
 # Related Documentation
 
-- architecture.md
-- network.md
-- troubleshooting.md
-- disaster-recovery.md
-- validation-report.md
+* architecture.md
+* inventory.md
+* network.md
+* troubleshooting.md
+* disaster-recovery.md
+* validation-report.md
+
+---
+
+# Current Operational Status
+
+Environment State:
+
+Stable Operational Environment
+
+Operational Readiness:
+
+Validated
+
+Documentation Status:
+
+Current

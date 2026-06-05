@@ -6,9 +6,10 @@
 ![IaC](https://img.shields.io/badge/IaC-Terraform-purple)
 ![Monitoring](https://img.shields.io/badge/monitoring-Grafana%20%7C%20Prometheus-green)
 ![Logging](https://img.shields.io/badge/logging-Loki-yellow)
+![Alerting](https://img.shields.io/badge/alerting-Telegram-success)
 ![VPN](https://img.shields.io/badge/network-Tailscale-blue)
 
-A self-hosted homelab built on Proxmox VE for learning infrastructure engineering, observability, networking, automation, and disaster recovery practices.
+A self-hosted homelab built on Proxmox VE for learning infrastructure engineering, observability, networking, automation, Infrastructure as Code, and disaster recovery practices.
 
 The environment is fully manageable remotely through Tailscale and is designed to remain operational without physical access.
 
@@ -32,7 +33,7 @@ Apollo (Proxmox VE Host)
     ├── Grafana
     ├── Prometheus
     ├── Loki
-    ├── Promtail
+    ├── Grafana Alloy
     ├── Portainer
     └── LocalStack
 ```
@@ -42,13 +43,15 @@ Apollo (Proxmox VE Host)
 # Key Achievements
 
 * Built a multi-node Proxmox homelab
-* Implemented remote management through Tailscale
+* Implemented secure remote management through Tailscale
 * Centralized monitoring using Prometheus and Grafana
-* Centralized log aggregation using Loki and Promtail
+* Centralized log aggregation using Loki and Grafana Alloy
+* Implemented Telegram-based infrastructure alerting
 * Automated cloud resource provisioning using Terraform
 * Validated infrastructure through reboot and disaster recovery testing
 * Maintained complete infrastructure documentation
 * Implemented Infrastructure as Code workflows using LocalStack and Terraform
+* Performed troubleshooting and root cause analysis on production-style incidents
 
 ---
 
@@ -60,6 +63,7 @@ Apollo (Proxmox VE Host)
 * Ubuntu Server
 * Linux Containers (LXC)
 * Docker
+* Docker Compose
 
 ## Networking
 
@@ -67,20 +71,92 @@ Apollo (Proxmox VE Host)
 * Linux Bridges
 * Proxmox Virtual Networking
 
-## Monitoring & Logging
+## Monitoring, Logging & Alerting
 
 * Grafana
 * Prometheus
 * Loki
-* Promtail
+* Grafana Alloy
 * Node Exporter
 * Proxmox Exporter
+* Telegram Alerting
 
-## Automation
+## Automation & IaC
 
 * Terraform
 * LocalStack
 * AWS CLI
+* Bash
+
+---
+
+# Observability Platform
+
+## Metrics Pipeline
+
+```text
+Node Exporter
+        │
+        ▼
+Prometheus
+        │
+        ▼
+Grafana
+
+Proxmox Exporter
+        │
+        ▼
+Prometheus
+```
+
+---
+
+## Logging Pipeline
+
+```text
+Docker Containers
+        │
+        ▼
+Grafana Alloy
+        │
+        ▼
+Loki
+        │
+        ▼
+Grafana
+```
+
+---
+
+## Alerting Pipeline
+
+```text
+Prometheus
+        │
+        ▼
+Grafana Alerting
+        │
+        ▼
+Telegram
+```
+
+---
+
+# Infrastructure as Code
+
+Terraform is used with LocalStack to simulate AWS services locally.
+
+Current resources include:
+
+* tf-homelab-storage-bucket
+* tf-homelab-metadata
+
+Benefits:
+
+* Repeatable deployments
+* Safe experimentation
+* No cloud costs
+* Infrastructure testing workflows
 
 ---
 
@@ -143,9 +219,66 @@ HomeLab/
 
 ![Portainer](screenshots/portainer.png)
 
-## Proxmox
+## Proxmox Summary
 
 ![Proxmox](screenshots/proxmox-summary.png)
+
+---
+
+# Current Status
+
+| Component         | Status      |
+| ----------------- | ----------- |
+| Apollo            | Healthy     |
+| Athena            | Healthy     |
+| Hestia            | Healthy     |
+| Grafana           | Healthy     |
+| Prometheus        | Healthy     |
+| Loki              | Healthy     |
+| Grafana Alloy     | Healthy     |
+| Node Exporter     | Healthy     |
+| Proxmox Exporter  | Healthy     |
+| LocalStack        | Healthy     |
+| Tailscale         | Operational |
+| Metrics Pipeline  | Operational |
+| Logging Pipeline  | Operational |
+| Alerting Pipeline | Operational |
+
+---
+
+# Major Incidents Investigated
+
+## Proxmox Network Isolation Incident
+
+### Root Cause
+
+Incomplete bridge configuration resulted in VM and container connectivity issues.
+
+### Resolution
+
+Rebuilt and validated the Proxmox bridge configuration.
+
+---
+
+## Loki Readiness Incident
+
+### Discovery
+
+Incorrect readiness endpoint:
+
+```text
+/loki/api/v1/status/ready
+```
+
+Correct endpoint:
+
+```text
+/ready
+```
+
+### Resolution
+
+Updated validation and monitoring procedures to use the correct endpoint.
 
 ---
 
@@ -156,6 +289,7 @@ HomeLab/
 * Learn Infrastructure as Code workflows
 * Practice disaster recovery procedures
 * Build operational experience with self-hosted services
+* Develop troubleshooting and incident response skills
 
 ---
 
@@ -163,9 +297,35 @@ HomeLab/
 
 See:
 
+```text
 HOMELAB_ROADMAP.md
+```
 
 for the complete project roadmap and milestones.
+
+---
+
+# Skills Demonstrated
+
+* Linux Administration
+* Docker & Docker Compose
+* Proxmox Virtualization
+* Networking
+* Tailscale
+* Monitoring & Alerting
+* Centralized Logging
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Terraform
+* LocalStack
+* Infrastructure as Code
+* Troubleshooting
+* Root Cause Analysis
+* Incident Response
+* Disaster Recovery
+* Documentation
 
 ---
 
