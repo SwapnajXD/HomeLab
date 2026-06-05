@@ -10,38 +10,19 @@
 ![VPN](https://img.shields.io/badge/network-Tailscale-blue)
 
 A self-hosted homelab built on Proxmox VE for learning infrastructure engineering, observability, networking, automation, Infrastructure as Code, and disaster recovery practices.
-
 The environment is fully manageable remotely through Tailscale and is designed to remain operational without physical access.
 
 ---
 
-# Infrastructure Overview
-
-```text
-Artemis (Management Workstation)
-        │
-        ▼
-    Tailscale
-        │
-        ▼
-Apollo (Proxmox VE Host)
-├── Hestia (LXC)
-│   ├── Homepage Dashboard
-│   └── Vaultwarden
-│
-└── Athena (Ubuntu VM)
-    ├── Grafana
-    ├── Prometheus
-    ├── Loki
-    ├── Grafana Alloy
-    ├── Portainer
-    └── LocalStack
-```
+## Infrastructure Overview
+* **Apollo:** Proxmox VE Hypervisor
+* **Athena:** Ubuntu VM (Monitoring, Automation, IaC)
+* **Hestia:** LXC Container (Core Applications)
+* **Artemis:** Arch Linux Management Workstation
 
 ---
 
-# Key Achievements
-
+## Key Achievements
 * Built a multi-node Proxmox homelab
 * Implemented secure remote management through Tailscale
 * Centralized monitoring using Prometheus and Grafana
@@ -55,104 +36,25 @@ Apollo (Proxmox VE Host)
 
 ---
 
-# Technology Stack
-
-## Infrastructure
-
-* Proxmox VE
-* Ubuntu Server
-* Linux Containers (LXC)
-* Docker
-* Docker Compose
-
-## Networking
-
-* Tailscale
-* Linux Bridges
-* Proxmox Virtual Networking
-
-## Monitoring, Logging & Alerting
-
-* Grafana
-* Prometheus
-* Loki
-* Grafana Alloy
-* Node Exporter
-* Proxmox Exporter
-* Telegram Alerting
-
-## Automation & IaC
-
-* Terraform
-* LocalStack
-* AWS CLI
-* Bash
+## Technology Stack
+### Infrastructure
+* Proxmox VE | Ubuntu Server | Linux Containers (LXC) | Docker | Docker Compose
+### Networking
+* Tailscale | Linux Bridges | Proxmox Virtual Networking
+### Monitoring, Logging & Alerting
+* Grafana | Prometheus | Loki | Grafana Alloy | Node Exporter | Proxmox Exporter | Telegram Alerting
+### Automation & IaC
+* Terraform | LocalStack | AWS CLI | Bash
 
 ---
 
-# Observability Platform
-
-## Metrics Pipeline
-
-```text
-Node Exporter
-        │
-        ▼
-Prometheus
-        │
-        ▼
-Grafana
-
-Proxmox Exporter
-        │
-        ▼
-Prometheus
-```
-
----
-
-## Logging Pipeline
-
-```text
-Docker Containers
-        │
-        ▼
-Grafana Alloy
-        │
-        ▼
-Loki
-        │
-        ▼
-Grafana
-```
-
----
-
-## Alerting Pipeline
-
-```text
-Prometheus
-        │
-        ▼
-Grafana Alerting
-        │
-        ▼
-Telegram
-```
-
----
-
-# Infrastructure as Code
-
+## Infrastructure as Code
 Terraform is used with LocalStack to simulate AWS services locally.
-
 Current resources include:
-
-* tf-homelab-storage-bucket
-* tf-homelab-metadata
+* `tf-homelab-storage-bucket`
+* `tf-homelab-metadata`
 
 Benefits:
-
 * Repeatable deployments
 * Safe experimentation
 * No cloud costs
@@ -160,175 +62,55 @@ Benefits:
 
 ---
 
-# Repository Structure
-
-```text
-HomeLab/
-├── architecture/
-├── configs/
-│   ├── apollo/
-│   ├── athena/
-│   └── hestia/
-├── docker-compose/
-├── docs/
-├── screenshots/
-├── scripts/
-├── terraform/
-├── README.md
-├── LICENSE
-├── HOMELAB_ROADMAP.md
-└── tree.txt
-```
+## Documentation Map
+| Document | Description |
+| ------ | ------ |
+| [Architecture](docs/architecture.md) | Infrastructure architecture |
+| [Network](docs/network.md) | Network topology and routing |
+| [Security](docs/security.md) | Security posture and access controls |
+| [Inventory](docs/inventory.md) | Infrastructure inventory |
+| [Runbook](docs/runbook.md) | Operational procedures |
+| [Troubleshooting](docs/troubleshooting.md) | Issues encountered and resolutions |
+| [Disaster Recovery](docs/disaster-recovery.md) | Recovery procedures |
+| [Validation Report](docs/validation-report.md) | Validation and testing results |
+| [Changelog](docs/changelog.md) | Infrastructure changes over time |
+| [Project Timeline](docs/project-timeline.md) | Project milestones and history |
+| [Roadmap](HOMELAB_ROADMAP.md) | Lean Engineering Homelab Roadmap |
 
 ---
 
-# Documentation
+## Screenshots
 
-| Document                  | Description                        |
-| ------------------------- | ---------------------------------- |
-| docs/architecture.md      | Infrastructure architecture        |
-| docs/network.md           | Network topology and routing       |
-| docs/inventory.md         | Infrastructure inventory           |
-| docs/runbook.md           | Operational procedures             |
-| docs/troubleshooting.md   | Issues encountered and resolutions |
-| docs/disaster-recovery.md | Recovery procedures                |
-| docs/validation-report.md | Validation and testing results     |
-| docs/changelog.md         | Infrastructure changes over time   |
+### Homepage Dashboard
+![Homepage Dashboard](screenshots/homepage-dashboard.png)
 
----
+### Grafana Dashboard
+![Grafana Dashboard](screenshots/grafana-dashboard.png)
 
-# Screenshots
+### Prometheus Targets
+![Prometheus Targets](screenshots/prometheus-targets.png)
 
-## Homepage Dashboard
+### Loki Logs
+![Loki Logs](screenshots/loki-logs.png)
 
-![Homepage](screenshots/homepage-dashboard.png)
-
-## Grafana Dashboard
-
-![Grafana](screenshots/grafana-dashboard.png)
-
-## Prometheus Targets
-
-![Prometheus](screenshots/prometheus-targets.png)
-
-## Loki Logs
-
-![Loki](screenshots/loki-logs.png)
-
-## Portainer
-
+### Portainer
 ![Portainer](screenshots/portainer.png)
 
-## Proxmox Summary
-
-![Proxmox](screenshots/proxmox-summary.png)
-
----
-
-# Current Status
-
-| Component         | Status      |
-| ----------------- | ----------- |
-| Apollo            | Healthy     |
-| Athena            | Healthy     |
-| Hestia            | Healthy     |
-| Grafana           | Healthy     |
-| Prometheus        | Healthy     |
-| Loki              | Healthy     |
-| Grafana Alloy     | Healthy     |
-| Node Exporter     | Healthy     |
-| Proxmox Exporter  | Healthy     |
-| LocalStack        | Healthy     |
-| Tailscale         | Operational |
-| Metrics Pipeline  | Operational |
-| Logging Pipeline  | Operational |
-| Alerting Pipeline | Operational |
+### Proxmox Summary
+![Proxmox Summary](screenshots/proxmox-summary.png)
 
 ---
 
-# Major Incidents Investigated
-
-## Proxmox Network Isolation Incident
-
-### Root Cause
-
-Incomplete bridge configuration resulted in VM and container connectivity issues.
-
-### Resolution
-
-Rebuilt and validated the Proxmox bridge configuration.
+## Future Roadmap & Plans
+The following initiatives are planned for the next phase of the homelab's evolution:
+* **CI/CD & GitOps:** Transitioning the repository into a fully automated GitOps deployment structure.
+* **Backup & Restore Automation:** Scripting automated, version-controlled backups for all container volumes and configurations.
+* **ESP32 Telemetry Integration:** Integrating external IoT and hardware sensors into the Prometheus metrics pipeline.
+* **Advanced Monitoring Upgrades:** Adding network latency tracking, uptime monitoring, and SRE-grade Grafana dashboards.
+* **Security Enhancements:** Implementing Tailscale ACLs, network device tagging, and secure authentication layers for Prometheus and Loki.
+* **Architecture Flow Diagrams:** Generating dedicated Mermaid.js flow diagrams for metrics, logging, alerting, and recovery.
 
 ---
 
-## Loki Readiness Incident
-
-### Discovery
-
-Incorrect readiness endpoint:
-
-```text
-/loki/api/v1/status/ready
-```
-
-Correct endpoint:
-
-```text
-/ready
-```
-
-### Resolution
-
-Updated validation and monitoring procedures to use the correct endpoint.
-
----
-
-# Project Goals
-
-* Learn infrastructure engineering fundamentals
-* Learn observability and monitoring practices
-* Learn Infrastructure as Code workflows
-* Practice disaster recovery procedures
-* Build operational experience with self-hosted services
-* Develop troubleshooting and incident response skills
-
----
-
-# Roadmap
-
-See:
-
-```text
-HOMELAB_ROADMAP.md
-```
-
-for the complete project roadmap and milestones.
-
----
-
-# Skills Demonstrated
-
-* Linux Administration
-* Docker & Docker Compose
-* Proxmox Virtualization
-* Networking
-* Tailscale
-* Monitoring & Alerting
-* Centralized Logging
-* Grafana
-* Prometheus
-* Loki
-* Grafana Alloy
-* Terraform
-* LocalStack
-* Infrastructure as Code
-* Troubleshooting
-* Root Cause Analysis
-* Incident Response
-* Disaster Recovery
-* Documentation
-
----
-
-# License
-
+## License
 MIT License
