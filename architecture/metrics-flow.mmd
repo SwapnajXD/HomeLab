@@ -1,0 +1,26 @@
+```mermaid
+graph LR
+
+    Apollo["Apollo - Proxmox Host"]
+    Athena["Athena - Ubuntu VM"]
+
+    PveExp["Proxmox Exporter"]
+    NodeExp["Node Exporter"]
+
+    Prometheus[(Prometheus)]
+    Grafana["Grafana"]
+
+    Apollo -->|Metrics| PveExp
+    Athena -->|Metrics| NodeExp
+
+    PveExp -->|Scraped Every 15s| Prometheus
+    NodeExp -->|Scraped Every 15s| Prometheus
+
+    Prometheus -->|Datasource Queries| Grafana
+
+    classDef source fill:#6aa84f,color:#ffffff,stroke:#ffffff,stroke-width:2px;
+    classDef storage fill:#e69138,color:#ffffff,stroke:#ffffff,stroke-width:2px;
+
+    class Apollo,Athena source;
+    class Prometheus storage;
+```

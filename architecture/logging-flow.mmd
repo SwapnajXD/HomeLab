@@ -1,0 +1,19 @@
+```mermaid
+graph LR
+
+    Docker["Docker Containers"]
+    Alloy["Grafana Alloy"]
+    Loki[(Loki)]
+    Grafana["Grafana Explore"]
+
+    Docker -->|Container Logs| Alloy
+
+    Alloy -->|Service Discovery| Alloy
+    Alloy -->|Push API| Loki
+
+    Loki -->|Datasource Queries| Grafana
+
+    classDef logs fill:#f1c232,color:#000000,stroke:#ffffff,stroke-width:2px;
+
+    class Docker,Loki logs;
+```

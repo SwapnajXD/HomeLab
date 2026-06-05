@@ -1,0 +1,20 @@
+```mermaid
+graph TD
+
+    Prometheus[(Prometheus)]
+    Loki[(Loki)]
+
+    Alerting["Grafana Alerting Engine"]
+    ContactPoint["Telegram Contact Point"]
+    Telegram["Telegram Bot / User Device"]
+
+    Prometheus -->|Alert Rules| Alerting
+    Loki -->|Log Queries| Alerting
+
+    Alerting -->|Notification Policy| ContactPoint
+    ContactPoint -->|Telegram API| Telegram
+
+    classDef alert fill:#cc0000,color:#ffffff,stroke:#ffffff,stroke-width:2px;
+
+    class Telegram alert;
+```

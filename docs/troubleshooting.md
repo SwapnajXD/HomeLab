@@ -2,651 +2,13 @@
 
 ## Purpose
 
-This document records significant issues encountered during the design, deployment, operation, and maintenance of the homelab environment.
-
-Each incident includes:
-
-- Overview
-- Symptoms
-- Investigation
-- Root Cause
-- Resolution
-- Verification
-- Impact
-- Lessons Learned
-
-The goal is to preserve operational knowledge, reduce recovery time, and document engineering decisions for future maintenance and portfolio review.
-
----
-
-# Permission Denied During Infrastructure Refactoring
-
-## Overview
-
-During the consolidation of multiple Docker Compose projects into a unified infrastructure layout, several directories could not be created or modified within the homelab workspace.
-
-This prevented the migration of monitoring services into their new location and temporarily blocked repository restructuring efforts.
-
-## Symptoms
-
-Attempts to create new directories inside the homelab repository failed immediately.
-
-```bash
-mkdir -p ~/homelab/docker-compose/telemetry
-```
-
-Result:
-
-```text
-mkdir: cannot create directory ... Permission denied
-```
-
-Additional operations such as moving files and editing existing directories also failed.
-
-## Investigation
-
-Filesystem ownership was inspected:
-
-```bash
-ls -la ~/homelab
-```
-
-Several directories were owned by:
-
-```text
-root:root
-```
-
-instead of the intended user account.
-
-## Root Cause
-
-Previous Docker operations executed with elevated privileges created directories owned by root.
-
-The repository became a mixture of user-owned and root-owned files.
-
-## Resolution
-
-```bash
-sudo chown -R $USER:$USER ~/homelab
-```
-
-## Verification
-
-Directory creation, file movement, and Git operations completed successfully after ownership was restored.
-
-## Impact
-
-- Repository restructuring delayed
-- No service outage
-- No data loss
-
-## Lessons Learned
-
-Avoid unnecessary use of sudo during Docker operations and periodically verify repository ownership.
-
----
-
-# Docker Container Name Conflicts During Stack Consolidation
-
-## Overview
-
-While consolidating monitoring services into a single telemetry stack, Docker failed to create containers due to naming conflicts.
-
-## Symptoms
-
-```text
-Conflict. The container name "/proxmox-exporter" is already in use.
-```
-
-Similar conflicts occurred for:
-
-- grafana
-- prometheus
-- promtail
-- node-exporter
-
-## Investigation
-
-Existing containers from previous deployments remained registered within Docker.
-
-## Root Cause
-
-Legacy containers were not removed before deploying the new unified compose stack.
-
-## Resolution
-
-```bash
-docker rm -f \
-proxmox-exporter \
-prometheus \
-node-exporter \
-grafana \
-promtail \
-loki
-```
-
-Then:
-
-```bash
-docker compose up -d
-```
-
-## Verification
-
-All telemetry containers started successfully within the new compose project.
-
-## Impact
-
-- Telemetry deployment blocked
-- No data loss
-
-## Lessons Learned
-
-Always decommission legacy stacks before migration.
-
----
-
-# VM and LXC Autostart Failure
-
-## Overview
-
-A planned reboot revealed that critical workloads did not automatically start after the hypervisor came back online.
-
-## Symptoms
-
-After rebooting Apollo:
-
-- Athena remained offline
-- Hestia remained offline
-- Services unavailable
-
-## Investigation
-
-Proxmox startup settings were reviewed.
-
-## Root Cause
-
-The "Start at Boot" option was disabled for both Athena and Hestia.
-
-## Resolution
-
-Enabled:
-
-```text
-VM/LXC
-→ Options
-→ Start at Boot
-→ Yes
-```
-
-## Verification
-
-Subsequent reboots automatically restored:
-
-- Athena
-- Hestia
-- Docker services
-
-## Impact
-
-Temporary service outage after reboot.
-
-## Lessons Learned
-
-All production workloads should have autostart enabled and validated during testing.
-
----
-
-# Apollo Network Outage and Recovery
-
-## Overview
-
-Apollo experienced a network outage that prevented communication between infrastructure components.
-
-## Symptoms
-
-- VMs lost connectivity
-- Containers unreachable
-- Remote administration unavailable
-- Tailscale access unavailable
-
-## Investigation
-
-Bridge interfaces, firewall settings, routing rules, and network configuration files were reviewed.
-
-Commands used:
-
-```bash
-ip addr
-ip route
-bridge link
-brctl show
-iptables -L -n -v
-```
-
-## Root Cause
-
-Network configuration drift combined with bridge and firewall interactions created inconsistent routing behavior.
-
-Additional testing revealed that previous network experiments left behind stale networking artifacts that complicated troubleshooting.
-
-## Resolution
-
-- Validated active bridge assignments
-- Corrected routing configuration
-- Verified firewall settings
-- Restarted affected network services
-- Removed obsolete networking components
-
-## Verification
-
-Connectivity restored between:
-
-- Apollo
-- Hestia
-- Athena
-- Artemis
-
-Verified using:
-
-```bash
-ping
-ssh
-tailscale status
-```
-
-## Impact
-
-Temporary loss of infrastructure management capability.
-
-## Lessons Learned
-
-Network changes should be documented immediately and tested incrementally.
-
----
-
-# Stale vmbr1 Bridge Configuration
-
-## Overview
-
-During network troubleshooting, an unused Proxmox bridge interface was discovered.
-
-## Symptoms
-
-Inspection showed:
-
-```bash
-brctl show vmbr1
-```
-
-Output:
-
-```text
-bridge name bridge id STP enabled interfaces
-vmbr1 8000.xxxxxxxxxxxx no
-```
-
-The bridge existed but had no attached interfaces.
-
-Further validation:
-
-```bash
-bridge link | grep vmbr1
-```
-
-Returned no results.
-
-## Investigation
-
-Network configuration files and Proxmox bridge assignments were reviewed.
-
-## Root Cause
-
-The bridge remained from earlier networking experiments and was no longer connected to any active workload.
-
-## Resolution
-
-Removed unused bridge configuration and standardized networking around the active infrastructure bridge.
-
-## Verification
-
-Network inventory matched actual infrastructure design.
-
-Only actively used bridges remained.
-
-## Impact
-
-No service outage.
-
-However, it introduced confusion during troubleshooting and network audits.
-
-## Lessons Learned
-
-Unused networking components should be removed after migrations or testing activities.
-
----
-
-# Loki Centralized Logging Integration
-
-## Overview
-
-Container logs were initially fragmented across multiple hosts and difficult to search.
-
-## Symptoms
-
-No centralized method existed for viewing historical container logs.
-
-Troubleshooting required manually accessing individual hosts and containers.
-
-## Investigation
-
-Docker logging configuration was reviewed across deployed services.
-
-## Root Cause
-
-Containers were writing logs locally without centralized aggregation.
-
-## Resolution
-
-Deployed:
-
-- Loki
-- Promtail
-- Grafana integration
-
-Configured Docker logging pipelines to forward logs centrally.
-
-## Verification
-
-Logs became visible through Grafana Explore.
-
-Example query:
-
-```logql
-{job=~".+"}
-```
-
-Vaultwarden and other service logs became searchable from a single interface.
-
-## Impact
-
-Improved troubleshooting efficiency and observability.
-
-## Lessons Learned
-
-Centralized logging should be deployed early in infrastructure projects.
-
----
-
-# Homepage Dashboard Configuration Recovery
-
-## Overview
-
-The Homepage dashboard configuration was lost during restructuring and migration activities.
-
-## Symptoms
-
-Dashboard sections disappeared or rendered incorrectly.
-
-Widgets failed to display expected service information.
-
-## Investigation
-
-Homepage configuration files were reviewed:
-
-```text
-services.yaml
-widgets.yaml
-settings.yaml
-```
-
-## Root Cause
-
-Configuration changes and file restructuring introduced inconsistencies between the deployed container and repository state.
-
-## Resolution
-
-Configuration files were rebuilt and reorganized.
-
-Service definitions were re-added and validated.
-
-## Verification
-
-Homepage successfully displayed:
-
-- Proxmox
-- Grafana
-- Portainer
-- Vaultwarden
-- Prometheus
-
-Widgets loaded successfully.
-
-## Impact
-
-Dashboard visibility temporarily reduced.
-
-No underlying services were affected.
-
-## Lessons Learned
-
-Configuration should always be tracked in Git and backed up before major restructuring.
-
----
-
-# LocalStack and Terraform Infrastructure Validation
-
-## Overview
-
-Infrastructure as Code workflows were validated using LocalStack.
-
-## Symptoms
-
-Required confirmation that Terraform could provision infrastructure successfully through a local AWS-compatible endpoint.
-
-## Investigation
-
-Terraform configuration and LocalStack endpoint configuration were reviewed.
-
-Provider configuration was validated.
-
-## Resolution
-
-Successfully provisioned:
-
-### S3 Bucket
-
-```text
-tf-homelab-storage-bucket
-```
-
-### DynamoDB Table
-
-```text
-tf-homelab-metadata
-```
-
-## Verification
-
-Terraform deployment:
-
-```bash
-terraform apply
-```
-
-Result:
-
-```text
-Apply complete! Resources: 2 added.
-```
-
-Endpoint validation:
-
-```text
-HTTP/1.1 200 OK
-```
-
-Resource validation:
-
-```bash
-aws s3 ls
-aws dynamodb list-tables
-```
-
-## Impact
-
-Established a repeatable Infrastructure as Code workflow.
-
-## Lessons Learned
-
-Declarative infrastructure significantly improves recovery, consistency, and scalability.
-
----
-
-# Headless Operations Validation
-
-## Overview
-
-The infrastructure was tested without requiring a monitor, keyboard, or mouse.
-
-## Objective
-
-Verify that the environment could be fully managed remotely after leaving for college.
-
-## Procedure
-
-Disconnected:
-
-- Monitor
-- Keyboard
-- Mouse
-
-Left connected:
-
-- Power
-- Network
-
-## Verification
-
-Successfully managed infrastructure using:
-
-- Tailscale
-- SSH
-- Grafana
-- Portainer
-- Homepage
-
-All services remained accessible.
-
-## Impact
-
-Confirmed remote-only operation capability.
-
-## Lessons Learned
-
-Physical access should never be required for routine administration.
-
----
-
-# Chaos Reboot Recovery Testing
-
-## Overview
-
-A full recovery test was executed to verify automatic service restoration after a simulated outage.
-
-## Test Procedure
-
-Rebooted Apollo.
-
-Observed:
-
-1. Hypervisor startup
-2. VM startup
-3. Container startup
-4. Network recovery
-5. Service recovery
-
-## Verification
-
-Recovered automatically:
-
-- Hestia
-- Athena
-- Homepage
-- Vaultwarden
-- Grafana
-- Prometheus
-- Loki
-- Portainer
-- LocalStack
-
-Verified through:
-
-```bash
-docker ps
-tailscale status
-```
-
-and web interface accessibility.
-
-## Result
-
-PASS
-
-## Impact
-
-Validated disaster recovery readiness.
-
-## Lessons Learned
-
-Recovery testing is as important as deployment testing.
-
----
-
-# Key Takeaways
-
-1. Infrastructure should be reproducible through code.
-2. Monitoring must exist before major workloads are deployed.
-3. Centralized logging dramatically reduces troubleshooting time.
-4. Recovery procedures should be tested regularly.
-5. Documentation is part of the infrastructure.
-6. Network changes should be tracked carefully.
-7. Remote administration should be possible without physical access.
-8. Every major configuration should be version controlled.
-9. Disaster recovery should be validated, not assumed.
-10. Operational documentation reduces future troubleshooting effort.
-
-
-
-
-
-# V2
-
-
-
-# Troubleshooting Guide
-
-## Purpose
-
 This document records significant issues encountered during the design, deployment, operation, maintenance, and evolution of the HomeLab environment.
 
-Each incident includes:
-
-* Overview
-* Symptoms
-* Investigation
-* Root Cause
-* Resolution
-* Verification
-* Impact
-* Lessons Learned
-
-The objective is to preserve operational knowledge, reduce future recovery time, document engineering decisions, and maintain a historical record of infrastructure changes.
+Each incident includes an overview, symptoms, investigation, root cause, resolution, verification, impact, and lessons learned. The objective is to preserve operational knowledge, reduce future recovery time, document engineering decisions, and maintain a historical record of infrastructure changes.
 
 ---
 
-# Incident Summary
+## Incident Summary
 
 | Incident                                                   | Severity | Status    |
 | ---------------------------------------------------------- | -------- | --------- |
@@ -665,226 +27,187 @@ The objective is to preserve operational knowledge, reduce future recovery time,
 
 ---
 
-# Permission Denied During Infrastructure Refactoring
+## 1. Permission Denied During Infrastructure Refactoring
 
-## Overview
+### Overview
 
-During consolidation of multiple Docker Compose projects into a unified infrastructure layout, several directories could not be created or modified within the homelab repository.
+During consolidation of multiple Docker Compose projects into a unified infrastructure layout, several directories could not be created or modified within the homelab workspace.
 
-This prevented migration of monitoring services into their new location and temporarily blocked repository restructuring efforts.
+### Symptoms
 
-## Symptoms
+* `Permission denied` errors during directory creation
+* Failed file moves
+* Failed repository restructuring operations
 
-Attempts to create new directories failed immediately.
-
-```bash
-mkdir -p ~/homelab/docker-compose/telemetry
-```
-
-Result:
-
-```text
-mkdir: cannot create directory ... Permission denied
-```
-
-Additional operations such as moving files and editing existing directories also failed.
-
-## Investigation
-
-Filesystem ownership was inspected.
+### Investigation
 
 ```bash
-ls -la ~/homelab
+ls -la
 ```
 
-Several directories were owned by:
+Several directories were owned by `root` rather than the intended user account.
 
-```text
-root:root
-```
+### Root Cause
 
-instead of the intended user account.
+Previous Docker operations executed with elevated privileges (`sudo`) created root-owned directories.
 
-## Root Cause
-
-Previous Docker operations executed with elevated privileges created directories owned by root.
-
-The repository became a mixture of user-owned and root-owned files.
-
-## Resolution
+### Resolution
 
 ```bash
-sudo chown -R $USER:$USER ~/homelab
+sudo chown -R ubuntu:ubuntu ~/homelab
 ```
 
-## Verification
+### Verification
 
-Directory creation, file movement, and Git operations completed successfully.
+* Directory creation successful
+* Git operations successful
+* File modifications successful
 
-## Impact
+### Impact
 
-* Repository restructuring delayed
+* Temporary repository restructuring delay
 * No service outage
 * No data loss
 
-## Lessons Learned
+### Lessons Learned
 
-Avoid unnecessary use of sudo during Docker operations and periodically verify repository ownership.
+Avoid unnecessary use of `sudo` during routine Docker operations.
 
 ---
 
-# Docker Container Name Conflicts During Stack Consolidation
+## 2. Docker Container Name Conflicts During Stack Consolidation
 
-## Overview
+### Overview
 
-While consolidating monitoring services into a single telemetry stack, Docker failed to create containers due to naming conflicts.
+While consolidating monitoring services into a unified telemetry stack, Docker failed to create containers due to naming conflicts.
 
-## Symptoms
+### Symptoms
 
-```text
-Conflict. The container name "/proxmox-exporter" is already in use.
-```
+Conflicts occurred for:
 
-Similar conflicts occurred for:
+* grafana
+* prometheus
+* loki
+* promtail
+* node-exporter
 
-* Grafana
-* Prometheus
-* Node Exporter
-* Loki
-* Promtail
-
-## Investigation
-
-Existing containers from previous deployments remained registered within Docker.
-
-## Root Cause
-
-Legacy containers were not removed before deployment of the new compose stack.
-
-## Resolution
+### Investigation
 
 ```bash
-docker rm -f \
-proxmox-exporter \
-prometheus \
-node-exporter \
-grafana \
-promtail \
-loki
+docker ps -a
 ```
 
-Redeployed:
+Legacy containers remained registered from previous deployments.
+
+### Root Cause
+
+Existing containers were not removed before deploying the new stack.
+
+### Resolution
 
 ```bash
+docker rm -f grafana prometheus promtail node-exporter loki
 docker compose up -d
 ```
 
-## Verification
+### Verification
 
-Telemetry services started successfully.
+All telemetry containers started successfully.
 
-## Impact
+### Impact
 
-* Deployment blocked
+* Deployment blocked temporarily
 * No data loss
 
-## Lessons Learned
+### Lessons Learned
 
-Always decommission legacy stacks before migration.
+Always decommission legacy stacks before migrations.
 
 ---
 
-# VM and LXC Autostart Failure
+## 3. VM and LXC Autostart Failure
 
-## Overview
+### Overview
 
-A planned reboot revealed that critical workloads did not automatically start after the hypervisor returned online.
+A planned reboot revealed critical workloads were not configured to start automatically.
 
-## Symptoms
+### Symptoms
 
-After rebooting Apollo:
+After reboot:
 
-* Athena remained offline
-* Hestia remained offline
+* Athena offline
+* Hestia offline
 * Services unavailable
 
-## Investigation
+### Investigation
 
-Proxmox startup settings were reviewed.
+Reviewed Proxmox startup settings.
 
-## Root Cause
+### Root Cause
 
-Start-at-boot was disabled.
+**Start at Boot** was disabled for:
 
-## Resolution
+* VM 100 (Athena)
+* LXC 101 (Hestia)
 
-Enabled:
+### Resolution
 
-```text
-VM/LXC
-→ Options
-→ Start at Boot
-→ Yes
-```
+Enabled Proxmox autostart for both workloads.
 
-## Verification
+### Verification
 
-Subsequent reboots automatically restored:
+Subsequent reboots automatically restored services.
 
-* Athena
-* Hestia
-* Docker services
+### Impact
 
-## Impact
+Temporary service outage after host reboot.
 
-Temporary service outage.
+### Lessons Learned
 
-## Lessons Learned
-
-Autostart settings should be validated during recovery testing.
+Validate autostart configuration during infrastructure testing.
 
 ---
 
-# Apollo Network Outage and Recovery
+## 4. Apollo Network Outage and Recovery
 
-## Overview
+### Overview
 
-Apollo experienced a network outage that prevented communication between infrastructure components.
+Apollo experienced a network outage that interrupted connectivity between infrastructure components.
 
-## Symptoms
+### Symptoms
 
-* VM connectivity failures
-* Container connectivity failures
-* Tailscale unavailable
-* Remote administration unavailable
+* VMs unreachable
+* Containers unreachable
+* SSH unavailable
+* Tailscale inaccessible
 
-## Investigation
+### Investigation
 
-Commands used:
+Reviewed:
+
+* Proxmox bridge configuration
+* Routing
+* Firewall rules
+* Interface assignments
+
+### Root Cause
+
+Network configuration drift combined with stale bridge configurations and firewall interactions.
+
+### Resolution
+
+* Validated active bridge assignments (`vmbr0`)
+* Corrected routing configuration
+* Verified firewall settings
+* Restarted networking services
+* Removed obsolete networking components
+
+### Verification
 
 ```bash
-ip addr
-ip route
-bridge link
-brctl show
-iptables -L -n -v
+ping
+tailscale ping
 ```
-
-Network bridges, firewall rules, and routing were reviewed.
-
-## Root Cause
-
-Network configuration drift combined with bridge and firewall interactions produced inconsistent routing behavior.
-
-## Resolution
-
-* Corrected routing configuration
-* Validated bridge assignments
-* Reviewed firewall rules
-* Restarted networking services
-* Removed obsolete components
-
-## Verification
 
 Connectivity restored between:
 
@@ -893,41 +216,59 @@ Connectivity restored between:
 * Hestia
 * Artemis
 
-Validated using:
+### Impact
 
-```bash
-ping
-ssh
-tailscale status
-```
+Temporary infrastructure management outage.
 
-## Impact
-
-Temporary loss of infrastructure management capability.
-
-## Lessons Learned
+### Lessons Learned
 
 Network changes should be documented immediately and validated incrementally.
 
 ---
 
-# Loki Centralized Logging Integration
+## 5. Stale vmbr1 Bridge Configuration
 
-## Overview
+### Overview
 
-Container logs were initially fragmented across multiple hosts and difficult to search.
+An unused bridge interface was discovered during network auditing.
 
-## Resolution
+### Symptoms
 
-Initially deployed:
+`vmbr1` existed but had no active workloads attached.
 
-* Loki
-* Promtail
-* Grafana Integration
+### Investigation
 
-The logging platform was later modernized by replacing Promtail with Grafana Alloy.
+Reviewed Proxmox network configuration.
 
-### Current Logging Architecture
+### Root Cause
+
+Legacy bridge from earlier networking experiments.
+
+### Resolution
+
+Removed unused bridge and standardized networking on `vmbr0`.
+
+### Verification
+
+Network inventory matched actual infrastructure design.
+
+### Impact
+
+No service outage.
+
+### Lessons Learned
+
+Remove obsolete infrastructure components after testing.
+
+---
+
+## 6. Loki Centralized Logging Integration
+
+### Overview
+
+Container logs were initially distributed across multiple hosts without centralized aggregation.
+
+### Architecture
 
 ```text
 Docker Containers
@@ -939,122 +280,206 @@ Grafana Alloy
 Loki
         │
         ▼
-Grafana
+Grafana Explore
 ```
 
-## Verification
+### Symptoms
 
-Logs became visible through Grafana Explore.
+* No centralized log access
+* Difficult troubleshooting
+* Limited historical log visibility
 
-Example query:
+### Root Cause
 
-```logql
-{job=~".+"}
+Containers only stored local logs.
+
+### Resolution
+
+Implemented:
+
+* Loki
+* Grafana Alloy
+* Centralized log forwarding
+
+### Verification
+
+Grafana Explore query:
+
+```text
+{container="vaultwarden"}
 ```
 
-## Lessons Learned
+returned expected logs.
 
-Centralized logging should be implemented early in infrastructure projects.
+### Impact
+
+Significantly improved troubleshooting capability.
+
+### Lessons Learned
+
+Centralized logging should be deployed early.
 
 ---
 
-# Loki Readiness Endpoint Investigation
+## 7. Loki Readiness Endpoint Investigation
 
-## Overview
+### Overview
 
-Loki readiness checks repeatedly failed despite the service operating normally.
+Loki appeared unhealthy despite functioning correctly.
 
-## Symptoms
+### Symptoms
 
-```text
-503 Service Unavailable
-```
+Health checks reported Loki unavailable.
 
-## Investigation
-
-Verified:
+### Investigation
 
 ```bash
-curl http://localhost:3100/services
+curl -I http://localhost:3100/ready
+docker logs loki
 ```
 
-Observed:
+Internal services reported:
 
 * Distributor ACTIVE
 * Ingester ACTIVE
 * Scheduler ACTIVE
 * Compactor ACTIVE
 
-All services healthy.
+### Root Cause
 
-## Root Cause
+Incorrect readiness configuration for single-node deployment.
 
-Incorrect readiness endpoint used.
+### Resolution
 
-Attempted:
+Configured Loki for standalone operation:
 
-```text
-/loki/api/v1/status/ready
+```yaml
+replication_factor: 1
+kvstore:
+  store: inmemory
 ```
+
+Validated correct readiness endpoint:
+
+```bash
+curl -I http://localhost:3100/ready
+```
+
+### Verification
 
 Returned:
 
 ```text
-404 Not Found
+HTTP/1.1 200 OK
 ```
 
-Correct endpoint:
+### Impact
 
-```text
-/ready
-```
+False-positive health failures.
 
-## Resolution
+### Lessons Learned
 
-```bash
-curl http://localhost:3100/ready
-```
-
-Response:
-
-```text
-ready
-```
-
-HTTP:
-
-```text
-200 OK
-```
-
-## Verification
-
-```bash
-curl http://localhost:3100/ready
-curl http://localhost:3100/services
-curl http://localhost:3100/metrics
-curl http://localhost:3100/loki/api/v1/labels
-```
-
-All checks passed.
-
-## Lessons Learned
-
-Do not assume health endpoints remain identical between versions.
+Validate health endpoints against deployment architecture.
 
 ---
 
-# Telegram Alerting Validation
+## 8. Homepage Dashboard Configuration Recovery
 
-## Overview
+### Overview
 
-Grafana alerting was integrated with Telegram for infrastructure notifications.
+Homepage configuration became inconsistent during infrastructure restructuring.
 
-## Objective
+### Symptoms
 
-Verify end-to-end alert delivery.
+* Missing dashboard sections
+* Missing widgets
+* Incorrect service rendering
 
-## Validation Path
+### Investigation
+
+Reviewed:
+
+* services.yaml
+* widgets.yaml
+* settings.yaml
+
+### Root Cause
+
+Configuration drift during repository reorganization.
+
+### Resolution
+
+Rebuilt Homepage configuration from Git-backed configuration files.
+
+### Verification
+
+Successfully rendered:
+
+* Proxmox
+* Grafana
+* Portainer
+* Vaultwarden
+* Prometheus
+
+### Impact
+
+Reduced dashboard visibility.
+
+### Lessons Learned
+
+Store all application configuration in version control.
+
+---
+
+## 9. LocalStack and Terraform Infrastructure Validation
+
+### Overview
+
+Validated Infrastructure as Code workflows using LocalStack.
+
+### Objective
+
+Verify Terraform provisioning against a local AWS-compatible environment.
+
+### Resolution
+
+Successfully provisioned:
+
+* `tf-homelab-storage-bucket`
+* `tf-homelab-metadata`
+
+using:
+
+```bash
+terraform apply
+```
+
+### Verification
+
+```bash
+aws --endpoint-url=http://localhost:4566 s3 ls
+aws --endpoint-url=http://localhost:4566 dynamodb list-tables
+```
+
+Resources successfully created.
+
+### Impact
+
+Established repeatable Infrastructure as Code workflows.
+
+### Lessons Learned
+
+Infrastructure should be reproducible through code.
+
+---
+
+## 10. Telegram Alerting Validation
+
+### Overview
+
+Validated Grafana alert delivery through Telegram.
+
+### Alert Flow
 
 ```text
 Prometheus
@@ -1066,31 +491,133 @@ Grafana Alerting
 Telegram
 ```
 
-## Verification
+### Verification
 
-Triggered a test alert from Grafana.
+Triggered test alert through Grafana Contact Points.
 
 Telegram notification received successfully.
 
-## Result
+### Result
 
-PASS
+**PASS**
 
-## Lessons Learned
+### Lessons Learned
 
-Alerting systems must be tested regularly to ensure notification delivery remains functional after infrastructure changes.
+Alerting systems must be validated regularly.
 
 ---
 
-# Key Takeaways
+## 11. Headless Operations Validation
+
+### Overview
+
+Verified complete infrastructure management without monitor, keyboard, or mouse.
+
+### Procedure
+
+Disconnected:
+
+* Monitor
+* Keyboard
+* Mouse
+
+### Verification
+
+Successfully managed infrastructure using:
+
+* Tailscale
+* SSH
+* Grafana
+* Portainer
+* Homepage
+
+### Result
+
+**PASS**
+
+### Impact
+
+Confirmed remote-only administration capability.
+
+### Lessons Learned
+
+Routine administration should never require physical access.
+
+---
+
+## 12. Chaos Reboot Recovery Testing
+
+### Overview
+
+Executed full recovery testing to validate automatic service restoration.
+
+### Procedure
+
+Rebooted Apollo and monitored:
+
+* Hypervisor startup
+* VM startup
+* Container startup
+* Network recovery
+* Service recovery
+
+### Verification
+
+Recovered automatically:
+
+* Athena
+* Hestia
+* Grafana
+* Prometheus
+* Loki
+* Homepage
+* Vaultwarden
+* Portainer
+* LocalStack
+
+Verified via:
+
+```bash
+tailscale ping
+```
+
+and service accessibility checks.
+
+### Result
+
+**PASS**
+
+### Impact
+
+Validated disaster recovery readiness.
+
+### Lessons Learned
+
+Recovery testing is as important as deployment testing.
+
+---
+
+## Key Takeaways
 
 1. Infrastructure should be reproducible through code.
 2. Monitoring should exist before major workloads are deployed.
 3. Centralized logging dramatically reduces troubleshooting time.
-4. Alerting should be validated regularly.
-5. Recovery procedures should be tested, not assumed.
-6. Documentation is part of the infrastructure.
-7. Network changes should be tracked carefully.
-8. Remote administration should not require physical access.
-9. Every major configuration should be version controlled.
-10. Disaster recovery readiness should be continuously validated.
+4. Recovery procedures must be tested regularly.
+5. Documentation is part of the infrastructure.
+6. Network changes should be tracked carefully.
+7. Remote administration should not require physical access.
+8. Configuration should be version controlled.
+9. Alerting systems should be tested regularly.
+10. Operational knowledge should be preserved through documentation.
+
+---
+
+## Status
+
+**Incident Log Status:** Current
+
+**Historical Records:** Preserved
+
+**Operational Knowledge Base:** Active
+
+**Overall Environment State:** Stable Operational Environment

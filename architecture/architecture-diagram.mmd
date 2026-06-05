@@ -1,36 +1,58 @@
 ```mermaid
 graph TD
 
-Artemis[Artemis<br>Arch Linux Laptop]
+    %% Remote Administration
+    Artemis["Artemis<br/>Arch Linux Workstation"]
+    Tailnet(("Tailscale Mesh VPN"))
 
-Apollo[Apollo<br>Proxmox VE]
+    Artemis -->|Remote Administration| Tailnet
 
-Hestia[Hestia<br>LXC]
+    %% Infrastructure
+    Tailnet --> Apollo
+    Tailnet --> Athena
+    Tailnet --> Hestia
 
-Athena[Athena<br>Ubuntu VM]
+    subgraph Apollo["Apollo - Proxmox VE Hypervisor"]
+        direction TB
 
-Homepage[Homepage]
-Vaultwarden[Vaultwarden]
+        Bridge["vmbr0<br/>Virtual Bridge"]
 
-Grafana[Grafana]
-Prometheus[Prometheus]
-Loki[Loki]
-Promtail[Promtail]
-Portainer[Portainer]
-LocalStack[LocalStack]
+        subgraph Athena["Athena - Ubuntu VM"]
+            direction TB
 
-Artemis -->|Tailscale| Apollo
+            subgraph Telemetry["Telemetry Stack"]
+                Grafana["Grafana"]
+                Prometheus["Prometheus"]
+                Loki["Loki"]
+                Alloy["Grafana Alloy"]
+                NodeExporter["Node Exporter"]
+                ProxmoxExporter["Proxmox Exporter"]
+            end
 
-Apollo --> Hestia
-Apollo --> Athena
+            subgraph Development["Development Services"]
+                LocalStack["LocalStack"]
+                Portainer["Portainer"]
+            end
+        end
 
-Hestia --> Homepage
-Hestia --> Vaultwarden
+        subgraph Hestia["Hestia - LXC"]
+            direction TB
 
-Athena --> Grafana
-Athena --> Prometheus
-Athena --> Loki
-Athena --> Promtail
-Athena --> Portainer
-Athena --> LocalStack
+            subgraph CoreServices["Core Services"]
+                Homepage["Homepage"]
+                Vaultwarden["Vaultwarden"]
+            end
+        end
+
+        Bridge --- Athena
+        Bridge --- Hestia
+    end
+
+    classDef host fill:#0b5394,color:#ffffff,stroke:#ffffff,stroke-width:2px;
+    classDef guest fill:#e69138,color:#ffffff,stroke:#ffffff,stroke-width:2px;
+    classDef service fill:#3d85c6,color:#ffffff,stroke:#ffffff,stroke-width:1px;
+
+    class Apollo host;
+    class Athena,Hestia guest;
+    class Grafana,Prometheus,Loki,Alloy,NodeExporter,ProxmoxExporter,LocalStack,Portainer,Homepage,Vaultwarden service;
 ```

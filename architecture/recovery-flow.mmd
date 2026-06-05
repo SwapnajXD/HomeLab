@@ -1,0 +1,38 @@
+```mermaid
+graph TD
+
+    Start((Power Restored))
+
+    Apollo["Apollo Boots"]
+
+    Network["vmbr0 Initialized"]
+
+    Athena["Athena Starts"]
+    Hestia["Hestia Starts"]
+
+    Telemetry["Telemetry Stack Recovery"]
+    Core["Core Services Recovery"]
+
+    Tailscale["Tailscale Reconnects"]
+
+    Finish((Infrastructure Operational))
+
+    Start --> Apollo
+
+    Apollo --> Network
+
+    Network -->|VM Autostart| Athena
+    Network -->|LXC Autostart| Hestia
+
+    Athena -->|Docker Restart Policy| Telemetry
+    Hestia -->|Docker Restart Policy| Core
+
+    Telemetry --> Tailscale
+    Core --> Tailscale
+
+    Tailscale --> Finish
+
+    classDef success fill:#38761d,color:#ffffff,stroke:#ffffff,stroke-width:2px;
+
+    class Finish success;
+```

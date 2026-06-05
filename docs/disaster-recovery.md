@@ -8,191 +8,116 @@ The objective is to restore services as quickly as possible following hardware f
 
 ---
 
-# Environment Overview
+## Environment Overview
 
-## Infrastructure
+### Hestia
 
-```text
-Artemis (Management Workstation)
-        │
-    Tailscale
-        │
-        ▼
-Apollo (Proxmox VE)
-        │
- ┌──────┴──────┐
- │             │
- ▼             ▼
-Hestia       Athena
-(LXC)         (VM)
+**Services:**
+
+- Homepage
+- Vaultwarden
+
+### Athena
+
+**Services:**
+
+- Grafana
+- Prometheus
+- Loki
+- Grafana Alloy
+- Portainer
+- LocalStack
+
+---
+
+## Recovery Priority Levels
+
+### Priority 1: Critical Infrastructure
+
+- Apollo (Proxmox Host)
+- Proxmox Virtual Networking
+- Tailscale Connectivity
+
+### Priority 2: Core Services
+
+- Homepage
+- Vaultwarden
+
+### Priority 3: Observability Platform
+
+- Grafana
+- Prometheus
+- Loki
+- Grafana Alloy
+- Telegram Alerting
+
+### Priority 4: Development Services
+
+- LocalStack
+- Terraform
+
+---
+
+## Failure Scenarios & Recovery Steps
+
+### Scenario 1: Cannot Reach Apollo
+
+**Symptoms:** SSH unavailable, Proxmox UI unavailable, Tailscale unreachable.
+
+**Verification:** From Artemis, verify using:
+
+```bash
+tailscale ping apollo
+```
+
+**Recovery:**
+
+1. Verify router is online.
+2. Verify Apollo is powered on.
+3. Verify network connectivity is available.
+4. Verify Tailscale is operational.
+
+> **Note:** If remote recovery fails, physical intervention is required.
+
+---
+
+### Scenario 2: Apollo Rebooted Unexpectedly
+
+**Verification:** Check the Proxmox summary dashboard.
+
+**Expected:**
+
+- Athena running
+- Hestia running
+
+**Recovery:**
+
+If workloads did not autostart, run the following from Apollo:
+
+```bash
+qm start 100
+pct start 101
 ```
 
 ---
 
-## Hestia
+### Scenario 3: Athena Offline
 
-Services:
-
-* Homepage
-* Vaultwarden
-
----
-
-## Athena
-
-Services:
-
-* Grafana
-* Prometheus
-* Loki
-* Grafana Alloy
-* Portainer
-* LocalStack
-
----
-
-# Recovery Priority Levels
-
-## Priority 1
-
-Critical Infrastructure
-
-* Apollo
-* Proxmox Networking
-* Tailscale Connectivity
-
----
-
-## Priority 2
-
-Core Services
-
-* Homepage
-* Vaultwarden
-
----
-
-## Priority 3
-
-Observability Platform
-
-* Grafana
-* Prometheus
-* Loki
-* Grafana Alloy
-* Telegram Alerting
-
----
-
-## Priority 4
-
-Development Services
-
-* LocalStack
-* Terraform
-
----
-
-# Scenario 1: Cannot Reach Apollo
-
-## Symptoms
-
-* SSH unavailable
-* Proxmox UI unavailable
-* Tailscale unreachable
-
-## Verification
-
-From Artemis:
+**Verification:**
 
 ```bash
-tailscale status
+qm status 100
 ```
+
+**Recovery:**
+
+Start the VM:
 
 ```bash
-ping <apollo-ip>
+qm start 100
 ```
 
-```bash
-ping <apollo-tailscale-ip>
-```
-
-## Recovery
-
-Verify:
-
-1. Router online
-2. Apollo powered on
-3. Network connectivity available
-4. Tailscale operational
-
-If remote recovery fails:
-
-Physical intervention required.
-
----
-
-# Scenario 2: Apollo Rebooted Unexpectedly
-
-## Verification
-
-```bash
-tailscale status
-```
-
-```bash
-ssh root@apollo
-```
-
-Check:
-
-```bash
-qm list
-pct list
-```
-
-Expected:
-
-* Athena running
-* Hestia running
-
-## Recovery
-
-Start VM:
-
-```bash
-qm start 101
-```
-
-Start container:
-
-```bash
-pct start <ctid>
-```
-
----
-
-# Scenario 3: Athena Offline
-
-## Verification
-
-On Apollo:
-
-```bash
-qm list
-```
-
-```bash
-qm status 101
-```
-
-## Recovery
-
-```bash
-qm start 101
-```
-
-Access:
+Verify SSH access via Tailscale:
 
 ```bash
 ssh ubuntu@athena
@@ -200,122 +125,85 @@ ssh ubuntu@athena
 
 ---
 
-# Scenario 4: Hestia Offline
+### Scenario 4: Hestia Offline
 
-## Verification
+**Verification:**
 
 ```bash
-pct list
+pct status 101
 ```
 
-```bash
-pct status <ctid>
-```
+**Recovery:**
 
-## Recovery
+Verify internal networking and start the container:
 
 ```bash
-pct start <ctid>
-```
-
-Verify networking:
-
-```bash
-pct exec <ctid> ip a
+pct start 101
 ```
 
 ---
 
-# Scenario 5: Docker Services Not Running
+### Scenario 5: Docker Services Not Running
 
-## Verification
+**Verification:**
 
-```bash
-docker ps -a
-```
-
-Inspect logs:
-
-```bash
-docker logs <container>
-```
-
-## Recovery
-
-Telemetry Stack:
-
-```bash
-cd ~/homelab/docker-compose/telemetry
-docker compose up -d
-```
-
-Core Services:
-
-```bash
-cd ~/homelab/docker-compose/core-services
-docker compose up -d
-```
-
-LocalStack:
-
-```bash
-cd ~/homelab/docker-compose/localstack
-docker compose up -d
-```
-
-Verify:
+SSH into Athena/Hestia and inspect running containers:
 
 ```bash
 docker ps
 ```
 
----
+**Recovery:**
 
-# Scenario 6: Grafana Unavailable
-
-## Verification
+Navigate to the affected stack and recreate it:
 
 ```bash
-docker logs grafana
+cd ~/homelab/docker-compose/telemetry
+docker compose down && docker compose up -d
 ```
 
-## Recovery
+Repeat for:
 
-```bash
-docker restart grafana
-```
-
-Verify access through browser.
+- `~/homelab/docker-compose/core-services`
+- `~/homelab/docker-compose/localstack`
 
 ---
 
-# Scenario 7: Prometheus Targets Down
+### Scenario 6: Grafana Unavailable
 
-## Verification
+**Verification:**
+
+Access:
+
+```text
+http://<athena-ip>:3001
+```
+
+**Recovery:**
+
+1. Restart the telemetry stack.
+2. Verify Prometheus datasource connectivity.
+3. Verify Loki datasource connectivity.
+
+---
+
+### Scenario 7: Prometheus Targets Down
+
+**Verification:**
 
 Open:
 
 ```text
-http://athena:9090/targets
+http://<athena-ip>:9090/targets
 ```
 
 Check target status.
 
-## Recovery
+**Recovery:**
 
-Review:
-
-```bash
-docker logs prometheus
-```
-
-Validate configuration:
-
-```bash
-cat prometheus/prometheus.yml
-```
-
-Restart:
+1. Review container logs.
+2. Validate `prometheus.yml`.
+3. Restart Prometheus:
 
 ```bash
 docker restart prometheus
@@ -323,374 +211,261 @@ docker restart prometheus
 
 ---
 
-# Scenario 8: Loki Unavailable
+### Scenario 8: Loki Unavailable
 
-## Verification
+**Verification:**
+
+Check readiness endpoint:
+
+```bash
+curl -I http://localhost:3100/ready
+```
+
+**Expected:** HTTP 200
+
+Check Loki logs:
 
 ```bash
 docker logs loki
 ```
 
-Check readiness:
+Expected components:
 
-```bash
-curl http://localhost:3100/ready
-```
+- Distributor
+- Ingester
+- Scheduler
+- Compactor
 
-Expected:
+All should be ACTIVE.
 
-```text
-ready
-```
+**Recovery:**
 
-Check services:
-
-```bash
-curl http://localhost:3100/services
-```
-
-## Recovery
-
-```bash
-docker restart loki
-```
+Restart the Loki container.
 
 ---
 
-# Scenario 9: Logs Not Appearing in Grafana
+### Scenario 9: Logs Not Appearing in Grafana
 
-## Verification
+**Verification:**
 
-```bash
-docker logs alloy
-```
-
-Verify labels:
+Verify labels API:
 
 ```bash
-curl http://localhost:3100/loki/api/v1/labels
+curl -s http://localhost:3100/loki/api/v1/labels
 ```
 
 Check Grafana Explore.
 
-## Recovery
+**Recovery:**
 
-Restart Alloy:
-
-```bash
-docker restart alloy
-```
-
-Verify Loki ingestion.
+1. Restart Grafana Alloy.
+2. Verify Docker container discovery.
+3. Verify Loki ingestion pipeline is active.
 
 ---
 
-# Scenario 10: Homepage Unavailable
+### Scenario 10: Homepage Unavailable
 
-## Verification
+**Verification:**
 
-```bash
-docker logs homepage
-```
+Review configuration files:
 
-Review configuration:
+- `services.yaml`
+- `widgets.yaml`
+- `settings.yaml`
 
-* services.yaml
-* widgets.yaml
-* settings.yaml
+**Recovery:**
 
-## Recovery
-
-```bash
-docker restart homepage
-```
+1. Restore configuration from Git backup.
+2. Restart the `core-services` stack.
 
 ---
 
-# Scenario 11: Vaultwarden Unavailable
+### Scenario 11: Vaultwarden Unavailable
 
-## Verification
+**Verification:**
 
-```bash
-docker logs vaultwarden
-```
+Check whether the Vaultwarden login page loads.
 
-## Recovery
+**Recovery:**
 
-```bash
-docker restart vaultwarden
-```
-
-Verify login page loads successfully.
+Restart the Vaultwarden container.
 
 ---
 
-# Scenario 12: LocalStack Failure
+### Scenario 12: LocalStack Failure
 
-## Verification
-
-```bash
-docker logs localstack
-```
-
-Test endpoint:
+**Verification:**
 
 ```bash
 curl http://localhost:4566
 ```
 
-## Recovery
+**Recovery:**
 
-```bash
-docker restart localstack
-```
-
-Verify:
-
-```bash
-awslocal s3 ls
-```
+1. Verify container status.
+2. Recreate the LocalStack deployment.
 
 ---
 
-# Scenario 13: Terraform Deployment Failure
+### Scenario 13: Terraform Deployment Failure
 
-## Verification
+**Verification:**
 
-```bash
-terraform validate
-```
+Review output from:
 
 ```bash
 terraform plan
 ```
 
-## Recovery
-
-```bash
-terraform refresh
-```
+or
 
 ```bash
 terraform apply
 ```
 
-Verify resources exist within LocalStack.
+**Recovery:**
+
+1. Verify S3 bucket exists.
+2. Verify DynamoDB table exists.
+3. Validate resources using AWS CLI against LocalStack.
+4. Destroy and re-apply if state corruption is detected.
 
 ---
 
-# Scenario 14: Tailscale Failure
+### Scenario 14: Tailscale Failure
 
-## Verification
+**Verification:**
 
 ```bash
 tailscale status
 ```
 
-## Recovery
+**Recovery:**
 
 ```bash
-sudo systemctl restart tailscaled
+tailscale up
 ```
 
-Reconnect:
+**Validation:**
 
-```bash
-sudo tailscale up
-```
+Verify all nodes are connected:
 
-## Validation
-
-Verify nodes:
-
-* Artemis
-* Apollo
-* Athena
+- Artemis
+- Apollo
+- Athena
 
 ---
 
-# Scenario 15: Telegram Alerting Failure
+### Scenario 15: Telegram Alerting Failure
 
-## Verification
+**Verification:**
 
-Open Grafana:
+Review Grafana Alerting configuration:
 
-```text
-Alerting → Contact Points
-```
+- Telegram Bot Token
+- Chat ID
+- Notification Policies
 
-Review:
+**Recovery:**
 
-* Telegram Bot Token
-* Chat ID
-* Notification Policies
+1. Reconfigure Telegram contact point.
+2. Trigger test notification.
 
-## Recovery
+**Validation:**
 
-Reconfigure Telegram contact point if necessary.
-
-Send test notification.
-
-## Validation
-
-Telegram message received successfully.
+Confirm Telegram message is received.
 
 ---
 
-# Scenario 16: Storage Running Out
+### Scenario 16: Storage Running Out
 
-## Verification
+**Verification:**
 
 ```bash
 df -h
 ```
 
-```bash
-docker system df
-```
+**Recovery:**
 
-## Recovery
-
-Remove unused resources:
-
-```bash
-docker system prune -a
-```
-
-Review:
-
-* Logs
-* Backups
-* Docker volumes
-
----
-
-# Scenario 17: Complete Environment Recovery
-
-## Recovery Sequence
-
-### Step 1
-
-Verify Apollo operational.
-
-### Step 2
-
-Verify networking.
-
-### Step 3
-
-Verify Tailscale.
-
-### Step 4
-
-Verify Athena running.
-
-### Step 5
-
-Verify Hestia running.
-
-### Step 6
-
-Verify Docker services.
-
-### Step 7
-
-Verify Grafana.
-
-### Step 8
-
-Verify Prometheus.
-
-### Step 9
-
-Verify Loki.
-
-### Step 10
-
-Verify Grafana Alloy.
-
-### Step 11
-
-Verify Homepage.
-
-### Step 12
-
-Verify Vaultwarden.
-
-### Step 13
-
-Verify LocalStack.
-
-### Step 14
-
-Verify Telegram alerting.
-
----
-
-# Health Verification Checklist
-
-Infrastructure:
+1. Remove unused resources.
+2. Review stale logs.
+3. Delete obsolete Proxmox backups.
+4. Remove unused Docker resources:
 
 ```bash
-tailscale status
-docker ps
-df -h
-free -h
-uptime
+docker system prune
 ```
 
 ---
 
-## Service Verification
+### Scenario 17: Complete Environment Recovery (Service Restoration Order)
 
-* Homepage accessible
-* Vaultwarden accessible
-* Grafana accessible
-* Prometheus accessible
-* Loki healthy
-* Logs visible in Grafana
-* Telegram alerts operational
-* LocalStack responding
-* Terraform operational
+#### Recovery Sequence
+
+1. Verify Apollo is operational.
+2. Verify networking (bridges active).
+3. Verify Tailscale mesh connectivity.
+4. Verify Athena is running.
+5. Verify Hestia is running.
+6. Verify all Docker services started successfully.
+7. Verify Grafana accessibility.
+8. Verify Prometheus metric collection.
+9. Verify Loki readiness.
+10. Verify Grafana Alloy log forwarding.
+11. Verify Homepage widget rendering.
+12. Verify Vaultwarden accessibility.
+13. Verify LocalStack responsiveness.
+14. Verify Telegram alert delivery.
 
 ---
 
-# Recovery Objectives
+## Recovery Objectives
 
-| Objective                 | Target       |
-| ------------------------- | ------------ |
-| Apollo Recovery           | < 5 Minutes  |
-| Athena Recovery           | < 2 Minutes  |
-| Hestia Recovery           | < 2 Minutes  |
-| Docker Recovery           | < 1 Minute   |
-| Observability Recovery    | < 2 Minutes  |
+| Objective | Target |
+|------------|---------|
+| Apollo Recovery | < 5 Minutes |
+| Athena Recovery | < 2 Minutes |
+| Hestia Recovery | < 2 Minutes |
+| Docker Recovery | < 1 Minute |
+| Observability Recovery | < 2 Minutes |
 | Full Environment Recovery | < 10 Minutes |
 
 ---
 
-# Recovery Design Principles
+## Recovery Design Principles
 
-* Proxmox Autostart Enabled
-* Docker Restart Policies Enabled
-* Tailscale Remote Administration
-* Version-Controlled Configuration
-* Infrastructure as Code
-* Documented Recovery Procedures
+- Proxmox Autostart enabled for critical VMs/LXCs
+- Docker restart policies (`unless-stopped`) configured
+- Tailscale remote administration
+- Version-controlled configuration via Git
+- Infrastructure as Code (LocalStack/Terraform)
+- Heavily documented recovery procedures
 
 ---
 
-# Conclusion
+## Health Verification Checklist
+
+### Service Verification
+
+- [ ] Homepage accessible
+- [ ] Vaultwarden accessible
+- [ ] Grafana accessible
+- [ ] Prometheus accessible
+- [ ] Loki healthy (`/ready` endpoint returns 200 OK)
+- [ ] Logs visible in Grafana Explore
+- [ ] Telegram alerts operational
+- [ ] LocalStack responding
+- [ ] Terraform operational
+
+---
+
+## Conclusion
 
 The HomeLab environment is designed to recover from common infrastructure failures through virtualization, containerization, observability, remote administration, and documented operational procedures.
 
-Current Recovery Status:
+**Current Recovery Status:** Operational
 
-Operational
+**Recovery Procedures:** Documented and Tested
 
-Recovery Procedures:
-
-Documented and Tested
-
-Overall Environment State:
-
-Stable Operational Environment
+**Overall Environment State:** Stable Operational Environment

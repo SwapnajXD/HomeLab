@@ -8,7 +8,7 @@ Validation is performed after major infrastructure changes, upgrades, maintenanc
 
 ---
 
-# Environment Under Test
+## Environment Under Test
 
 | Component        | Role            |
 | ---------------- | --------------- |
@@ -26,293 +26,255 @@ Validation is performed after major infrastructure changes, upgrades, maintenanc
 
 ---
 
-# Test 01: Proxmox Host Validation
+## Infrastructure Validation
 
-## Objective
+### Test 01: Proxmox Host Validation
 
-Verify Apollo is operational.
+**Objective:** Verify Apollo is operational.
 
-## Procedure
+**Procedure:**
 
 ```bash
-hostnamectl
-uptime
+ssh root@apollo
 ```
 
-## Expected Result
+**Expected Result:** Host responds normally.
 
-Host responds normally.
-
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 02: VM Validation
+### Test 02: VM Validation
 
-## Objective
+**Objective:** Verify Athena is operational.
 
-Verify Athena is operational.
-
-## Procedure
+**Procedure:**
 
 ```bash
-qm list
+ssh ubuntu@athena
 ```
 
-Verify Athena is running.
+or verify through the Proxmox UI.
 
-## Result
+**Expected Result:** VM is accessible and running.
 
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 03: LXC Validation
+### Test 03: LXC Validation
 
-## Objective
+**Objective:** Verify Hestia is operational.
 
-Verify Hestia is operational.
-
-## Procedure
+**Procedure:**
 
 ```bash
-pct list
+pct status 101
 ```
 
-Verify Hestia is running.
+**Expected Result:** Container is running and responding.
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 04: Docker Stack Validation
+### Test 04: Docker Stack Validation
 
-## Objective
+**Objective:** Verify all core and telemetry containers are running.
 
-Verify all containers are running.
-
-## Procedure
+**Procedure:**
 
 ```bash
-docker compose ps
+docker ps
 ```
 
-## Expected Result
+**Expected Result:**
 
-All containers report healthy or running.
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Node Exporter
+* Proxmox Exporter
+* Portainer
+* LocalStack
+* Homepage
+* Vaultwarden
 
-## Result
+report healthy or running.
 
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 05: Grafana Validation
+## Observability & Monitoring Validation
 
-## Objective
+### Test 05: Grafana Validation
 
-Verify Grafana availability.
+**Objective:** Verify Grafana availability.
 
-## Procedure
+**Procedure:**
 
-Open Grafana dashboard.
+Open:
+
+```text
+http://<athena-ip>:3001
+```
 
 Verify:
 
-* Dashboard Loading
-* Datasources Connected
-* Panels Rendering
+* Dashboard loading
+* Datasources connected
+* Panels rendering metrics
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 06: Prometheus Validation
+### Test 06: Prometheus Validation
 
-## Objective
+**Objective:** Verify Prometheus readiness.
 
-Verify Prometheus readiness.
-
-## Procedure
+**Procedure:**
 
 ```bash
-curl http://localhost:9090/-/ready
+curl -I http://localhost:9090/-/ready
 ```
 
-## Expected Result
+**Expected Result:**
 
 ```text
-Prometheus is Ready.
+HTTP/1.1 200 OK
 ```
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 07: Node Exporter Validation
+### Test 07: Node Exporter Validation
 
-## Objective
+**Objective:** Verify Node Exporter metrics collection.
 
-Verify Node Exporter metrics.
-
-## Procedure
+**Procedure:**
 
 ```bash
-curl http://localhost:9100/metrics
+curl -s http://localhost:9100/metrics
 ```
 
-## Expected Result
+**Expected Result:**
 
-Metrics returned.
+CPU, memory, disk, and network metrics returned.
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 08: Proxmox Exporter Validation
+### Test 08: Proxmox Exporter Validation
 
-## Objective
+**Objective:** Verify Proxmox metrics collection.
 
-Verify Proxmox metrics collection.
-
-## Procedure
+**Procedure:**
 
 ```bash
-curl http://localhost:9221/metrics
+curl -s http://localhost:9221/metrics
 ```
 
-## Expected Result
+**Expected Result:**
 
-Metrics returned.
+Node, VM, and storage metrics returned.
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 09: Loki Readiness Validation
+## Logging Pipeline Validation
 
-## Objective
+### Test 09: Loki Readiness Validation
 
-Verify Loki readiness.
+**Objective:** Verify Loki is ready to accept read/write requests.
 
-## Procedure
+**Procedure:**
 
 ```bash
-curl http://localhost:3100/ready
+curl -I http://localhost:3100/ready
 ```
 
-## Expected Result
-
-HTTP 200
-
-Response:
+**Expected Result:**
 
 ```text
-ready
+HTTP/1.1 200 OK
 ```
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 10: Loki Services Validation
+### Test 10: Loki Services Validation
 
-## Objective
+**Objective:** Verify Loki internal services.
 
-Verify Loki internal services.
-
-## Procedure
+**Procedure:**
 
 ```bash
-curl http://localhost:3100/services
+docker logs loki
 ```
 
-## Expected Result
+**Expected Result:**
 
-Services report ACTIVE.
+* Distributor ACTIVE
+* Ingester ACTIVE
+* Scheduler ACTIVE
+* Compactor ACTIVE
 
-### Expected Services
-
-* Distributor
-* Ingester
-* Scheduler
-* Compactor
-
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 11: Loki Labels Validation
+### Test 11: Loki Labels Validation
 
-## Objective
+**Objective:** Verify Loki query functionality.
 
-Verify Loki query functionality.
-
-## Procedure
+**Procedure:**
 
 ```bash
-curl http://localhost:3100/loki/api/v1/labels
+curl -s http://localhost:3100/loki/api/v1/labels
 ```
 
-## Expected Result
+**Expected Result:**
 
-Labels returned successfully.
+JSON array of labels returned successfully.
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 12: Grafana Alloy Validation
+### Test 12: Grafana Alloy Validation
 
-## Objective
+**Objective:** Verify active log collection.
 
-Verify log collection.
-
-## Procedure
-
-Check Alloy logs.
+**Procedure:**
 
 ```bash
-docker logs alloy
+docker logs grafana-alloy
 ```
 
-## Expected Result
+**Expected Result:**
 
-No collection failures.
+* Docker container discovery active
+* No collection failures
+* Logs successfully forwarded to Loki
 
-Logs successfully forwarded.
-
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 13: Metrics Pipeline Validation
+## End-to-End Pipeline Validation
 
-## Objective
+### Test 13: Metrics Pipeline Validation
 
-Verify end-to-end metrics flow.
+**Objective:** Verify end-to-end metrics flow.
 
-## Validation Path
+**Validation Path:**
 
 ```text
 Node Exporter
@@ -324,23 +286,19 @@ Prometheus
 Grafana
 ```
 
-## Expected Result
+**Expected Result:**
 
-Metrics visible in Grafana dashboards.
+Historical and real-time metrics visible in Grafana dashboards.
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 14: Logging Pipeline Validation
+### Test 14: Logging Pipeline Validation
 
-## Objective
+**Objective:** Verify end-to-end log flow.
 
-Verify end-to-end log flow.
-
-## Validation Path
+**Validation Path:**
 
 ```text
 Docker Containers
@@ -352,30 +310,28 @@ Grafana Alloy
 Loki
         │
         ▼
-Grafana
+Grafana Explore
 ```
 
-## Expected Result
+**Expected Result:**
 
-Logs visible in Grafana Explore.
+Logs visible and searchable in Grafana Explore.
 
-## Result
+Example:
 
-PASS
+```text
+{container="vaultwarden"}
+```
+
+**Result:** **PASS**
 
 ---
 
-# Test 15: Alerting Validation
+### Test 15: Alerting Validation
 
-## Objective
+**Objective:** Verify infrastructure alert delivery.
 
-Verify alert delivery.
-
-## Procedure
-
-Trigger test alert from Grafana.
-
-## Validation Path
+**Validation Path:**
 
 ```text
 Prometheus
@@ -387,132 +343,129 @@ Grafana Alerting
 Telegram
 ```
 
-## Expected Result
+**Procedure:**
 
-Telegram notification received.
+Trigger a test alert from Grafana Contact Points.
 
-## Result
+**Expected Result:**
 
-PASS
+Telegram notification received on the registered device.
+
+**Result:** **PASS**
 
 ---
 
-# Test 16: LocalStack Validation
+## Infrastructure as Code & Network Validation
 
-## Objective
+### Test 16: LocalStack Validation
 
-Verify LocalStack services.
+**Objective:** Verify AWS service emulation.
 
-## Procedure
+**Procedure:**
 
 ```bash
-awslocal s3 ls
+aws --endpoint-url=http://localhost:4566 s3 ls
 ```
 
-## Expected Result
+**Expected Result:**
 
-S3 resources visible.
+S3 resources and endpoint visible and responding.
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 17: Terraform Validation
+### Test 17: Terraform Validation
 
-## Objective
+**Objective:** Verify Infrastructure as Code deployment.
 
-Verify Infrastructure as Code deployment.
-
-## Procedure
+**Procedure:**
 
 ```bash
-terraform init
+terraform validate
 terraform plan
 terraform apply
 ```
 
-## Expected Result
+**Expected Result:**
 
-Resources created successfully.
+Infrastructure resources created successfully.
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 18: Tailscale Validation
+### Test 18: Tailscale Validation
 
-## Objective
+**Objective:** Verify secure remote access functionality.
 
-Verify remote access functionality.
-
-## Procedure
+**Procedure:**
 
 ```bash
 tailscale status
 ```
 
-## Expected Result
+and
 
-All nodes connected.
+```bash
+tailscale ping apollo
+tailscale ping athena
+```
 
-### Expected Nodes
+**Expected Result:**
+
+All nodes connected to the Tailnet.
 
 * Artemis
 * Apollo
 * Athena
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 19: Reboot Recovery Validation
+## Recovery Validation
 
-## Objective
+### Test 19: Reboot Recovery Validation
 
-Verify infrastructure recovery after reboot.
+**Objective:** Verify automatic recovery after complete host reboot.
 
-## Procedure
+**Procedure:**
 
-Reboot infrastructure host.
+Reboot Apollo.
 
-Verify:
+**Expected Result:**
 
 * Proxmox starts
-* VM starts
-* LXC starts
-* Services recover
+* Athena autostarts
+* Hestia autostarts
+* Docker services recover automatically
 
-## Result
-
-PASS
+**Result:** **PASS**
 
 ---
 
-# Test 20: Disaster Recovery Validation
+### Test 20: Disaster Recovery Validation
 
-## Objective
+**Objective:** Verify documented recovery procedures.
 
-Verify documented recovery procedures.
+**Procedure:**
 
-## Procedure
+Execute simulated outage scenarios using procedures from:
 
-Execute recovery procedures from runbooks.
+```text
+docs/disaster-recovery.md
+```
 
-Verify services can be restored and validated.
+**Expected Result:**
 
-## Result
+Services restored successfully using documented steps.
 
-PASS
+**Result:** **PASS**
 
 ---
 
-# Operational Readiness Checklist
+## Operational Readiness Checklist
 
 | Capability        | Status |
 | ----------------- | ------ |
@@ -529,7 +482,7 @@ PASS
 
 ---
 
-# Validation Summary
+## Validation Summary
 
 | Area              | Status |
 | ----------------- | ------ |
@@ -550,14 +503,24 @@ PASS
 
 ---
 
-# Conclusion
+## Conclusion
 
 The HomeLab environment has been validated across infrastructure, networking, monitoring, logging, alerting, remote access, and Infrastructure as Code workflows.
 
-Current Environment Status:
-
-```text
-Stable Operational Environment
-```
+**Current Environment Status:** Stable Operational Environment
 
 All critical systems are functioning as expected and are suitable for continued learning, experimentation, and operational practice.
+
+---
+
+### Validation Status
+
+* **Infrastructure Validation:** PASS
+* **Observability Validation:** PASS
+* **Logging Validation:** PASS
+* **Alerting Validation:** PASS
+* **Remote Access Validation:** PASS
+* **Infrastructure as Code Validation:** PASS
+* **Recovery Validation:** PASS
+
+**Overall Operational Readiness:** VALIDATED

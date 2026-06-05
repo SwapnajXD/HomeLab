@@ -1,384 +1,109 @@
-Here’s a **clean, audit-style change report** of everything that was modified, validated, and improved in your telemetry stack during this session.
+Excellent. Based on everything you've shown, your repository documentation now appears to have:
+
+### Root Documentation
+
+* ✅ README.md
+* ✅ CONTRIBUTING.md (if applicable)
+* ✅ LICENSE (if applicable)
+
+### `/docs`
+
+* ✅ architecture.md
+* ✅ network.md
+* ✅ inventory.md
+* ✅ runbook.md
+* ✅ troubleshooting.md
+* ✅ disaster-recovery.md
+* ✅ validation-report.md
+* ✅ changelog.md
+* ✅ project-timeline.md
+
+### `/architecture`
+
+* ✅ README.md
+* ✅ architecture-diagram.mmd
+* ✅ metrics-flow.mmd
+* ✅ logging-flow.mmd
+* ✅ alerting-flow.mmd
+* ✅ recovery-flow.mmd
+
+### `/docker-compose`
+
+* ✅ README.md
+
+### `/terraform`
+
+* ✅ README.md
+* ✅ localstack/README.md
+
+### `/scripts`
+
+* ✅ README.md
+
+### `/configs`
+
+* ✅ configs/apollo/README.md
+* ✅ configs/athena/README.md
+* ✅ configs/hestia/README.md
+
+### `/screenshots`
+
+* ✅ README.md
 
 ---
 
-# 📊 HOMELAB TELEMETRY CHANGE REPORT (ATHENA)
+### Final Recommendations
 
-## 📅 Date
+A few optional additions that would make it even stronger as a portfolio/SRE project:
 
-June 4, 2026
+#### `/docs/adr/`
 
-## 🖥️ Host
-
-Athena (Ubuntu VM in Proxmox)
-
----
-
-# 1. 🧠 OVERALL OBJECTIVE
-
-The goal of this change cycle was to:
-
-* Stabilize Loki (fix readiness/health confusion)
-* Modernize log pipeline
-* Introduce Grafana Alloy as unified telemetry agent
-* Verify full observability stack (metrics + logs)
-* Ensure Grafana query readiness for visualization/screenshot
-
----
-
-# 2. 🏗️ ARCHITECTURE TRANSFORMATION
-
-## BEFORE (Legacy Stack)
-
-### Logging pipeline:
+Architecture Decision Records
 
 ```text
-Docker → Promtail → Loki → Grafana
+docs/
+└── adr/
+    ├── 001-proxmox-as-hypervisor.md
+    ├── 002-tailscale-for-remote-access.md
+    ├── 003-loki-for-centralized-logging.md
+    └── 004-localstack-for-iac-learning.md
 ```
 
-### Metrics pipeline:
+#### `/docs/postmortems/`
 
 ```text
-Node Exporter → Prometheus → Grafana
-Proxmox Exporter → Prometheus → Grafana
+docs/
+└── postmortems/
+    ├── loki-readiness-failure.md
+    ├── docker-volume-permission-issue.md
+    └── telemetry-stack-refactor.md
 ```
 
----
+#### GitHub Badges in Root README
 
-## AFTER (Current Stack)
+Examples:
 
-### Logging pipeline (modernized):
+```markdown
+![Documentation](https://img.shields.io/badge/docs-complete-brightgreen)
+![Status](https://img.shields.io/badge/status-operational-success)
+![Platform](https://img.shields.io/badge/platform-Proxmox-blue)
+![Monitoring](https://img.shields.io/badge/monitoring-Grafana-orange)
+![IaC](https://img.shields.io/badge/IaC-Terraform-purple)
+```
+
+#### Repository Tree Section
 
 ```text
-Docker → Grafana Alloy → Loki → Grafana
-```
-
-### Metrics pipeline (unchanged but validated):
-
-```text
-Node Exporter → Prometheus → Grafana
-Proxmox Exporter → Prometheus → Grafana
-```
-
----
-
-# 3. 🧹 COMPONENT CHANGES
-
-## ❌ Removed / Deprecated (conceptually)
-
-* Promtail (replaced by Alloy in design discussions)
-* Manual log shippers
-
-## ✅ Retained (critical infrastructure)
-
-* Node Exporter
-* Proxmox Exporter
-* Prometheus
-* Grafana
-* Loki
-
-## 🆕 Introduced / Expanded Role
-
-* Grafana Alloy (central telemetry agent)
-
----
-
-# 4. 📦 DOCKER COMPOSE CHANGES
-
-## Updated services in `docker-compose.yml`
-
-### Added / Expanded:
-
-### 🔹 Grafana Alloy
-
-* Replaces Promtail log shipping role
-* Connects directly to:
-
-  * Docker socket
-  * Loki write API
-* Handles:
-
-  * Log discovery
-  * Relabeling
-  * Shipping pipeline
-
----
-
-### 🔹 Loki (validated configuration)
-
-* Switched to **single-node filesystem mode**
-* Confirmed:
-
-  * `/ready` endpoint = OK
-  * `/labels` endpoint = functional
-  * ingestion pipeline active
-
----
-
-### 🔹 Prometheus
-
-* No structural changes
-* Confirmed:
-
-  * `/ready = 200 OK`
-  * active targets healthy
-
----
-
-### 🔹 Grafana
-
-* No changes
-* Confirmed ready for Loki queries
-
----
-
-# 5. 🧾 LOKI CONFIGURATION CHANGES
-
-## Key stabilization change:
-
-### BEFORE (problem state)
-
-* Implicit/unclear distributed config assumptions
-* Risk of ring/ingester readiness issues
-
----
-
-### AFTER (stable state)
-
-Single-node filesystem mode:
-
-* `replication_factor: 1`
-* `kvstore: inmemory`
-* filesystem-based chunk storage
-* compactor configured locally
-
----
-
-## Result:
-
-* ❌ No more 503 readiness loop
-* ✅ Immediate startup health
-* ✅ Stable ingestion pipeline
-
----
-
-# 6. ⚙️ GRAFANA ALLOY IMPLEMENTATION
-
-## Configuration added:
-
-### Core responsibilities:
-
-#### 1. Docker log discovery
-
-```river
-discovery.docker
-```
-
-#### 2. Log relabeling
-
-```river
-discovery.relabel
-```
-
-#### 3. Loki log shipping
-
-```river
-loki.source.docker
-loki.write
+homelab/
+├── architecture/
+├── configs/
+├── docker-compose/
+├── docs/
+├── scripts/
+├── screenshots/
+└── terraform/
 ```
 
 ---
 
-## Observed behavior:
-
-### ✅ Alloy logs confirm:
-
-* Graph evaluation successful
-* Docker container discovery active
-* Log forwarding working
-* Loki write pipeline active
-
-### ⚠ Minor warning:
-
-* Docker container inspection mismatch:
-
-  ```
-  No such container: <id>
-  ```
-
-  → harmless stale container reference
-
----
-
-# 7. 📡 PROMETHEUS PIPELINE VALIDATION
-
-## Confirmed working:
-
-### Targets:
-
-* Node Exporter → UP
-* Proxmox Exporter → UP
-
-### APIs:
-
-* `/api/v1/status/buildinfo` → OK
-* `/api/v1/targets` → healthy
-
----
-
-# 8. 📊 NODE EXPORTER OBSERVATION
-
-## Issue observed:
-
-```
-write: broken pipe
-```
-
-## Root cause:
-
-* Prometheus scrape connection closing early
-* HTTP client disconnect mid-metric stream
-
-## Classification:
-
-| Type         | Severity        |
-| ------------ | --------------- |
-| Error        | Non-critical    |
-| Impact       | None on metrics |
-| Fix required | Optional        |
-
-## Confirmed working:
-
-* `/metrics` endpoint fully functional
-
----
-
-# 9. 🧪 LOKI QUERY READINESS
-
-## Confirmed working endpoints:
-
-* `/ready` → 200 OK
-* `/labels` → returns:
-
-```json
-["container", "service_name"]
-```
-
-## Query capability:
-
-✔ Fully operational
-
-Example working queries:
-
-```logql
-{container=~".+"}
-```
-
-```logql
-{container="grafana"}
-```
-
-```logql
-{container=~".+"} |= "error"
-```
-
----
-
-# 10. 📈 FINAL PIPELINE HEALTH
-
-## Metrics pipeline
-
-```text
-NODE EXPORTER + PROXMOX EXPORTER
-        ↓
-     PROMETHEUS
-        ↓
-      GRAFANA
-```
-
-Status: 🟢 HEALTHY
-
----
-
-## Logging pipeline
-
-```text
-DOCKER CONTAINERS
-        ↓
-   GRAFANA ALLOY
-        ↓
-       LOKI
-        ↓
-     GRAFANA
-```
-
-Status: 🟢 HEALTHY
-
----
-
-# 11. 🧾 FINAL STATE SUMMARY
-
-| Layer                   | Status             |
-| ----------------------- | ------------------ |
-| Compute (VM/LXC)        | ✅ Stable           |
-| Metrics (Prometheus)    | ✅ Healthy          |
-| Logs (Loki)             | ✅ Stable           |
-| Log Agent (Alloy)       | ✅ Working          |
-| Visualization (Grafana) | ✅ Ready            |
-| Exporters               | ⚠ Minor noise only |
-
----
-
-# 12. 🧠 KEY ENGINEERING OUTCOMES
-
-## Major improvements achieved:
-
-### 1. Logging modernization
-
-* Promtail → Alloy migration conceptually completed
-* Unified log pipeline architecture
-
-### 2. Loki stabilization
-
-* Eliminated distributed-mode complexity
-* Forced deterministic single-node behavior
-
-### 3. Observability validation
-
-* Full metrics + logs pipeline verified end-to-end
-
-### 4. Query readiness confirmed
-
-* Loki fully usable in Grafana Explore
-
----
-
-# 13. ⚠ REMAINING MINOR ITEMS
-
-* Node exporter "broken pipe" logs (cosmetic)
-* Stale container ID warning in Alloy logs
-* Optional: add alerting layer in Grafana
-
----
-
-# 14. 🏁 FINAL CONCLUSION
-
-Your homelab telemetry stack is now:
-
-> 🟢 Fully operational
-> 🟢 Single-node stable
-> 🟢 Query-ready in Grafana
-> 🟢 Modern log pipeline (Alloy-based)
-> 🟢 SRE-grade observability baseline achieved
-
----
-
-If you want next step upgrades, I can generate:
-
-* 📊 Grafana SRE dashboard JSON (import-ready)
-* 🔔 Alert rules (CPU, disk, Loki errors)
-* 🔐 secure auth layer for Loki + Prometheus
-* 💾 backup + restore automation
-* 📦 GitOps structure for full homelab
-
-Just tell me.
+As it stands, you've moved well beyond a typical homelab README and into the territory of a structured operations repository. The combination of architecture documentation, runbooks, troubleshooting records, disaster recovery procedures, validation reports, and Mermaid diagrams gives it the feel of a small production environment rather than just a collection of services.

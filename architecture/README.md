@@ -1,10 +1,16 @@
 # Architecture
 
+## Purpose
+
+This directory contains architecture diagrams and visual representations of the HomeLab environment.
+
+These diagrams provide a high-level overview of infrastructure components, networking, telemetry pipelines, alerting workflows, and recovery procedures. They complement the detailed documentation found in the `docs/` directory.
+
+---
+
 ## Overview
 
-This directory contains architecture diagrams describing the homelab infrastructure.
-
-The homelab is built around a Proxmox VE hypervisor hosting isolated virtual machines and containers for operations, monitoring, development, and self-hosted services.
+The HomeLab is built around a Proxmox VE hypervisor hosting isolated virtual machines and Linux containers for operations, observability, development, and self-hosted services.
 
 ---
 
@@ -12,13 +18,9 @@ The homelab is built around a Proxmox VE hypervisor hosting isolated virtual mac
 
 ### Apollo
 
-Role:
+**Type:** Proxmox VE Hypervisor
 
-```text
-Proxmox VE Hypervisor
-```
-
-Responsibilities:
+**Responsibilities:**
 
 * Virtualization
 * Storage Management
@@ -28,90 +30,128 @@ Responsibilities:
 
 ---
 
-### Hestia
-
-Type:
-
-```text
-LXC Container
-```
-
-Services:
-
-* Homepage Dashboard
-* Vaultwarden
-
-Purpose:
-
-Provides user-facing applications and lightweight services.
-
----
-
 ### Athena
 
-Type:
+**Type:** Ubuntu Virtual Machine
 
-```text
-Ubuntu Virtual Machine
-```
+**Purpose:** Monitoring, observability, automation, and development services.
 
-Services:
+**Hosted Services:**
 
 * Grafana
 * Prometheus
 * Loki
-* Promtail
+* Grafana Alloy
+* Node Exporter
+* Proxmox Exporter
 * Portainer
 * LocalStack
 
-Purpose:
+---
 
-Provides monitoring, observability, container management, and cloud emulation services.
+### Hestia
+
+**Type:** Linux Container (LXC)
+
+**Purpose:** Self-hosted applications and user-facing services.
+
+**Hosted Services:**
+
+* Homepage
+* Vaultwarden
 
 ---
 
 ### Artemis
 
-Type:
+**Type:** Arch Linux Workstation
 
-```text
-Arch Linux Laptop
-```
+**Purpose:** Infrastructure administration and management.
 
-Purpose:
+**Responsibilities:**
 
-Primary management workstation used for:
-
-* Infrastructure administration
-* Terraform deployments
-* Git operations
-* Remote management through Tailscale
+* SSH Administration
+* Git Operations
+* Terraform Development
+* Documentation
+* Remote Administration via Tailscale
 
 ---
 
-## Network Architecture
+## Network Overview
 
 ```text
 Artemis
     │
-Tailscale
+    ▼
+Tailscale Mesh VPN
     │
+    ▼
 Apollo
-    │
  ┌──┴──┐
  │     │
+ ▼     ▼
 Hestia Athena
 ```
 
 ---
 
-## Diagram
+## Diagram Inventory
 
-See:
+| Diagram                    | Purpose                                       |
+| -------------------------- | --------------------------------------------- |
+| `architecture-diagram.mmd` | Infrastructure topology and service placement |
+| `metrics-flow.mmd`         | Metrics collection and visualization flow     |
+| `logging-flow.mmd`         | Log collection and aggregation pipeline       |
+| `alerting-flow.mmd`        | Alert routing and notification flow           |
+| `recovery-flow.mmd`        | Infrastructure recovery sequence              |
 
-```text
-architecture-diagram.mmd
-```
+---
 
-for the complete Mermaid architecture diagram.
+## Usage
 
+These diagrams can be viewed directly on platforms that support Mermaid rendering or through local Markdown viewers with Mermaid.js support.
+
+Recommended reading order:
+
+1. `architecture-diagram.mmd`
+2. `metrics-flow.mmd`
+3. `logging-flow.mmd`
+4. `alerting-flow.mmd`
+5. `recovery-flow.mmd`
+
+For detailed explanations, refer to:
+
+* `docs/architecture.md`
+* `docs/network.md`
+* `docs/runbook.md`
+* `docs/disaster-recovery.md`
+
+---
+
+## Dependencies
+
+* Mermaid.js
+* Markdown renderer with Mermaid support
+
+---
+
+## Maintenance
+
+Update diagrams whenever:
+
+* New hosts are added
+* Services are deployed or removed
+* Network topology changes
+* Monitoring architecture changes
+* Recovery procedures are modified
+
+---
+
+## Status
+
+**Documentation Status:** Current
+
+**Architecture State:** Operational
+
+**Last Reviewed:** June 2026

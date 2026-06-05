@@ -6,494 +6,277 @@ This document provides a complete inventory of physical systems, virtual infrast
 
 ---
 
-# Physical Systems
+## Physical Systems
 
-## Apollo
+### Apollo
 
-Primary Infrastructure Host
+**Primary Infrastructure Host**
 
-### Platform
+- **Platform:** Proxmox VE
+- **Role:** Hypervisor
+- **Responsibilities:**
+  - VM Hosting
+  - LXC Hosting
+  - Storage Management
+  - Virtual Networking
+  - Infrastructure Core Services
+- **Status:** Healthy
 
-* Proxmox VE
+### Artemis
 
-### Role
+**Management Workstation**
 
-Hypervisor
-
-### Responsibilities
-
-* VM Hosting
-* LXC Hosting
-* Storage Management
-* Virtual Networking
-* Infrastructure Core Services
-
-### Status
-
-Healthy
-
----
-
-## Artemis
-
-Management Workstation
-
-### Platform
-
-* Arch Linux
-
-### Role
-
-Administration Workstation
-
-### Responsibilities
-
-* SSH Administration
-* Git Operations
-* Terraform Development
-* Documentation
-* Remote Infrastructure Management
-
-### Status
-
-Healthy
+- **Platform:** Arch Linux
+- **Role:** Administration Workstation
+- **Responsibilities:**
+  - SSH Administration
+  - Git Operations
+  - Terraform Development
+  - Documentation
+  - Remote Infrastructure Management
+- **Status:** Healthy
 
 ---
 
-# Virtual Infrastructure
+## Virtual Infrastructure
 
-## Athena
+### Athena
 
-### Type
+- **Type:** Ubuntu Virtual Machine
+- **Purpose:** Operations, Monitoring, Observability, and Infrastructure Testing
+- **Status:** Healthy
 
-Ubuntu Virtual Machine
+#### Hosted Services
 
-### Purpose
+| Service | Function |
+|----------|----------|
+| Grafana | Visualization and Dashboards |
+| Prometheus | Metrics Collection |
+| Loki | Log Aggregation |
+| Grafana Alloy | Log Collection |
+| Node Exporter | Host Metrics |
+| Proxmox Exporter | Proxmox Metrics |
+| Portainer | Container Management |
+| LocalStack | AWS Service Emulation |
 
-Operations, Monitoring, Observability, and Infrastructure Testing
+### Hestia
 
-### Status
+- **Type:** Linux Container (LXC)
+- **Purpose:** Self-Hosted Applications
+- **Status:** Healthy
 
-Healthy
+#### Hosted Services
 
-### Hosted Services
-
-| Service          | Function                     |
-| ---------------- | ---------------------------- |
-| Grafana          | Visualization and Dashboards |
-| Prometheus       | Metrics Collection           |
-| Loki             | Log Aggregation              |
-| Grafana Alloy    | Log Collection               |
-| Node Exporter    | Host Metrics                 |
-| Proxmox Exporter | Proxmox Metrics              |
-| Portainer        | Container Management         |
-| LocalStack       | AWS Service Emulation        |
-
----
-
-## Hestia
-
-### Type
-
-Linux Container (LXC)
-
-### Purpose
-
-Self-Hosted Applications
-
-### Status
-
-Healthy
-
-### Hosted Services
-
-| Service     | Function          |
-| ----------- | ----------------- |
-| Homepage    | Service Dashboard |
-| Vaultwarden | Password Manager  |
+| Service | Function |
+|----------|----------|
+| Homepage | Service Dashboard |
+| Vaultwarden | Password Manager |
 
 ---
 
-# Docker Services
+## Docker Services
 
-## Telemetry Stack
+### Telemetry Stack
 
-Host:
+- **Host:** Athena
+- **Status:** Operational
 
-Athena
-
-### Components
-
-| Service          | Purpose         |
-| ---------------- | --------------- |
-| Grafana          | Visualization   |
-| Prometheus       | Metrics Storage |
-| Loki             | Log Storage     |
-| Grafana Alloy    | Log Collection  |
-| Node Exporter    | Host Metrics    |
+| Service | Purpose |
+|----------|----------|
+| Grafana | Visualization |
+| Prometheus | Metrics Storage |
+| Loki | Log Storage |
+| Grafana Alloy | Log Collection |
+| Node Exporter | Host Metrics |
 | Proxmox Exporter | Proxmox Metrics |
 
-Status:
+### LocalStack Stack
 
-Operational
+- **Host:** Athena
+- **Status:** Operational
 
----
-
-## LocalStack Stack
-
-Host:
-
-Athena
-
-### Components
-
-| Service    | Purpose       |
-| ---------- | ------------- |
+| Service | Purpose |
+|----------|----------|
 | LocalStack | AWS Emulation |
 
-Status:
+### Core Services Stack
 
-Operational
+- **Host:** Hestia
+- **Status:** Operational
 
----
-
-## Core Services Stack
-
-Host:
-
-Hestia
-
-### Components
-
-| Service     | Purpose             |
-| ----------- | ------------------- |
-| Homepage    | Service Dashboard   |
+| Service | Purpose |
+|----------|----------|
+| Homepage | Service Dashboard |
 | Vaultwarden | Password Management |
 
-Status:
+---
 
-Operational
+## Monitoring Inventory
+
+### Prometheus
+
+- **Function:** Metrics Collection and Storage
+- **Monitored Targets:** Node Exporter, Proxmox Exporter
+- **Status:** Healthy
+
+### Grafana
+
+- **Function:** Visualization and Alerting
+- **Features:** Dashboards, Alerting, Log Exploration, Metrics Visualization
+- **Status:** Healthy
+
+### Node Exporter
+
+- **Function:** Host Metrics Collection
+- **Metrics:** CPU, Memory, Disk, Network
+- **Status:** Healthy
+
+### Proxmox Exporter
+
+- **Function:** Proxmox Metrics Collection
+- **Metrics:** Node Metrics, VM Metrics, Storage Metrics
+- **Status:** Healthy
 
 ---
 
-# Monitoring Inventory
+## Logging Inventory
 
-## Prometheus
+### Loki
 
-### Function
+- **Function:** Centralized Log Storage
+- **Features:** Log Aggregation, Querying, Historical Retention
+- **Status:** Healthy
 
-Metrics Collection and Storage
+### Grafana Alloy
 
-### Monitored Targets
-
-* Node Exporter
-* Proxmox Exporter
-
-### Status
-
-Healthy
-
----
-
-## Grafana
-
-### Function
-
-Visualization and Alerting
-
-### Features
-
-* Dashboards
-* Alerting
-* Log Exploration
-* Metrics Visualization
-
-### Status
-
-Healthy
+- **Function:** Telemetry Collection
+- **Responsibilities:**
+  - Docker Log Discovery
+  - Log Collection
+  - Log Forwarding
+- **Destination:** Loki
+- **Status:** Healthy
 
 ---
 
-## Node Exporter
+## Alerting Inventory
 
-### Function
+### Grafana Alerting
 
-Host Metrics Collection
+- **Function:** Alert Evaluation and Notification
+- **Alert Delivery:** Telegram
+- **Purpose:**
+  - Infrastructure Alerts
+  - Service Health Alerts
+  - Resource Utilization Alerts
+- **Status:** Operational
 
-### Metrics
+### Telegram Notifications
 
-* CPU
-* Memory
-* Disk
-* Network
-
-### Status
-
-Healthy
-
----
-
-## Proxmox Exporter
-
-### Function
-
-Proxmox Metrics Collection
-
-### Metrics
-
-* Node Metrics
-* VM Metrics
-* Storage Metrics
-
-### Status
-
-Healthy
+- **Purpose:** Incident Notification
+- **Status:** Operational
 
 ---
 
-# Logging Inventory
+## Infrastructure as Code Inventory
 
-## Loki
+### Terraform
 
-### Function
+- **Purpose:** Infrastructure Automation
+- **Environment:** LocalStack
+- **Status:** Operational
 
-Centralized Log Storage
+### LocalStack
 
-### Features
+- **Purpose:** AWS Service Emulation
+- **Services Used:**
+  - S3
+  - DynamoDB
+- **Status:** Operational
 
-* Log Aggregation
-* Querying
-* Historical Retention
+### Managed Resources
 
-### Status
-
-Healthy
-
----
-
-## Grafana Alloy
-
-### Function
-
-Telemetry Collection
-
-### Responsibilities
-
-* Docker Log Discovery
-* Log Collection
-* Log Forwarding
-
-### Destination
-
-* Loki
-
-### Status
-
-Healthy
+- **S3 Bucket:** `tf-homelab-storage-bucket`
+- **DynamoDB Table:** `tf-homelab-metadata`
 
 ---
 
-# Alerting Inventory
+## Networking Inventory
 
-## Grafana Alerting
+### Router
 
-### Function
+- **Provider:** Airtel Fiber
+- **Status:** Operational
 
-Alert Evaluation and Notification
+### Tailscale
 
-### Alert Delivery
+- **Purpose:** Remote Administration
+- **Connected Nodes:**
+  - Artemis
+  - Apollo
+  - Athena
+- **Status:** Operational
 
-Telegram
+### Proxmox Bridge
 
-### Current Status
-
-Operational
-
-### Purpose
-
-* Infrastructure Alerts
-* Service Health Alerts
-* Resource Utilization Alerts
-
----
-
-## Telegram Notifications
-
-### Purpose
-
-Incident Notification
-
-### Delivery Path
-
-```text
-Prometheus
-        │
-        ▼
-Grafana Alerting
-        │
-        ▼
-Telegram
-```
-
-### Status
-
-Operational
+- **Purpose:**
+  - VM Connectivity
+  - LXC Connectivity
+  - External Network Access
+- **Status:** Operational
 
 ---
 
-# Infrastructure as Code Inventory
+## Documentation Inventory
 
-## Terraform
-
-### Purpose
-
-Infrastructure Automation
-
-### Status
-
-Operational
-
-### Environment
-
-LocalStack
-
----
-
-## LocalStack
-
-### Purpose
-
-AWS Service Emulation
-
-### Status
-
-Operational
-
-### Services Used
-
-* S3
-* DynamoDB
+| Document | Purpose |
+|----------|----------|
+| `architecture.md` | Architecture Overview |
+| `network.md` | Network Design |
+| `inventory.md` | Infrastructure Inventory |
+| `runbook.md` | Operational Procedures |
+| `troubleshooting.md` | Incident Documentation |
+| `disaster-recovery.md` | Recovery Procedures |
+| `validation-report.md` | Validation Results |
+| `changelog.md` | Change Tracking |
+| `project-timeline.md` | Project History |
+| `health-checks.md` | Health Verification |
 
 ---
 
-## Managed Resources
+## Operational Status Summary
 
-### S3 Bucket
-
-```text
-tf-homelab-storage-bucket
-```
-
----
-
-### DynamoDB Table
-
-```text
-tf-homelab-metadata
-```
-
----
-
-# Networking Inventory
-
-## Router
-
-Provider:
-
-Airtel Fiber
-
-### Status
-
-Operational
-
----
-
-## Tailscale
-
-### Purpose
-
-Remote Administration
-
-### Connected Nodes
-
-* Artemis
-* Apollo
-* Athena
-
-### Status
-
-Operational
-
----
-
-## Proxmox Bridge
-
-### Bridge
-
-```text
-vmbr0
-```
-
-### Purpose
-
-* VM Connectivity
-* LXC Connectivity
-* External Network Access
-
-### Status
-
-Operational
-
----
-
-# Documentation Inventory
-
-Current documentation includes:
-
-| Document             | Purpose                  |
-| -------------------- | ------------------------ |
-| architecture.md      | Architecture Overview    |
-| network.md           | Network Design           |
-| inventory.md         | Infrastructure Inventory |
-| runbook.md           | Operational Procedures   |
-| troubleshooting.md   | Incident Documentation   |
-| disaster-recovery.md | Recovery Procedures      |
-| validation-report.md | Validation Results       |
-| changelog.md         | Change Tracking          |
-| project-timeline.md  | Project History          |
-| health-checks.md     | Health Verification      |
-
----
-
-# Operational Status Summary
-
-| Component         | Status      |
-| ----------------- | ----------- |
-| Apollo            | Healthy     |
-| Athena            | Healthy     |
-| Hestia            | Healthy     |
-| Grafana           | Healthy     |
-| Prometheus        | Healthy     |
-| Loki              | Healthy     |
-| Grafana Alloy     | Healthy     |
-| Node Exporter     | Healthy     |
-| Proxmox Exporter  | Healthy     |
-| LocalStack        | Healthy     |
-| Tailscale         | Operational |
-| Metrics Pipeline  | Operational |
-| Logging Pipeline  | Operational |
+| Component | Status |
+|----------|----------|
+| Apollo | Healthy |
+| Athena | Healthy |
+| Hestia | Healthy |
+| Grafana | Healthy |
+| Prometheus | Healthy |
+| Loki | Healthy |
+| Grafana Alloy | Healthy |
+| Node Exporter | Healthy |
+| Proxmox Exporter | Healthy |
+| LocalStack | Healthy |
+| Tailscale | Operational |
+| Metrics Pipeline | Operational |
+| Logging Pipeline | Operational |
 | Alerting Pipeline | Operational |
 
 ---
 
-# Inventory Status
+## Summary
 
-Last Reviewed:
+The HomeLab environment consists of:
 
-Current Infrastructure State
+- **1 Physical Hypervisor:** Apollo
+- **1 Management Workstation:** Artemis
+- **1 Ubuntu VM:** Athena
+- **1 LXC Container:** Hestia
+- **8 Monitoring & Infrastructure Services**
+- **2 Core Self-Hosted Services**
+- **Terraform-managed LocalStack Resources**
+- **Tailscale-based Remote Administration**
+- **Centralized Metrics, Logging, and Alerting**
 
-Overall Status:
-
-```text
-Fully Operational
-```
+**Overall Infrastructure Status:** Healthy and Operational
