@@ -1,604 +1,486 @@
-# 🚀 Lean Engineering Homelab Roadmap (30-Day Student Edition)
+# HOMELAB_ROADMAP.md
 
-## 🎯 Goal
+## Overview
 
-By the time I leave for college, I will have:
+This roadmap outlines the evolution of the HomeLab environment, highlights completed engineering milestones, identifies current development priorities, and captures future initiatives planned for continued learning and infrastructure maturity.
 
-* A headless home server
-* Secure remote access through Tailscale
-* A centralized dashboard
-* Monitoring and alerting
-* Local AWS experimentation using LocalStack
-* Terraform-managed infrastructure
-* Git-tracked configurations
-* Tested backup and recovery procedures
-
-**Success Metric:** I can manage my entire home infrastructure remotely from my hostel using only my laptop.
+The objective is to maintain a clear direction for the platform while documenting the practical skills and operational capabilities developed throughout the project lifecycle.
 
 ---
 
-# Week 0: Preparation (1–2 Days)
+# ✅ Completed Milestones
 
-## Backup Existing Data
+## 🏗️ Phase 1–5: Core Virtualization & Telemetry Foundation
 
-* Copy important Windows files to:
+### Bare-Metal Compute Platform
+- Deployed **Proxmox VE** on the bare-metal host **Apollo**.
+- Established the primary virtual bridge network (`vmbr0`).
+- Created isolated execution environments for infrastructure workloads.
 
-  * External drive
-  * Cloud storage
-  * Laptop
+### Workload Isolation Architecture
+- Provisioned **Athena** (Ubuntu Server VM) for monitoring, automation, and operational services.
+- Provisioned **Hestia** (Linux Container) for user-facing applications.
+- Installed Docker and Docker Compose within guest environments.
 
-### Verification
+### Secure Remote Administration
+- Connected infrastructure nodes using **Tailscale**:
+  - Artemis
+  - Apollo
+  - Athena
+- Enabled MagicDNS resolution.
+- Standardized SSH-based headless administration.
+- Eliminated public router port forwarding requirements.
 
-* Open several files from backup locations
-* Confirm backups are usable
+### Core Service Deployment
+Successfully deployed:
 
----
+- Homepage
+- Vaultwarden
+- Portainer
 
-## Create Repository Structure
+Result:
+- Centralized service visibility.
+- Self-hosted credential management.
+- Simplified container administration.
+
+### Observability Foundation
+Implemented a complete metrics and alerting stack:
+
+#### Metrics Collection
+- Prometheus
+- Node Exporter
+- Proxmox Exporter
+
+#### Visualization
+- Grafana dashboards
+
+#### Alerting
+- Grafana Alerting
+- Telegram notifications
+
+Metrics architecture:
 
 ```text
-homelab/
-├── README.md
-├── docs/
-├── docker-compose/
-├── terraform/
-├── scripts/
-└── screenshots/
+Node Exporter
+        │
+        ▼
+Prometheus
+        │
+        ▼
+Grafana
+        │
+        ▼
+Telegram
 ```
+
+Result:
+- Real-time infrastructure visibility.
+- Automated incident notifications.
 
 ---
 
-## Create Documentation Files
+# 🛠️ Phase 6–7: Reliability Engineering & Platform Optimization
+
+## Telemetry Stack Consolidation
+
+Restructured fragmented Docker deployments into a unified layout:
 
 ```text
-docs/
-├── architecture.md
-├── network.md
-└── troubleshooting.md
-```
-
----
-
-## Download Required Software
-
-* Proxmox VE ISO
-* Ventoy (or preferred USB flashing tool)
-
----
-
-# Week 1: Infrastructure Foundation
-
-## Day 1 — Install Proxmox VE
-
-### Tasks
-
-* Flash Proxmox VE ISO to USB
-* Install Proxmox on desktop
-* Verify storage detection
-* Verify web interface access
-
-### Validation
-
-* Proxmox web UI accessible
-* Storage visible
-* System stable
-
----
-
-## Day 2 — Configure Networking
-
-### Preferred
-
-```text
-Router
-│
-Ethernet
-│
-Proxmox
-```
-
-### Alternative
-
-```text
-Router
-│
-Wi-Fi
-│
-Proxmox
-```
-
-### Documentation
-
-* Record network settings
-* Record IP addresses
-* Update `docs/network.md`
-
----
-
-## Day 3 — Create Ubuntu Server VM
-
-### Recommended Configuration
-
-```text
-CPU: 4 cores
-RAM: 6 GB
-Storage: 50–100 GB
-```
-
-### Settings
-
-* Enable auto-start at boot
-
----
-
-## Day 4 — Install Docker
-
-### Tasks
-
-* Install Docker
-* Install Docker Compose
-
-### Validation
-
-```bash
-docker run hello-world
-```
-
----
-
-## Day 5 — Configure Tailscale
-
-### Tasks
-
-* Install Tailscale inside Ubuntu VM
-* Connect laptop and VM to same tailnet
-
-### Validation
-
-* Laptop can access VM remotely
-* Tailscale MagicDNS working
-
----
-
-## Day 6–7 — Configure Backups
-
-### Tasks
-
-* Create scheduled Proxmox VM backup
-* Test backup generation
-
-### Documentation
-
-Record:
-
-* Backup location
-* Recovery procedure
-
----
-
-# Week 2: Visibility & Operations
-
-## Day 8 — Deploy Homepage Dashboard
-
-### Tasks
-
-Deploy Homepage using Docker Compose.
-
-### Dashboard Entries
-
-* Proxmox
-* Ubuntu VM
-* Future services
-
----
-
-## Day 9 — Deploy Portainer
-
-### Tasks
-
-Deploy Portainer CE.
-
-### Practice
-
-* View logs
-* Restart containers
-* Create stacks
-
----
-
-## Day 10 — Deploy Monitoring Stack
-
-### Services
-
-* Prometheus
-* Node Exporter
-
-### Validation
-
-* Metrics collected successfully
-
----
-
-## Day 11 — Deploy Grafana
-
-### Create Dashboards
-
-* CPU usage
-* Memory usage
-* Disk utilization
-* Network traffic
-
----
-
-## Day 12 — Enhance Homepage
-
-### Add Widgets
-
-* System status
-* Container status
-* Resource usage
-
----
-
-## Day 13–14 — Optional Personal Service
-
-Choose **ONE**:
-
-### Option A
-
-Immich
-
-### Option B
-
-Vaultwarden
-
----
-
-# Week 3: Cloud & Automation
-
-## Day 15 — Deploy LocalStack
-
-### Tasks
-
-Deploy LocalStack container.
-
-### Validation
-
-* Services start successfully
-
----
-
-## Day 16 — Install Terraform
-
-### Structure
-
-```text
-terraform/
+docker-compose/
+├── telemetry/
+├── core-services/
 └── localstack/
 ```
 
----
+Benefits:
 
-## Day 17 — Provision S3 Bucket
-
-### Objective
-
-Create first Terraform-managed resource.
-
-### Validation
-
-* S3 bucket visible in LocalStack
+- Simplified operations.
+- Reduced deployment complexity.
+- Standardized maintenance workflows.
+- Eliminated container naming conflicts.
 
 ---
 
-## Day 18 — Provision DynamoDB Table
+## Logging Pipeline Modernization
 
-### Objective
+Modernized the centralized logging stack by replacing Promtail with Grafana Alloy.
 
-Create Terraform-managed DynamoDB table.
+### Improvements
 
-### Validation
+- Unified telemetry agent architecture.
+- Improved Docker service discovery.
+- Simplified configuration management.
+- Reduced operational overhead.
 
-* Table successfully created
-
----
-
-## Day 19 — Integrate Monitoring
-
-### Optional
-
-* Connect LocalStack metrics to Grafana
-
-If difficult, continue without blocking progress.
-
----
-
-## Day 20 — Push Everything to Git
-
-### Tasks
-
-* Commit infrastructure files
-* Push repository
-
-### Tag Release
-
-```bash
-git tag v0.1
-```
-
----
-
-## Day 21 — Create Architecture Diagram
-
-### Include
+Logging architecture:
 
 ```text
-Laptop
-    │
-Tailscale
-    │
-Ubuntu VM
-    │
-Docker Services
+Docker Containers
+        │
+        ▼
+Grafana Alloy
+        │
+        ▼
+Loki
+        │
+        ▼
+Grafana Explore
 ```
 
-Save diagram inside:
+Result:
+- Centralized, searchable log aggregation.
+
+---
+
+## Reliability & Recovery Validation
+
+Validated infrastructure resilience through controlled testing.
+
+### Headless Operations
+
+Confirmed complete management without:
+
+- Monitor
+- Keyboard
+- Mouse
+
+Using:
+
+- Tailscale
+- SSH
+- Grafana
+- Portainer
+- Homepage
+
+---
+
+### Autostart Validation
+
+Verified automatic startup of:
+
+- Athena (VM 100)
+- Hestia (LXC 101)
+
+following Apollo reboot.
+
+---
+
+### Recovery Testing
+
+Validated:
+
+- Hypervisor reboot recovery
+- VM recovery
+- Container recovery
+- Service recovery
+- Tailscale reconnection
+- Telemetry restoration
+
+Result:
 
 ```text
-docs/
+Operational Readiness: VALIDATED
 ```
 
 ---
 
-# Week 4: Reliability & Validation
+## Dashboard Data Architecture Improvements
 
-## Day 22 — Deploy Loki
+Resolved intermittent external weather integration failures.
+
+### Improvements
+
+- Replaced unreliable direct integrations.
+- Implemented local shell wrappers around `wttr.in`.
+- Improved Homepage widget stability.
+
+Result:
+
+- Consistent weather updates.
+- Improved dashboard reliability.
+
+---
+
+## Inter-Node Data Synchronization
+
+Implemented secure synchronization between Athena and Hestia.
+
+### Architecture
+
+```text
+Athena
+    │
+    ▼
+Ed25519 SSH
+    │
+    ▼
+Hestia
+    │
+    ▼
+JSON Data Sync
+    │
+    ▼
+Olympus Dashboard API
+```
+
+Features:
+
+- Passwordless authentication.
+- Automated cron execution.
+- Five-minute synchronization intervals.
+- Reliable dashboard data ingestion.
+
+Result:
+
+- Fully automated data distribution pipeline.
+
+---
+
+## Incident Response & Troubleshooting
+
+### Apollo Networking Recovery
+
+Successfully diagnosed and resolved a major networking outage following hypervisor reboot.
+
+### Root Cause
+
+Missing outbound NAT masquerading rules.
+
+### Resolution
+
+- Identified broken routing path.
+- Restored iptables masquerading.
+- Revalidated connectivity.
+
+Validated services:
+
+- Internet access
+- Tailscale
+- Docker workloads
+- Monitoring pipelines
+
+Result:
+
+```text
+Recovery procedures proven effective.
+```
+
+---
+
+# ⚡ Active Engineering Focus (Phase 8)
+
+## Homepage Dashboard Enhancement
+
+Current objective:
+
+Transform Homepage from a simple service directory into an operational command center.
+
+### Planned Structure
+
+```text
+Olympus
+Operations
+Observability
+Personal Feed
+Resources
+```
+
+Goals:
+
+- Improved usability.
+- Logical grouping.
+- Faster navigation.
+- Better visual hierarchy.
+
+---
+
+## Olympus Dashboard API Expansion
+
+Expanding the custom FastAPI service.
+
+### Planned Endpoints
+
+```text
+GET /weather
+GET /system
+```
+
+Purpose:
+
+- Surface live operational data.
+- Feed Homepage widgets directly.
+- Reduce reliance on third-party integrations.
+
+Expected outcome:
+
+- Richer dashboard experiences.
+- Greater control over displayed data.
+
+---
+
+# 🔮 Future Architecture Initiatives (Phase 9+)
+
+## Reverse Proxy & Internal Routing
+
+### Evaluation Candidates
+
+- Caddy
+- Traefik
+
+### Objectives
+
+Replace direct port references with friendly internal domains.
+
+Target architecture:
+
+```text
+homepage.lab ──► 10.10.10.2:3000
+vault.lab    ──► 10.10.10.2:8080
+grafana.lab  ──► 10.10.10.10:3001
+```
+
+Benefits:
+
+- Improved usability.
+- Cleaner URLs.
+- Internal TLS opportunities.
+- Simplified access patterns.
+
+---
+
+## Synthetic Uptime Monitoring
+
+### Planned Deployment
+
+Uptime Kuma
+
+### Objectives
+
+- Availability monitoring.
+- Latency tracking.
+- Historical uptime reporting.
+- Telegram integration.
+
+Result:
+
+- Independent validation of service health.
+
+---
+
+## CI/CD & GitOps Experimentation
+
+### Evaluation Candidates
+
+- Forgejo
+- Gitea
+
+### Objectives
+
+Implement lightweight GitOps workflows.
+
+Potential capabilities:
+
+- Repository hosting.
+- Webhook automation.
+- Configuration deployment triggers.
+- Change validation workflows.
+
+Example triggers:
+
+```text
+services.yaml
+prometheus.yml
+homepage-config/
+```
+
+Result:
+
+- Improved automation maturity.
+- Hands-on GitOps experience.
+
+---
+
+## IoT Telemetry Integration
 
 ### Objective
 
-Collect Docker container logs.
+Integrate physical sensors into the observability stack.
 
-### Validation
+### Platform
 
-* Logs visible in Grafana
+ESP32 microcontrollers.
 
----
+### Potential Metrics
 
-## Day 23 — Configure Alerts
+- Temperature
+- Humidity
+- Environmental conditions
+- Power usage
 
-### Example Alerts
+Architecture:
 
-* CPU > 90%
-* Disk > 85%
-* Service unavailable
+```text
+ESP32 Sensors
+        │
+        ▼
+Custom Exporters
+        │
+        ▼
+Prometheus
+        │
+        ▼
+Grafana
+```
 
-### Delivery Method
+Result:
 
-* Telegram notifications
-
----
-
-## Day 24 — Headless Operation Test
-
-### Tasks
-
-Disconnect:
-
-* Monitor
-* Keyboard
-* Mouse
-
-Operate exclusively through remote access.
-
----
-
-## Day 25 — Recovery Drill #1
-
-### Simulate Reboot
-
-Verify:
-
-* Proxmox starts
-* Ubuntu VM starts
-* Docker starts
-* Tailscale reconnects
+- Real-world telemetry ingestion.
+- Expanded monitoring capabilities.
+- Additional experimentation opportunities.
 
 ---
 
-## Day 26 — Recovery Drill #2
+# Current Environment Status
 
-### Simulate Container Failure
+```text
+Stable Operational Environment
+```
 
-Kill Homepage container.
+## Active Capabilities
 
-### Objective
-
-Restore service using documented procedures.
-
----
-
-## Day 27 — Recovery Drill #3
-
-### Simulate Network Failure
-
-* Power off router
-* Wait 30 seconds
-* Restore power
-
-### Validation
-
-* Automatic reconnection
-* Services reachable
+- Virtualization
+- Containerization
+- Secure Remote Administration
+- Monitoring
+- Logging
+- Alerting
+- Infrastructure Validation
+- Disaster Recovery
+- Documentation
+- Infrastructure as Code
+- Automated Data Synchronization
 
 ---
 
-## Day 28 — Recovery Drill #4
+# Roadmap Summary
 
-### Backup Restoration
-
-Restore from backup.
-
-### Validation
-
-* Recovery successful
-* Data intact
+| Phase | Focus Area | Status |
+|---------|------------|----------|
+| 1–5 | Foundation, Services, Observability | ✅ Complete |
+| 6–7 | Reliability Engineering & Refactoring | ✅ Complete |
+| 8 | Dashboard Enhancement & API Expansion | 🚧 In Progress |
+| 9 | Reverse Proxy, Uptime, GitOps, IoT | 📋 Planned |
 
 ---
 
-## Day 29 — Documentation Review
+# Project Status
 
-Verify:
+**Current Phase:** Dashboard Enhancement & API Expansion
 
-* Setup guide complete
-* Troubleshooting guide complete
-* Architecture diagram complete
+**Infrastructure State:** Stable Operational Environment
 
----
+**Operational Readiness:** Validated
 
-## Day 30 — Final Validation
+**Documentation Coverage:** Comprehensive
 
-Run the complete readiness checklist.
-
----
-
-# ✅ College Departure Checklist
-
-## Infrastructure
-
-* [ ] Proxmox reachable
-* [ ] Ubuntu VM autostarts
-* [ ] Docker autostarts
-
-## Connectivity
-
-* [ ] Tailscale reconnects automatically
-* [ ] Remote access verified
-
-## Operations
-
-* [ ] Homepage dashboard operational
-* [ ] Grafana dashboard operational
-* [ ] Prometheus collecting metrics
-* [ ] Loki collecting logs
-
-## Cloud & Automation
-
-* [ ] LocalStack operational
-* [ ] Terraform deployments successful
-
-## Reliability
-
-* [ ] Backup verified
-* [ ] Recovery procedures tested
-
-## Documentation
-
-* [ ] Git repository up to date
-* [ ] Architecture documentation complete
-* [ ] Network documentation complete
-* [ ] Troubleshooting documentation complete
-
----
-
-# 🎓 Expected Skills Gained
-
-By completing this roadmap, I will gain hands-on experience with:
-
-* Linux Administration
-* Virtualization (Proxmox)
-* Networking
-* VPN & Remote Access
-* Docker & Containers
-* Infrastructure as Code (Terraform)
-* Monitoring (Prometheus & Grafana)
-* Logging (Loki)
-* Backup & Recovery
-* Incident Response
-* Documentation Practices
-* Basic Cloud Architecture
-* Local AWS Emulation (LocalStack)
-* Remote System Operations
-
-
-
-Here is a comprehensive, production-grade engineering debrief of exactly what we achieved tonight, structured perfectly so you can paste it directly into your project docs or a post-mortem file.
-Engineering Log: Infrastructure Consolidation & IaC Validation
-
-Date: June 3, 2026
-
-Host: ubuntu@athena (Server) | Client: Artemis (Laptop)
-
-Status: Completed (Zero Technical Debt)
-🛠️ Summary of What We Did
-
-We successfully closed out the core infrastructure and automation phases of the homelab roadmap. The entire project repository was refactored away from isolated, messy application directories into a clean, unified, and enterprise-grade multi-stack layout. Additionally, we verified the Infrastructure-as-Code (IaC) pipeline, consolidated the telemetry suite, and secured the version control boundary.
-🏗️ Technical Execution: How We Did It
-1. IaC Verification & LocalStack Validation
-
-    Action: Executed local Terraform configuration blocks from Artemis targeting the remote LocalStack container running over the Tailscale network fabric.
-
-    Verification: Interrogated the local cloud sandbox using the AWS CLI inside a Fish shell to confirm stateful resource creation.
-
-    Confirmed Assets:
-
-        S3 Bucket: tf-homelab-storage-bucket
-
-        DynamoDB Table: tf-homelab-metadata
-
-2. File System Restructuring & Telemetry Fusion
-
-    Action: Dismantled fragmented legacy directories (~/homelab/core-services/ and ~/homelab/monitoring/) on Athena.
-
-    Consolidation: Merged Prometheus, Node-Exporter, Proxmox-Exporter, Loki, and Promtail into a single, unified Docker Compose workspace under ~/homelab/docker-compose/telemetry/.
-
-    Artemis Realignment: Renamed local directory structures to mirror Athena exactly, aligning the Git remote with actual server state.
-
-3. Repository Sanitation & Commit
-
-    Action: Hardened the root .gitignore to mask high-volume persistent storage volumes and state engines.
-
-    Commit: Staged all tracking updates, reconciled deletions, and pushed a clean tracking snapshot to origin main.
-
-⚡ Challenges Faced & Engineering Solutions
-Challenge 1: Permission Barrier During Directory Migration
-
-    Symptom: When running mkdir -p ~/homelab/docker-compose/telemetry, the system threw an explicit mkdir: cannot create directory ... Permission denied block.
-
-    Root Cause: Certain subdirectories inside the homelab tree had inherited root:root user ownership from prior decoupled sudo docker executions, blocking the standard ubuntu system user from modifying the tree.
-
-    Solution: Reclaimed absolute recursive user and group ownership of the workspace directory utilizing the change ownership binary:
-    Bash
-
-    sudo chown -R $USER:$USER ~/homelab
-
-Challenge 2: Docker Daemon Container Name Conflicts
-
-    Symptom: Initializing the new unified telemetry stack threw a fatal daemon error: Conflict. The container name "/proxmox-exporter" is already in use by... followed immediately by a similar block for /promtail.
-
-    Root Cause: Stale container footprints created by previous docker-compose files were still actively mapped inside the Docker engine daemon's memory namespace.
-
-    Solution: Forcefully purged the legacy runtime allocations by their explicit container identifiers before bringing up the new network bridge:
-    Bash
-
-    docker rm -f proxmox-exporter prometheus node-exporter grafana promtail loki
-    docker compose up -d
-
-📊 Current Container Architecture Status (docker ps)
-
-The unified telemetry workspace is fully initialized and isolated within a custom bridge network (telemetry_telemetry-net). All 6 microservices are healthy and operating concurrently:
-
-    ✅ loki (Port 3100) — Log aggregation engine
-
-    ✅ prometheus (Port 9090) — Time-series metric database
-
-    ✅ grafana (Port 3001 -> 3000) — Visual analytics dashboard
-
-    ✅ promtail (Host Log Agent) — Shipping container and system logs
-
-    ✅ node-exporter (Port 9100) — Host hardware metrics harvester
-
-    ✅ proxmox-exporter (Port 9221) — Virtualization layer hypervisor telemetry
-
-🎯 Next Objective: Priority 4 (Architecture Diagram)
-
-When you return to the lab, your workspace is perfectly clean and clear to start building out your Mermaid.js network and application architecture diagram inside your initialized docs/architecture-diagram.mmd file.
+**Overall Status:** Production-inspired HomeLab actively evolving through iterative improvement and experimentation.

@@ -2,105 +2,34 @@
 
 ## Overview
 
-The HomeLab environment is designed as a small-scale infrastructure platform for learning and practicing:
+The Olympus HomeLab is a production-inspired infrastructure platform designed to simulate real-world DevOps, Site Reliability Engineering (SRE), and cloud-native operational practices within a self-hosted environment.
+
+The platform serves as a practical environment for developing skills in:
 
 * Infrastructure Engineering
 * DevOps
 * Site Reliability Engineering (SRE)
 * Linux Administration
 * Observability
-* Infrastructure as Code
+* Infrastructure as Code (IaC)
 * Incident Response
 * Disaster Recovery
+* Systems Design
 
-The architecture emphasizes:
+---
+
+## Architectural Principles
+
+The architecture is guided by the following principles:
 
 * Private-by-default networking
-* Remote administration
 * Service isolation
+* Remote-first administration
 * Centralized observability
-* Repeatable infrastructure workflows
-
----
-
-# Physical Infrastructure
-
-## Apollo
-
-Primary Infrastructure Host
-
-Platform:
-
-* Proxmox VE
-
-Responsibilities:
-
-* Hypervisor
-* Virtual Machine Hosting
-* LXC Hosting
-* Virtual Networking
-* Storage Management
-
----
-
-## Artemis
-
-Management Workstation
-
-Platform:
-
-* Arch Linux
-
-Responsibilities:
-
-* Infrastructure Administration
-* SSH Management
-* Git Operations
-* Terraform Development
-* Documentation
-* Remote Access
-
----
-
-# Virtual Infrastructure
-
-## Athena
-
-Ubuntu Virtual Machine
-
-Purpose:
-
-Monitoring, observability, administration, and infrastructure experimentation.
-
-Services:
-
-| Service          | Purpose                      |
-| ---------------- | ---------------------------- |
-| Grafana          | Dashboards and Visualization |
-| Prometheus       | Metrics Collection           |
-| Loki             | Log Aggregation              |
-| Grafana Alloy    | Log Collection               |
-| Node Exporter    | Host Metrics                 |
-| Proxmox Exporter | Proxmox Metrics              |
-| Portainer        | Container Management         |
-| LocalStack       | AWS Service Emulation        |
-
----
-
-## Hestia
-
-Linux Container (LXC)
-
-Purpose:
-
-Self-hosted services platform.
-
-Services:
-
-| Service     | Purpose                  |
-| ----------- | ------------------------ |
-| Homepage    | Infrastructure Dashboard |
-| Vaultwarden | Password Management      |
+* Reproducible infrastructure
+* Lightweight workload placement
+* Operational resilience
+* Incremental evolution through experimentation
 
 ---
 
@@ -114,63 +43,142 @@ Airtel Fiber Router
     │
     ▼
 Apollo (Proxmox VE)
-│
-├── Athena (Ubuntu VM)
-│   ├── Grafana
-│   ├── Prometheus
-│   ├── Loki
-│   ├── Grafana Alloy
-│   ├── Portainer
-│   └── LocalStack
-│
-└── Hestia (LXC)
-    ├── Homepage
-    └── Vaultwarden
+    │
+    ├── Athena (Ubuntu VM)
+    │   ├── Grafana
+    │   ├── Prometheus
+    │   ├── Loki
+    │   ├── Grafana Alloy
+    │   ├── Portainer
+    │   ├── Olympus Dashboard API
+    │   └── Floci
+    │
+    └── Hestia (Alpine LXC)
+        ├── Homepage
+        └── Vaultwarden
 ```
 
 ---
 
-# Networking Architecture
+# Physical Infrastructure
 
-The homelab operates as a private internal environment.
+## Apollo
 
-Design principles:
+**Primary Infrastructure Host**
 
-* No intentional public exposure
-* Internal service communication
-* Remote administration through Tailscale
-* No router port forwarding
+Apollo serves as the compute foundation of the homelab.
 
----
+### Platform
 
-# Remote Access Architecture
+* Proxmox VE (Type-1 Hypervisor)
 
-```text
-Artemis
-    │
-    ▼
-Tailscale Network
-    │
-    ▼
-Apollo
-    │
-    ├── Athena
-    │
-    └── Hestia
-```
+### Responsibilities
 
-Benefits:
+* Virtual Machine Hosting
+* LXC Hosting
+* Storage Management
+* Virtual Networking
+* Hardware Abstraction
 
-* Encrypted communication
-* Device authentication
-* Reduced attack surface
-* Secure remote administration
+### Design Rationale
+
+Separating workloads from the hypervisor improves portability, backup flexibility, and operational safety.
 
 ---
 
-# Metrics Architecture
+## Artemis
 
-Metrics are collected through exporters and stored in Prometheus.
+**Management Workstation**
+
+Artemis functions as the operational control point for the environment.
+
+### Platform
+
+* Arch Linux
+
+### Responsibilities
+
+* Infrastructure Administration
+* SSH Management
+* Git Operations
+* Terraform Development
+* Documentation
+* Remote Access
+
+### Design Rationale
+
+Keeping management tooling external to the infrastructure ensures administrative access remains available during partial service failures.
+
+---
+
+# Virtualized Workload Segregation
+
+To mirror production deployment patterns, workloads are separated into platform services and user-facing applications.
+
+---
+
+## Athena (Ubuntu VM)
+
+### Role
+
+Operations, Observability, and Local Development Platform.
+
+### Hosted Services
+
+| Service               | Purpose                      |
+| --------------------- | ---------------------------- |
+| Grafana               | Dashboards and Visualization |
+| Prometheus            | Metrics Collection           |
+| Loki                  | Log Aggregation              |
+| Grafana Alloy         | Log Collection               |
+| Node Exporter         | Host Metrics                 |
+| Proxmox Exporter      | Proxmox Metrics              |
+| Portainer             | Container Management         |
+| Olympus Dashboard API | Homepage Data Services       |
+| Floci                 | AWS Service Emulation        |
+
+### Design Rationale
+
+Athena was deployed as a full virtual machine because observability and development workloads require:
+
+* Greater resource flexibility
+* Broad software compatibility
+* Independent lifecycle management
+* Isolation from the hypervisor
+
+---
+
+## Hestia (CT 101)
+
+### Role
+
+Self-Hosted Application Platform.
+
+### Hosted Services
+
+| Service     | Purpose                  |
+| ----------- | ------------------------ |
+| Homepage    | Infrastructure Dashboard |
+| Vaultwarden | Password Management      |
+
+### Design Rationale
+
+Hestia uses an unprivileged Alpine Linux LXC to provide:
+
+* Minimal overhead
+* Rapid startup times
+* Efficient resource utilization
+* Strong workload isolation
+
+This placement is well suited to lightweight, continuously running services.
+
+---
+
+# Observability Architecture
+
+The observability stack provides unified visibility across the environment.
+
+## Metrics Pipeline
 
 ```text
 Node Exporter
@@ -187,19 +195,17 @@ Proxmox Exporter
 Prometheus
 ```
 
-Capabilities:
+### Capabilities
 
 * Host Monitoring
 * VM Monitoring
-* Resource Utilization Tracking
 * Capacity Planning
+* Resource Utilization Tracking
 * Infrastructure Visibility
 
 ---
 
-# Logging Architecture
-
-Logs are collected using Grafana Alloy and stored in Loki.
+## Logging Pipeline
 
 ```text
 Docker Containers
@@ -214,7 +220,7 @@ Loki
 Grafana
 ```
 
-Capabilities:
+### Capabilities
 
 * Centralized Logging
 * Historical Log Search
@@ -223,9 +229,7 @@ Capabilities:
 
 ---
 
-# Alerting Architecture
-
-Alerting is implemented through Grafana Alerting with Telegram notifications.
+## Alerting Pipeline
 
 ```text
 Prometheus
@@ -237,95 +241,127 @@ Grafana Alerting
 Telegram
 ```
 
-Alert Types:
+### Alert Coverage
 
 * Host Availability
 * Service Availability
-* High CPU Utilization
-* High Memory Utilization
-* Disk Utilization
+* CPU Utilization
+* Memory Utilization
+* Disk Capacity
 * Infrastructure Health
 
 ---
 
 # Infrastructure as Code Architecture
 
-Terraform is used with LocalStack for local cloud experimentation.
+Infrastructure provisioning and experimentation are managed through Terraform.
+
+## Active Cloud Emulation
 
 ```text
 Terraform
         │
         ▼
-LocalStack
+Floci
         │
         ├── S3
         └── DynamoDB
 ```
 
-Current Resources:
+### Managed Resources
 
-* tf-homelab-storage-bucket
-* tf-homelab-metadata
+* `tf-homelab-storage-bucket`
+* `tf-homelab-metadata`
 
-Benefits:
+### Benefits
 
-* Repeatable Deployments
+* Reproducible Deployments
 * Safe Experimentation
-* No Cloud Costs
-* Local Testing Environment
+* Zero Cloud Cost
+* Local Validation of AWS Workflows
 
 ---
 
-# Service Placement Rationale
+## Architectural Evolution
 
-## Athena
+Floci replaced LocalStack as the active AWS emulation platform due to its significantly lower startup time and resource consumption.
 
-Chosen for:
-
-* Monitoring workloads
-* Containerized services
-* Observability stack
-* Terraform experimentation
-
-Benefits:
-
-* Resource flexibility
-* Easy backup and migration
-* Isolation from Proxmox host
+LocalStack is retained as a historical reference and compatibility artifact documenting the platform's evolution.
 
 ---
 
-## Hestia
+# Dashboard Data Architecture
 
-Chosen for:
+Custom Homepage widgets rely on a decoupled synchronization pipeline.
 
-* Lightweight service hosting
-* Low resource requirements
-* Simplified management
+```text
+Hestia
+    │
+    ├── Collect External Data
+    │
+    ▼
+Generate JSON Assets
+    │
+    ▼
+Secure SCP Synchronization
+    │
+    ▼
+Athena
+    │
+    ▼
+Olympus Dashboard API
+    │
+    ▼
+Homepage Widgets
+```
 
-Benefits:
+### Design Goals
 
-* Fast startup
-* Reduced overhead
-* Efficient resource utilization
+* Decouple data collection from presentation
+* Minimize external dependencies in the frontend
+* Preserve dashboard responsiveness
+* Support extensible widget development
 
 ---
 
-# Security Design
+# Security Architecture
 
-Security principles include:
+The homelab follows a defense-in-depth approach.
+
+## Security Principles
 
 * Private-by-default networking
-* No public-facing services
-* Tailscale-only remote access
+* No intentional public exposure
+* Tailscale-only remote administration
 * Service isolation
-* Internal communications only
+* Internal service communication
+* Least-exposure design
 
-Future improvements:
+---
 
-* Tailscale ACLs
-* Device Tagging
-* Access Segmentation
+## Remote Access Model
+
+```text
+Artemis
+    │
+    ▼
+Tailscale Network
+    │
+    ▼
+Apollo
+    │
+    ├── Athena
+    │
+    └── Hestia (Indirect Access)
+```
+
+### Security Decisions
+
+* No public SSH access
+* No router port forwarding
+* Device-authenticated administration
+* Encrypted WireGuard transport
+* Hestia excluded from the Tailscale mesh to reduce exposure of sensitive services
 
 ---
 
@@ -334,6 +370,7 @@ Future improvements:
 | Component         | Status      |
 | ----------------- | ----------- |
 | Apollo            | Healthy     |
+| Artemis           | Healthy     |
 | Athena            | Healthy     |
 | Hestia            | Healthy     |
 | Grafana           | Healthy     |
@@ -342,17 +379,25 @@ Future improvements:
 | Grafana Alloy     | Healthy     |
 | Node Exporter     | Healthy     |
 | Proxmox Exporter  | Healthy     |
-| LocalStack        | Healthy     |
+| Floci             | Healthy     |
 | Metrics Pipeline  | Operational |
 | Logging Pipeline  | Operational |
 | Alerting Pipeline | Operational |
 
 ---
 
-# Architecture Status
+# Current Architecture State
 
-Current Phase:
+**Phase:** Stable Operational Environment
 
-Stable Operational Environment
+The Olympus HomeLab currently provides:
 
-The architecture currently supports infrastructure monitoring, centralized logging, alerting, remote administration, self-hosted services, and Infrastructure as Code experimentation while remaining fully manageable through secure remote access.
+* Centralized observability
+* Secure remote administration
+* Self-hosted application services
+* Local AWS workflow experimentation
+* Automated dashboard integrations
+* Infrastructure as Code validation
+* Operational resilience through documented processes
+
+The architecture continues to evolve incrementally through experimentation while preserving production-inspired design principles.

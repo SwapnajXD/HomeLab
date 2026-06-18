@@ -1,16 +1,33 @@
-# Architecture
+# Architecture Diagrams
 
 ## Purpose
 
-This directory contains architecture diagrams and visual representations of the HomeLab environment.
+This directory contains the visual architecture diagrams and Mermaid (`.mmd`) flowcharts that document the design, communication paths, and operational workflows of the HomeLab environment.
 
-These diagrams provide a high-level overview of infrastructure components, networking, telemetry pipelines, alerting workflows, and recovery procedures. They complement the detailed documentation found in the `docs/` directory.
+These diagrams complement the detailed documentation found in the `docs/` directory by providing a visual representation of the infrastructure, observability stack, alerting mechanisms, and recovery procedures.
 
 ---
 
-## Overview
+## Architecture Overview
 
-The HomeLab is built around a Proxmox VE hypervisor hosting isolated virtual machines and Linux containers for operations, observability, development, and self-hosted services.
+The HomeLab follows a layered architecture designed to emulate enterprise infrastructure patterns while remaining lightweight and maintainable.
+
+The environment is built around a Proxmox VE hypervisor hosting isolated workloads for operations, observability, and self-hosted services.
+
+```text
+Artemis
+    │
+    ▼
+Tailscale Mesh VPN
+    │
+    ▼
+Apollo (Proxmox VE)
+ ┌──┴─────────┐
+ │            │
+ ▼            ▼
+Hestia      Athena
+(LXC)         (VM)
+```
 
 ---
 
@@ -22,19 +39,19 @@ The HomeLab is built around a Proxmox VE hypervisor hosting isolated virtual mac
 
 **Responsibilities:**
 
-* Virtualization
-* Storage Management
-* Network Management
-* VM Hosting
-* LXC Hosting
+* Virtualization platform
+* VM and LXC lifecycle management
+* Storage management
+* Virtual networking (`vmbr0`)
+* Guest autostart policies
 
 ---
 
 ### Athena
 
-**Type:** Ubuntu Virtual Machine
+**Type:** Ubuntu Server Virtual Machine
 
-**Purpose:** Monitoring, observability, automation, and development services.
+**Purpose:** Monitoring, observability, automation, and supporting services.
 
 **Hosted Services:**
 
@@ -45,7 +62,7 @@ The HomeLab is built around a Proxmox VE hypervisor hosting isolated virtual mac
 * Node Exporter
 * Proxmox Exporter
 * Portainer
-* LocalStack
+* LocalStack (Terraform experimentation)
 
 ---
 
@@ -53,7 +70,7 @@ The HomeLab is built around a Proxmox VE hypervisor hosting isolated virtual mac
 
 **Type:** Linux Container (LXC)
 
-**Purpose:** Self-hosted applications and user-facing services.
+**Purpose:** Self-hosted and user-facing services.
 
 **Hosted Services:**
 
@@ -66,51 +83,137 @@ The HomeLab is built around a Proxmox VE hypervisor hosting isolated virtual mac
 
 **Type:** Arch Linux Workstation
 
-**Purpose:** Infrastructure administration and management.
+**Purpose:** Infrastructure administration and development.
 
 **Responsibilities:**
 
-* SSH Administration
-* Git Operations
-* Terraform Development
-* Documentation
-* Remote Administration via Tailscale
-
----
-
-## Network Overview
-
-```text
-Artemis
-    │
-    ▼
-Tailscale Mesh VPN
-    │
-    ▼
-Apollo
- ┌──┴──┐
- │     │
- ▼     ▼
-Hestia Athena
-```
+* SSH administration
+* Git operations
+* Terraform development
+* Documentation maintenance
+* Remote management via Tailscale
 
 ---
 
 ## Diagram Inventory
 
-| Diagram                    | Purpose                                       |
-| -------------------------- | --------------------------------------------- |
-| `architecture-diagram.mmd` | Infrastructure topology and service placement |
-| `metrics-flow.mmd`         | Metrics collection and visualization flow     |
-| `logging-flow.mmd`         | Log collection and aggregation pipeline       |
-| `alerting-flow.mmd`        | Alert routing and notification flow           |
-| `recovery-flow.mmd`        | Infrastructure recovery sequence              |
+### `architecture-diagram.mmd`
+
+**Purpose:**
+
+Provides the high-level infrastructure topology and service placement.
+
+**Illustrates:**
+
+* Hypervisor and guest relationships
+* Service distribution across hosts
+* Network segmentation
+* Administrative access paths
 
 ---
 
-## Usage
+### `metrics-flow.mmd`
 
-These diagrams can be viewed directly on platforms that support Mermaid rendering or through local Markdown viewers with Mermaid.js support.
+**Purpose:**
+
+Documents the metrics collection and visualization pipeline.
+
+**Flow:**
+
+```text
+Node Exporter
+        │
+        ▼
+Proxmox Exporter
+        │
+        ▼
+Prometheus
+        │
+        ▼
+Grafana Dashboards
+```
+
+---
+
+### `logging-flow.mmd`
+
+**Purpose:**
+
+Documents centralized log aggregation.
+
+**Flow:**
+
+```text
+Docker Containers
+        │
+        ▼
+Grafana Alloy
+        │
+        ▼
+Loki
+        │
+        ▼
+Grafana Explore
+```
+
+---
+
+### `alerting-flow.mmd`
+
+**Purpose:**
+
+Illustrates the alert evaluation and notification workflow.
+
+**Flow:**
+
+```text
+Prometheus Rules
+        │
+        ▼
+Grafana Alerting
+        │
+        ▼
+Telegram Notifications
+```
+
+---
+
+### `recovery-flow.mmd`
+
+**Purpose:**
+
+Documents the expected recovery sequence following a complete host reboot or power restoration event.
+
+**Flow:**
+
+```text
+Power Restored
+        │
+        ▼
+Apollo Boots
+        │
+        ▼
+Network Initialization
+        │
+        ▼
+Athena Autostarts
+        │
+        ▼
+Hestia Autostarts
+        │
+        ▼
+Docker Services Recover
+```
+
+---
+
+## Viewing the Diagrams
+
+These diagrams can be rendered using:
+
+* GitHub's native Mermaid support
+* Markdown viewers with Mermaid.js support
+* Mermaid Live Editor
 
 Recommended reading order:
 
@@ -120,31 +223,32 @@ Recommended reading order:
 4. `alerting-flow.mmd`
 5. `recovery-flow.mmd`
 
-For detailed explanations, refer to:
+---
+
+## Related Documentation
+
+For detailed operational guidance and implementation details, refer to:
 
 * `docs/architecture.md`
 * `docs/network.md`
 * `docs/runbook.md`
 * `docs/disaster-recovery.md`
+* `docs/validation-report.md`
 
 ---
 
-## Dependencies
+## Maintenance Guidelines
 
-* Mermaid.js
-* Markdown renderer with Mermaid support
+Update the diagrams whenever:
 
----
-
-## Maintenance
-
-Update diagrams whenever:
-
-* New hosts are added
-* Services are deployed or removed
+* Hosts are added, removed, or repurposed
+* Services are deployed or decommissioned
 * Network topology changes
-* Monitoring architecture changes
-* Recovery procedures are modified
+* Monitoring or logging pipelines change
+* Alerting workflows are modified
+* Recovery procedures are updated
+
+Keeping these diagrams current ensures that the visual documentation accurately reflects the operational environment.
 
 ---
 

@@ -1,526 +1,590 @@
-# Validation Report
+# Infrastructure Validation Report
 
 ## Overview
 
-This document records validation procedures performed against the HomeLab infrastructure to verify functionality, stability, observability, remote access, and recovery capabilities.
+This document records the validation procedures performed against the homelab infrastructure to verify operational stability, service health, network functionality, observability pipelines, automated workflows, and recovery capabilities.
 
-Validation is performed after major infrastructure changes, upgrades, maintenance operations, and incident recovery activities.
-
----
-
-## Environment Under Test
-
-| Component        | Role            |
-| ---------------- | --------------- |
-| Apollo           | Proxmox Host    |
-| Athena           | Monitoring VM   |
-| Hestia           | Application LXC |
-| Grafana          | Visualization   |
-| Prometheus       | Metrics         |
-| Loki             | Logging         |
-| Grafana Alloy    | Log Collection  |
-| Node Exporter    | Host Metrics    |
-| Proxmox Exporter | Proxmox Metrics |
-| LocalStack       | AWS Emulation   |
-| Tailscale        | Remote Access   |
+Validation is executed after major infrastructure changes, maintenance activities, incident remediation efforts, and platform upgrades to ensure the environment remains production-ready.
 
 ---
 
-## Infrastructure Validation
+# Environment Under Test
 
-### Test 01: Proxmox Host Validation
+| Component             | Role                              |
+| --------------------- | --------------------------------- |
+| Apollo                | Proxmox VE Hypervisor             |
+| Athena                | Ubuntu Operations VM              |
+| Hestia                | Alpine Linux Application LXC      |
+| Artemis               | Arch Linux Management Workstation |
+| Grafana               | Visualization and Alerting        |
+| Prometheus            | Metrics Collection                |
+| Loki                  | Log Aggregation                   |
+| Grafana Alloy         | Log Collection                    |
+| Node Exporter         | Host Metrics                      |
+| Proxmox Exporter      | Hypervisor Metrics                |
+| Portainer             | Container Management              |
+| Floci                 | Local AWS Emulation               |
+| Olympus Dashboard API | Custom Dashboard Backend          |
+| Homepage              | Service Dashboard                 |
+| Vaultwarden           | Password Management               |
+| Tailscale             | Secure Remote Access              |
 
-**Objective:** Verify Apollo is operational.
+---
 
-**Procedure:**
+# Infrastructure Validation
+
+## Test 01: Hypervisor Accessibility
+
+### Objective
+
+Verify that the Proxmox host is operational and reachable.
+
+### Procedure
 
 ```bash
 ssh root@apollo
 ```
 
-**Expected Result:** Host responds normally.
+### Expected Result
 
-**Result:** **PASS**
+Administrative shell access is established successfully.
+
+### Result
+
+**PASS**
 
 ---
 
-### Test 02: VM Validation
+## Test 02: Athena VM Status
 
-**Objective:** Verify Athena is operational.
+### Objective
 
-**Procedure:**
+Verify that the operations virtual machine is running.
+
+### Procedure
 
 ```bash
-ssh ubuntu@athena
+qm status 100
 ```
 
-or verify through the Proxmox UI.
+### Expected Result
 
-**Expected Result:** VM is accessible and running.
+```text
+status: running
+```
 
-**Result:** **PASS**
+### Result
+
+**PASS**
 
 ---
 
-### Test 03: LXC Validation
+## Test 03: Hestia Container Status
 
-**Objective:** Verify Hestia is operational.
+### Objective
 
-**Procedure:**
+Verify that the application container is operational.
+
+### Procedure
 
 ```bash
 pct status 101
 ```
 
-**Expected Result:** Container is running and responding.
-
-**Result:** **PASS**
-
----
-
-### Test 04: Docker Stack Validation
-
-**Objective:** Verify all core and telemetry containers are running.
-
-**Procedure:**
-
-```bash
-docker ps
-```
-
-**Expected Result:**
-
-* Grafana
-* Prometheus
-* Loki
-* Grafana Alloy
-* Node Exporter
-* Proxmox Exporter
-* Portainer
-* LocalStack
-* Homepage
-* Vaultwarden
-
-report healthy or running.
-
-**Result:** **PASS**
-
----
-
-## Observability & Monitoring Validation
-
-### Test 05: Grafana Validation
-
-**Objective:** Verify Grafana availability.
-
-**Procedure:**
-
-Open:
+### Expected Result
 
 ```text
-http://<athena-ip>:3001
+status: running
 ```
 
-Verify:
+### Result
 
-* Dashboard loading
-* Datasources connected
-* Panels rendering metrics
-
-**Result:** **PASS**
+**PASS**
 
 ---
 
-### Test 06: Prometheus Validation
+# Network & Remote Access Validation
 
-**Objective:** Verify Prometheus readiness.
+## Test 04: Tailscale Mesh Connectivity
 
-**Procedure:**
+### Objective
 
-```bash
-curl -I http://localhost:9090/-/ready
-```
+Validate secure administrative connectivity.
 
-**Expected Result:**
-
-```text
-HTTP/1.1 200 OK
-```
-
-**Result:** **PASS**
-
----
-
-### Test 07: Node Exporter Validation
-
-**Objective:** Verify Node Exporter metrics collection.
-
-**Procedure:**
-
-```bash
-curl -s http://localhost:9100/metrics
-```
-
-**Expected Result:**
-
-CPU, memory, disk, and network metrics returned.
-
-**Result:** **PASS**
-
----
-
-### Test 08: Proxmox Exporter Validation
-
-**Objective:** Verify Proxmox metrics collection.
-
-**Procedure:**
-
-```bash
-curl -s http://localhost:9221/metrics
-```
-
-**Expected Result:**
-
-Node, VM, and storage metrics returned.
-
-**Result:** **PASS**
-
----
-
-## Logging Pipeline Validation
-
-### Test 09: Loki Readiness Validation
-
-**Objective:** Verify Loki is ready to accept read/write requests.
-
-**Procedure:**
-
-```bash
-curl -I http://localhost:3100/ready
-```
-
-**Expected Result:**
-
-```text
-HTTP/1.1 200 OK
-```
-
-**Result:** **PASS**
-
----
-
-### Test 10: Loki Services Validation
-
-**Objective:** Verify Loki internal services.
-
-**Procedure:**
-
-```bash
-docker logs loki
-```
-
-**Expected Result:**
-
-* Distributor ACTIVE
-* Ingester ACTIVE
-* Scheduler ACTIVE
-* Compactor ACTIVE
-
-**Result:** **PASS**
-
----
-
-### Test 11: Loki Labels Validation
-
-**Objective:** Verify Loki query functionality.
-
-**Procedure:**
-
-```bash
-curl -s http://localhost:3100/loki/api/v1/labels
-```
-
-**Expected Result:**
-
-JSON array of labels returned successfully.
-
-**Result:** **PASS**
-
----
-
-### Test 12: Grafana Alloy Validation
-
-**Objective:** Verify active log collection.
-
-**Procedure:**
-
-```bash
-docker logs grafana-alloy
-```
-
-**Expected Result:**
-
-* Docker container discovery active
-* No collection failures
-* Logs successfully forwarded to Loki
-
-**Result:** **PASS**
-
----
-
-## End-to-End Pipeline Validation
-
-### Test 13: Metrics Pipeline Validation
-
-**Objective:** Verify end-to-end metrics flow.
-
-**Validation Path:**
-
-```text
-Node Exporter
-        │
-        ▼
-Prometheus
-        │
-        ▼
-Grafana
-```
-
-**Expected Result:**
-
-Historical and real-time metrics visible in Grafana dashboards.
-
-**Result:** **PASS**
-
----
-
-### Test 14: Logging Pipeline Validation
-
-**Objective:** Verify end-to-end log flow.
-
-**Validation Path:**
-
-```text
-Docker Containers
-        │
-        ▼
-Grafana Alloy
-        │
-        ▼
-Loki
-        │
-        ▼
-Grafana Explore
-```
-
-**Expected Result:**
-
-Logs visible and searchable in Grafana Explore.
-
-Example:
-
-```text
-{container="vaultwarden"}
-```
-
-**Result:** **PASS**
-
----
-
-### Test 15: Alerting Validation
-
-**Objective:** Verify infrastructure alert delivery.
-
-**Validation Path:**
-
-```text
-Prometheus
-        │
-        ▼
-Grafana Alerting
-        │
-        ▼
-Telegram
-```
-
-**Procedure:**
-
-Trigger a test alert from Grafana Contact Points.
-
-**Expected Result:**
-
-Telegram notification received on the registered device.
-
-**Result:** **PASS**
-
----
-
-## Infrastructure as Code & Network Validation
-
-### Test 16: LocalStack Validation
-
-**Objective:** Verify AWS service emulation.
-
-**Procedure:**
-
-```bash
-aws --endpoint-url=http://localhost:4566 s3 ls
-```
-
-**Expected Result:**
-
-S3 resources and endpoint visible and responding.
-
-**Result:** **PASS**
-
----
-
-### Test 17: Terraform Validation
-
-**Objective:** Verify Infrastructure as Code deployment.
-
-**Procedure:**
-
-```bash
-terraform validate
-terraform plan
-terraform apply
-```
-
-**Expected Result:**
-
-Infrastructure resources created successfully.
-
-**Result:** **PASS**
-
----
-
-### Test 18: Tailscale Validation
-
-**Objective:** Verify secure remote access functionality.
-
-**Procedure:**
-
-```bash
-tailscale status
-```
-
-and
+### Procedure
 
 ```bash
 tailscale ping apollo
 tailscale ping athena
 ```
 
-**Expected Result:**
+### Expected Result
 
-All nodes connected to the Tailnet.
+Successful responses from both nodes.
 
-* Artemis
-* Apollo
-* Athena
+### Result
 
-**Result:** **PASS**
+**PASS**
 
 ---
 
-## Recovery Validation
+## Test 05: Inbound DNAT Validation
 
-### Test 19: Reboot Recovery Validation
+### Objective
 
-**Objective:** Verify automatic recovery after complete host reboot.
+Verify that Apollo correctly forwards requests to isolated services hosted on Hestia.
 
-**Procedure:**
+### Procedure
 
-Reboot Apollo.
+```bash
+curl -I http://100.81.86.51:3000
+curl -I http://100.81.86.51:8080
+```
 
-**Expected Result:**
+### Expected Result
 
-* Proxmox starts
+HTTP 200 responses from:
+
+* Homepage
+* Vaultwarden
+
+### Result
+
+**PASS**
+
+---
+
+## Test 06: Outbound NAT Validation
+
+### Objective
+
+Verify outbound internet connectivity from internal workloads.
+
+### Procedure
+
+From Athena:
+
+```bash
+ping -c 4 8.8.8.8
+```
+
+### Expected Result
+
+External connectivity succeeds without packet loss.
+
+### Result
+
+**PASS**
+
+---
+
+# Observability Validation
+
+## Test 07: Prometheus Readiness
+
+### Objective
+
+Verify Prometheus availability.
+
+### Procedure
+
+```bash
+curl -I http://localhost:9090/-/ready
+```
+
+### Expected Result
+
+```text
+HTTP/1.1 200 OK
+```
+
+### Result
+
+**PASS**
+
+---
+
+## Test 08: Prometheus Target Health
+
+### Objective
+
+Validate metrics collection across monitored systems.
+
+### Procedure
+
+```bash
+curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].health'
+```
+
+### Expected Result
+
+All configured targets report:
+
+```text
+"up"
+```
+
+### Result
+
+**PASS**
+
+---
+
+## Test 09: Grafana Validation
+
+### Objective
+
+Verify visualization services.
+
+### Procedure
+
+Access Grafana.
+
+```text
+http://10.10.10.10:3001
+```
+
+### Expected Result
+
+* Dashboards load correctly
+* Datasources connect successfully
+* Panels render live metrics
+
+### Result
+
+**PASS**
+
+---
+
+## Test 10: Node Exporter Validation
+
+### Objective
+
+Verify host metric collection.
+
+### Procedure
+
+```bash
+curl -s http://localhost:9100/metrics | head
+```
+
+### Expected Result
+
+CPU, memory, disk, and network metrics are returned.
+
+### Result
+
+**PASS**
+
+---
+
+## Test 11: Proxmox Exporter Validation
+
+### Objective
+
+Verify hypervisor metric collection.
+
+### Procedure
+
+```bash
+curl -s http://localhost:9221/metrics | head
+```
+
+### Expected Result
+
+Node, VM, and storage metrics are exposed.
+
+### Result
+
+**PASS**
+
+---
+
+# Logging Validation
+
+## Test 12: Loki Readiness
+
+### Objective
+
+Verify Loki availability.
+
+### Procedure
+
+```bash
+curl -I http://localhost:3100/ready
+```
+
+### Expected Result
+
+```text
+HTTP/1.1 200 OK
+```
+
+### Result
+
+**PASS**
+
+---
+
+## Test 13: Grafana Alloy Validation
+
+### Objective
+
+Validate active log collection.
+
+### Procedure
+
+```bash
+docker logs grafana-alloy
+```
+
+### Expected Result
+
+* Docker discovery active
+* No ingestion failures
+* Logs forwarded successfully
+
+### Result
+
+**PASS**
+
+---
+
+## Test 14: End-to-End Logging Pipeline
+
+### Objective
+
+Verify centralized log visibility.
+
+### Validation Path
+
+```text
+Containers
+    ↓
+Grafana Alloy
+    ↓
+Loki
+    ↓
+Grafana Explore
+```
+
+### Procedure
+
+Query:
+
+```text
+{container="vaultwarden"}
+```
+
+### Expected Result
+
+Live logs appear in Grafana Explore.
+
+### Result
+
+**PASS**
+
+---
+
+# Data Automation Validation
+
+## Test 15: Inter-Node Synchronization
+
+### Objective
+
+Verify secure synchronization between Hestia and Athena.
+
+### Procedure
+
+```bash
+ssh root@10.10.10.2 \
+"ls /root/homelab/personal-services/homepage-config/data/*.json"
+```
+
+### Expected Result
+
+Data files are accessible and synchronized successfully.
+
+### Result
+
+**PASS**
+
+---
+
+## Test 16: Dashboard API Validation
+
+### Objective
+
+Verify custom API functionality.
+
+### Procedure
+
+```bash
+curl -s http://10.10.10.10:8000/prices | jq .
+```
+
+### Expected Result
+
+Structured JSON responses are returned successfully.
+
+### Result
+
+**PASS**
+
+---
+
+# Local Cloud & Infrastructure as Code Validation
+
+## Test 17: Floci Validation
+
+### Objective
+
+Verify local AWS emulation.
+
+### Procedure
+
+```bash
+curl -I http://localhost:4566
+```
+
+### Expected Result
+
+Endpoint responds successfully.
+
+### Result
+
+**PASS**
+
+---
+
+## Test 18: Terraform Validation
+
+### Objective
+
+Verify Infrastructure as Code workflows.
+
+### Procedure
+
+```bash
+terraform validate
+terraform plan
+terraform apply -auto-approve
+```
+
+### Expected Result
+
+Resources are created successfully.
+
+Expected resources:
+
+* tf-homelab-storage-bucket
+* tf-homelab-metadata
+
+### Result
+
+**PASS**
+
+---
+
+# Recovery Validation
+
+## Test 19: Hypervisor Reboot Recovery
+
+### Objective
+
+Verify autonomous recovery following a host reboot.
+
+### Procedure
+
+Reboot Apollo and observe recovery behavior.
+
+### Expected Result
+
+* Apollo boots successfully
 * Athena autostarts
 * Hestia autostarts
 * Docker services recover automatically
+* Tailscale reconnects
+* Monitoring resumes
 
-**Result:** **PASS**
+### Result
 
----
-
-### Test 20: Disaster Recovery Validation
-
-**Objective:** Verify documented recovery procedures.
-
-**Procedure:**
-
-Execute simulated outage scenarios using procedures from:
-
-```text
-docs/disaster-recovery.md
-```
-
-**Expected Result:**
-
-Services restored successfully using documented steps.
-
-**Result:** **PASS**
+**PASS**
 
 ---
 
-## Operational Readiness Checklist
+## Test 20: Disaster Recovery Procedure Validation
 
-| Capability        | Status |
-| ----------------- | ------ |
-| Virtualization    | ✅      |
-| Containerization  | ✅      |
-| Monitoring        | ✅      |
-| Logging           | ✅      |
-| Alerting          | ✅      |
-| Remote Access     | ✅      |
-| Terraform         | ✅      |
-| LocalStack        | ✅      |
-| Documentation     | ✅      |
-| Disaster Recovery | ✅      |
+### Objective
 
----
+Verify documented recovery procedures.
 
-## Validation Summary
+### Procedure
 
-| Area              | Status |
-| ----------------- | ------ |
-| Apollo            | PASS   |
-| Athena            | PASS   |
-| Hestia            | PASS   |
-| Grafana           | PASS   |
-| Prometheus        | PASS   |
-| Loki              | PASS   |
-| Grafana Alloy     | PASS   |
-| Node Exporter     | PASS   |
-| Proxmox Exporter  | PASS   |
-| LocalStack        | PASS   |
-| Tailscale         | PASS   |
-| Metrics Pipeline  | PASS   |
-| Logging Pipeline  | PASS   |
-| Alerting Pipeline | PASS   |
+Execute simulated failure scenarios using the disaster recovery runbook.
+
+### Expected Result
+
+Services are restored successfully within documented RTO targets.
+
+### Result
+
+**PASS**
 
 ---
 
-## Conclusion
+# Operational Readiness Matrix
 
-The HomeLab environment has been validated across infrastructure, networking, monitoring, logging, alerting, remote access, and Infrastructure as Code workflows.
-
-**Current Environment Status:** Stable Operational Environment
-
-All critical systems are functioning as expected and are suitable for continued learning, experimentation, and operational practice.
+| Capability             | Status |
+| ---------------------- | ------ |
+| Virtualization         | PASS   |
+| Containerization       | PASS   |
+| Network Routing        | PASS   |
+| NAT Translation        | PASS   |
+| Remote Access          | PASS   |
+| Monitoring             | PASS   |
+| Logging                | PASS   |
+| Alerting               | PASS   |
+| Data Synchronization   | PASS   |
+| Custom API Services    | PASS   |
+| Infrastructure as Code | PASS   |
+| Local Cloud Emulation  | PASS   |
+| Recovery Procedures    | PASS   |
 
 ---
 
-### Validation Status
+# Validation Summary
 
-* **Infrastructure Validation:** PASS
-* **Observability Validation:** PASS
-* **Logging Validation:** PASS
-* **Alerting Validation:** PASS
-* **Remote Access Validation:** PASS
-* **Infrastructure as Code Validation:** PASS
-* **Recovery Validation:** PASS
+The homelab environment has been validated across compute infrastructure, network routing, observability pipelines, automation workflows, cloud emulation capabilities, and recovery operations.
 
-**Overall Operational Readiness:** VALIDATED
+All critical services are functioning as expected.
+
+The platform demonstrates operational maturity through:
+
+* Secure remote administration using Tailscale
+* Isolated service boundaries with controlled ingress paths
+* Centralized metrics and logging pipelines
+* Automated inter-node data synchronization
+* Repeatable Infrastructure as Code workflows
+* Tested disaster recovery procedures
+* Autonomous recovery following infrastructure failures
+
+---
+
+## Overall Validation Status
+
+**Infrastructure Validation:** PASS
+
+**Network Validation:** PASS
+
+**Observability Validation:** PASS
+
+**Automation Validation:** PASS
+
+**Infrastructure as Code Validation:** PASS
+
+**Recovery Validation:** PASS
+
+# Final Result
+
+**Overall Operational Readiness: FULLY VALIDATED**

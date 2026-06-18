@@ -2,50 +2,55 @@
 
 ## Purpose
 
-This document contains standard operational procedures for managing, validating, maintaining, and troubleshooting the HomeLab environment.
+This document defines the standard operational procedures for managing, validating, maintaining, and administering the Olympus HomeLab environment.
 
-The goal is to provide a single reference for routine administration and service management.
-
----
-
-## Infrastructure Overview
-
-| Host | Purpose |
-|--------|---------|
-| Apollo | Proxmox VE Hypervisor |
-| Hestia | Core Services LXC |
-| Athena | Monitoring & Automation VM |
-| Artemis | Management Workstation |
+Its purpose is to provide a single reference for routine operations, preventative maintenance, and common administrative tasks.
 
 ---
 
-## Service Inventory
+# Infrastructure Overview
 
-### Hestia
-
-**Services:**
-
-- Homepage
-- Vaultwarden
-
-### Athena
-
-**Services:**
-
-- Grafana
-- Prometheus
-- Loki
-- Grafana Alloy
-- Node Exporter
-- Proxmox Exporter
-- Portainer
-- LocalStack
+| Host    | Purpose                       |
+| ------- | ----------------------------- |
+| Apollo  | Proxmox VE Hypervisor         |
+| Athena  | Operations & Observability VM |
+| Hestia  | Core Services LXC             |
+| Artemis | Management Workstation        |
 
 ---
 
-## Daily Health Checks
+# Service Inventory
 
-### Verify Tailscale Connectivity
+## Athena
+
+Hosted Services:
+
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Node Exporter
+* Proxmox Exporter
+* Portainer
+* Olympus Dashboard API
+* Floci
+
+---
+
+## Hestia
+
+Hosted Services:
+
+* Homepage
+* Vaultwarden
+* Personal Feed Collection Scripts
+* SSH Synchronization Endpoint
+
+---
+
+# Daily Health Checks
+
+## Verify Tailscale Connectivity
 
 From Artemis:
 
@@ -54,193 +59,310 @@ tailscale ping apollo
 tailscale ping athena
 ```
 
-**Expected:** `pong` response from both nodes.
+Expected:
 
-### Verify Apollo Reachability
+```text
+pong
+```
+
+---
+
+## Verify Apollo Reachability
 
 ```bash
 ping -c 4 apollo
 ```
 
-**Expected:** `0%` packet loss.
+Expected:
 
-### Verify Athena Reachability
+```text
+0% packet loss
+```
+
+---
+
+## Verify Athena Access
 
 ```bash
 ssh ubuntu@athena
 ```
 
-**Expected:** Successful SSH login over Tailscale.
+Expected:
 
-### Verify Docker Services
-
-SSH into Athena and Hestia, then check containers:
-
-```bash
-docker ps
-```
-
-**Expected containers:**
-
-- Grafana
-- Prometheus
-- Loki
-- Alloy
-- Node Exporter
-- Proxmox Exporter
-- Portainer
-- LocalStack
-- Homepage
-- Vaultwarden
+Successful SSH login.
 
 ---
 
-## Weekly Health Checks
-
-### Verify Prometheus Readiness
+## Verify Homepage Access
 
 ```bash
-curl -I http://localhost:9090/-/ready
+curl -I http://100.81.86.51:3000
 ```
 
-**Expected:**
+Expected:
 
 ```text
 HTTP/1.1 200 OK
 ```
 
-### Verify Loki Readiness
+---
+
+## Verify Container Health
+
+Athena:
 
 ```bash
-curl -I http://localhost:3100/ready
+ssh ubuntu@athena \
+"docker ps --format 'table {{.Names}}\t{{.Status}}'"
 ```
 
-**Expected:**
+Hestia:
+
+```bash
+ssh root@10.10.10.2 \
+"docker ps --format 'table {{.Names}}\t{{.Status}}'"
+```
+
+Expected services:
+
+### Athena
+
+* grafana
+* prometheus
+* loki
+* alloy
+* node-exporter
+* proxmox-exporter
+* portainer
+* dashboard-api
+* floci
+
+### Hestia
+
+* homepage
+* vaultwarden
+
+---
+
+# Weekly Health Checks
+
+## Verify Prometheus
+
+```bash
+curl -I http://10.10.10.10:9090/-/ready
+```
+
+Expected:
 
 ```text
 HTTP/1.1 200 OK
 ```
 
-### Verify Loki Labels
+---
+
+## Verify Loki
 
 ```bash
-curl -s http://localhost:3100/loki/api/v1/labels
+curl -I http://10.10.10.10:3100/ready
 ```
 
-**Expected:** Returned JSON array of labels.
+Expected:
 
-### Verify Node Exporter & Proxmox Exporter
+```text
+HTTP/1.1 200 OK
+```
+
+---
+
+## Verify Loki Labels
+
+```bash
+curl -s http://10.10.10.10:3100/loki/api/v1/labels
+```
+
+Expected:
+
+JSON label output.
+
+---
+
+## Verify Exporters
 
 ```bash
 curl -s http://localhost:9100/metrics | head -n 5
 curl -s http://localhost:9221/metrics | head -n 5
 ```
 
-**Expected:** Raw Prometheus metrics returned.
+Expected:
 
-### Verify Telegram Alerting
-
-Open:
-
-**Grafana UI → Alerting → Contact Points**
-
-Send a test notification to the Telegram Contact Point.
-
-**Expected:** Telegram message received instantly on your device.
+Raw Prometheus metrics.
 
 ---
 
-## Docker Stack Management
+## Verify Telegram Alerting
 
-### Telemetry Stack
+Grafana:
 
-**Location:**
+```text
+Alerting → Contact Points
+```
+
+Send a test notification.
+
+Expected:
+
+Telegram message received.
+
+---
+
+# Docker Stack Management
+
+## Telemetry Stack
+
+Location:
 
 ```text
 ~/homelab/docker-compose/telemetry/
 ```
 
-#### Start
+### Start
 
 ```bash
 docker compose up -d
 ```
 
-#### Stop
+### Stop
 
 ```bash
 docker compose down
 ```
 
-#### Restart
+### Restart
 
 ```bash
-./scripts/restart-telemetry.sh
+docker compose restart
 ```
 
-#### View Logs
+### Logs
 
 ```bash
 docker compose logs -f
 ```
 
-### Core Services Stack
+---
 
-**Location:**
+## Core Services Stack
 
-```text
-~/homelab/docker-compose/core-services/
-```
-
-Use the same Start / Stop / Restart / Logs commands as above.
-
-### LocalStack Stack
-
-**Location:**
+Location:
 
 ```text
-~/homelab/docker-compose/localstack/
+~/homelab/personal-services/
 ```
 
-Use the same Start / Stop / Restart / Logs commands as above.
+### Start
+
+```bash
+docker compose up -d
+```
+
+### Stop
+
+```bash
+docker compose down
+```
+
+### Recreate
+
+```bash
+docker compose down
+docker compose up -d --force-recreate
+```
+
+### Logs
+
+```bash
+docker compose logs -f
+```
 
 ---
 
-## Monitoring Procedures
+## Floci Stack
 
-### Check Prometheus Targets
-
-Open:
+Location:
 
 ```text
-http://<athena-ip>:9090/targets
+~/homelab/docker-compose/floci/
 ```
 
-Verify **UP** state for:
+### Start
 
-- node-exporter
-- proxmox-exporter
-- prometheus (self-scrape)
+```bash
+docker compose up -d
+```
 
-### Check Grafana
+### Stop
+
+```bash
+docker compose down
+```
+
+### Restart
+
+```bash
+docker compose restart
+```
+
+### Logs
+
+```bash
+docker compose logs -f floci
+```
+
+---
+
+# Monitoring Procedures
+
+## Check Prometheus Targets
 
 Open:
 
 ```text
-http://<athena-ip>:3001
+http://10.10.10.10:9090/targets
 ```
 
 Verify:
 
-- Dashboards load correctly.
-- Prometheus datasource is healthy.
-- Loki datasource is healthy.
+* node-exporter
+* proxmox-exporter
+* prometheus
 
-### Check Logs in Grafana
+Status:
+
+```text
+UP
+```
+
+---
+
+## Check Grafana
 
 Open:
 
-**Grafana Explore (Loki Datasource)**
+```text
+http://10.10.10.10:3001
+```
+
+Verify:
+
+* Dashboards load
+* Prometheus datasource healthy
+* Loki datasource healthy
+
+---
+
+## Check Logs in Grafana
+
+Grafana Explore → Loki
 
 Query:
 
@@ -248,149 +370,200 @@ Query:
 {container="vaultwarden"}
 ```
 
-**Expected:** Container logs returned continuously.
+Expected:
 
-### Verify Loki Internal Services
+Continuous log output.
+
+---
+
+## Verify Loki Status
 
 ```bash
 docker logs loki
 ```
 
-**Expected output shows:**
+Expected components:
 
-- Distributor ACTIVE
-- Ingester ACTIVE
-- Scheduler ACTIVE
-- Compactor ACTIVE
+* Distributor ACTIVE
+* Ingester ACTIVE
+* Scheduler ACTIVE
+* Compactor ACTIVE
 
 ---
 
-## Terraform Operations
+# Dashboard Operations
 
-**Location:**
+## Verify API Endpoints
 
-```text
-~/homelab/terraform/localstack/
+Prices:
+
+```bash
+curl -s http://10.10.10.10:8000/prices | jq .
 ```
 
-### Validate
+Weather:
+
+```bash
+curl -s http://10.10.10.10:8000/weather | jq .
+```
+
+Pokémon:
+
+```bash
+curl -s http://10.10.10.10:8000/pokemon | jq .
+```
+
+Expected:
+
+Valid JSON responses.
+
+---
+
+## Manual Synchronization
+
+If widgets stop updating:
+
+```bash
+scp root@10.10.10.2:/root/homelab/personal-services/homepage-config/data/*.json \
+~/homelab/docker-compose/dashboard-api/data/
+```
+
+---
+
+## Verify Synchronization Jobs
+
+```bash
+crontab -l
+```
+
+Expected:
+
+Scheduled feed collection jobs present.
+
+---
+
+# Infrastructure as Code Operations
+
+Location:
+
+```text
+~/homelab/terraform/floci/
+```
+
+---
+
+## Validate
 
 ```bash
 terraform validate
 ```
 
-### Plan
+---
+
+## Plan
 
 ```bash
 terraform plan
 ```
 
-### Apply
+---
+
+## Apply
 
 ```bash
 terraform apply -auto-approve
 ```
 
-### Destroy
+---
+
+## Destroy
 
 ```bash
 terraform destroy -auto-approve
 ```
 
-### Verify Resources
+---
 
-#### List S3 Buckets
+## Verify Resources
 
-```bash
-aws --endpoint-url=http://localhost:4566 s3 ls
-```
-
-#### List DynamoDB Tables
+List S3 Buckets:
 
 ```bash
-aws --endpoint-url=http://localhost:4566 dynamodb list-tables
+aws --endpoint-url=http://10.10.10.10:4566 s3 ls
 ```
 
-**Expected resources:**
+List DynamoDB Tables:
 
-- `tf-homelab-storage-bucket`
-- `tf-homelab-metadata`
+```bash
+aws --endpoint-url=http://10.10.10.10:4566 dynamodb list-tables
+```
+
+Expected:
+
+* tf-homelab-storage-bucket
+* tf-homelab-metadata
 
 ---
 
-## Backup Validation
+# Backup Validation
 
-### Verify Proxmox Backup Jobs
+## Verify Proxmox Backup Jobs
 
-Open:
+Navigate to:
 
-**Proxmox UI → Datacenter → Backup**
+```text
+Datacenter → Backup
+```
 
 Verify:
 
-- Scheduled jobs are present.
-- Status of recent jobs shows **OK**.
-
-### Verify Backup Storage
-
-Open:
-
-**Proxmox UI → Storage (local-btrfs/directory) → Backups**
-
-Confirm backup archives exist:
-
-- `.vma.zst`
-- `.tar.zst`
+* Scheduled jobs exist
+* Recent jobs completed successfully
 
 ---
 
-## Service Recovery
+## Verify Backup Archives
 
-### Restart Individual Container
+Navigate to:
 
-```bash
-docker restart <container_name>
+```text
+Storage → Backups
 ```
 
-### Recreate Telemetry Stack
+Expected:
 
-```bash
-cd ~/homelab/docker-compose/telemetry
-docker compose down
-docker compose up -d --force-recreate
-```
-
-### Recreate Core Services
-
-```bash
-cd ~/homelab/docker-compose/core-services
-docker compose down
-docker compose up -d --force-recreate
-```
+* .vma.zst files
+* .tar.zst files
 
 ---
 
-## Proxmox Operations
+# Proxmox Operations
 
-### Verify VM Status
+## VM Status
 
 ```bash
 qm status 100
 ```
 
-### Verify LXC Status
+---
+
+## LXC Status
 
 ```bash
 pct status 101
 ```
 
-### Start Athena (VM)
+---
+
+## Start Athena
 
 ```bash
 qm start 100
 ```
 
-### Start Hestia (LXC)
+---
+
+## Start Hestia
 
 ```bash
 pct start 101
@@ -398,103 +571,123 @@ pct start 101
 
 ---
 
-## Emergency Procedures
+# Emergency Procedures
 
-### Reboot Apollo
+## Reboot Apollo
 
-Execute from Artemis (if Apollo SSH is available):
+From Artemis:
 
 ```bash
 ssh root@apollo "reboot"
 ```
 
-#### Verify
+Verify:
 
-- Apollo comes online.
-- Athena and Hestia autostart.
-- Services report healthy via Tailscale.
-
-### Router Outage Recovery
-
-**Expected sequence:**
-
-Tailscale nodes automatically re-establish mesh tunnels once internet access is restored.
-
-No manual action is normally required.
+* Apollo returns online
+* Athena autostarts
+* Hestia autostarts
+* Services recover successfully
 
 ---
 
-## Health Verification Checklist
+## Router Outage Recovery
 
-### Infrastructure
+Expected behavior:
 
-- [ ] Apollo reachable
-- [ ] Athena reachable
-- [ ] Hestia reachable
-- [ ] Tailscale operational
+Tailscale automatically re-establishes mesh connectivity once internet access returns.
 
-### Monitoring
-
-- [ ] Grafana operational
-- [ ] Prometheus operational
-- [ ] Loki operational
-- [ ] Alloy operational
-- [ ] Metrics available
-- [ ] Logs available
-
-### Alerting
-
-- [ ] Telegram notifications operational
-
-### Development
-
-- [ ] LocalStack operational
-- [ ] Terraform validation successful
-
-### Core Services
-
-- [ ] Homepage accessible
-- [ ] Vaultwarden accessible
+Manual intervention is typically unnecessary.
 
 ---
 
-## Useful Commands
+# Health Verification Checklist
 
-### Execute General Health Check Script
+## Infrastructure
+
+* [ ] Apollo reachable
+* [ ] Athena reachable
+* [ ] Hestia reachable
+* [ ] Tailscale operational
+* [ ] NAT functioning
+
+---
+
+## Monitoring
+
+* [ ] Grafana operational
+* [ ] Prometheus operational
+* [ ] Loki operational
+* [ ] Alloy operational
+* [ ] Metrics available
+* [ ] Logs available
+
+---
+
+## Dashboard Services
+
+* [ ] Dashboard API responding
+* [ ] Widgets updating
+* [ ] Synchronization jobs functioning
+
+---
+
+## Alerting
+
+* [ ] Telegram notifications operational
+
+---
+
+## Development
+
+* [ ] Floci operational
+* [ ] Terraform validation successful
+
+---
+
+## Core Services
+
+* [ ] Homepage accessible
+* [ ] Vaultwarden accessible
+
+---
+
+# Useful Commands
+
+General Resource Usage:
 
 ```bash
-./scripts/healthcheck.sh
+uptime
+free -h
+df -h
+htop
 ```
 
-### System Resource Usage
-
-```bash
-uptime        # Load average
-free -h       # Memory usage
-df -h         # Disk usage
-htop          # Interactive process viewer
-```
-
-### Tailscale Status
+Tailscale Status:
 
 ```bash
 tailscale status
 ```
 
----
+Docker Status:
 
-## Related Documentation
-
-- Architecture
-- Inventory
-- Network
-- Troubleshooting
-- Disaster Recovery
-- Validation Report
+```bash
+docker ps
+```
 
 ---
 
-## Current Operational Status
+# Related Documentation
+
+* architecture.md
+* inventory.md
+* network.md
+* troubleshooting.md
+* disaster-recovery.md
+* validation-report.md
+
+---
+
+# Current Operational Status
 
 **Environment State:** Stable Operational Environment
 

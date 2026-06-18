@@ -2,59 +2,89 @@
 
 ## Purpose
 
-This document records significant infrastructure changes, deployments, migrations, improvements, validations, and operational milestones within the HomeLab environment.
+This document records significant infrastructure changes, deployments, migrations, validations, refactoring efforts, and operational milestones within the HomeLab environment.
 
-The changelog serves as a historical record of infrastructure evolution, architectural decisions, technical debt resolution, operational improvements, and future planning.
+It serves as a historical record of the environment's evolution, architectural decisions, technical debt reduction, and reliability improvements.
 
 ---
 
-## Phase 8: Documentation & Standardization (Current)
+# Phase 8: Documentation & Standardization (Current)
 
-### Added
+## Added
 
 * `docs/architecture.md` — Infrastructure topology and service relationships
-* `docs/network.md` — Network design and connectivity documentation
+* `docs/network.md` — Network design, routing, and connectivity documentation
 * `docs/inventory.md` — Infrastructure asset inventory
 * `docs/runbook.md` — Operational procedures and maintenance tasks
 * `docs/troubleshooting.md` — Incident history and resolutions
 * `docs/disaster-recovery.md` — Recovery procedures and priorities
 * `docs/validation-report.md` — Infrastructure validation records
+* `docs/project-timeline.md` — Project evolution and milestones
 * `docs/changelog.md` — Historical change tracking
 
-### Changed
+## Changed
 
-* Repository restructured to comply with documentation standards
-* Documentation hierarchy standardized across the repository
-* Added README documentation throughout project directories
+* Repository structure standardized across all documentation.
+* Consistent Markdown formatting and naming conventions adopted.
+* README files added throughout the repository.
 
-### Benefits
+## Benefits
 
-* Improved maintainability
-* Reduced operational knowledge loss
-* Faster troubleshooting and onboarding
-* Consistent documentation standards
+* Improved maintainability.
+* Reduced operational knowledge loss.
+* Faster onboarding and troubleshooting.
+* Portfolio-ready documentation comparable to enterprise environments.
 
 ---
 
-## Phase 7: Infrastructure Consolidation & Telemetry Refactoring (June 2026)
+# Phase 7: Infrastructure Consolidation & Platform Refactoring (June 2026)
 
-### Added
+## Added
 
-* Grafana Alloy deployed as the centralized telemetry agent
-* Single-node Loki configuration:
+### Grafana Alloy
 
-  * `replication_factor: 1`
-  * `kvstore: inmemory`
-* Unified telemetry stack deployment model
+Deployed Grafana Alloy as the centralized telemetry agent for log collection.
 
-### Changed
+### Floci Migration
+
+Migrated from LocalStack to Floci Native AWS Emulator.
+
+Benefits:
+
+* Faster startup (~0.015 seconds)
+* Lower memory usage (~13 MiB)
+* Persistent mode support
+* Native AWS API compatibility
+
+### Inter-Node Synchronization
+
+Implemented passwordless Ed25519 SSH authentication between Athena and Hestia to support automated data synchronization.
+
+Features:
+
+* Secure file transfers
+* Automated cron-based synchronization
+* Dashboard data replication
+
+### Loki Hardening
+
+Configured single-node Loki deployment using:
+
+```yaml
+replication_factor: 1
+
+kvstore:
+  store: inmemory
+```
+
+## Changed
 
 Previous structure:
 
 ```text
 ~/homelab/
 ├── monitoring/
-├── core-services/
+└── core-services/
 ```
 
 New structure:
@@ -63,55 +93,73 @@ New structure:
 ~/homelab/docker-compose/
 ├── telemetry/
 ├── core-services/
-└── localstack/
+└── floci/
 ```
 
-* Consolidated Prometheus, Loki, Exporters, and Alloy into a single telemetry stack
-* Hardened `.gitignore` rules for persistent volumes and state files
-* Standardized Docker deployment workflows
+### Telemetry Consolidation
 
-### Removed
+Unified:
+
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Exporters
+
+into a single deployment stack.
+
+### Deployment Standardization
+
+* Docker deployment workflows standardized.
+* `.gitignore` hardened for persistent volumes and state files.
+
+## Removed
 
 * Promtail
-* Stale Proxmox bridge (`vmbr1`)
 * Legacy monitoring directories
-* Obsolete network configuration artifacts
+* Obsolete network artifacts
+* Unused Proxmox bridge (`vmbr1`)
+* Active LocalStack deployment (retained only for historical reference)
 
-### Fixed
+## Fixed
 
-* Root-owned directory permission issues
-* Docker container naming conflicts
-* Loki readiness endpoint instability
-* Legacy deployment inconsistencies
+* Apollo outbound NAT failures after Proxmox reboot.
+* Missing masquerade rules causing guest connectivity loss.
+* Docker container naming conflicts.
+* Loki readiness endpoint instability.
+* Root-owned directory permission inconsistencies.
 
-### Validated
+## Validated
 
-* End-to-end metrics pipeline
-* End-to-end logging pipeline
-* Grafana Explore integration
-* Telemetry stack deployment workflow
+* Metrics pipeline functionality.
+* Logging pipeline functionality.
+* Grafana Explore integration.
+* Telemetry deployment workflows.
+* Inter-node synchronization.
+* Floci operation and Terraform compatibility.
 
 ---
 
-## Phase 6: Reliability Testing
+# Phase 6: Reliability Engineering & Recovery Testing
 
-### Added
+## Added
 
-* Structured recovery validation procedures
-* Recovery testing methodology
-* Headless operation verification
+* Structured recovery validation procedures.
+* Recovery testing methodology.
+* Headless operations verification.
+* Disaster recovery playbooks.
 
-### Validated
+## Validated
 
-#### Headless Operations
+### Headless Operations
 
-Verified complete infrastructure management without:
+Verified complete infrastructure administration without:
 
 * Monitor
 * Keyboard
 * Mouse
 
-Confirmed functionality through:
+Managed successfully using:
 
 * Tailscale
 * SSH
@@ -119,16 +167,16 @@ Confirmed functionality through:
 * Portainer
 * Homepage
 
-#### Autostart Validation
+### Autostart Validation
 
 Verified automatic startup of:
 
-* Athena (VM)
-* Hestia (LXC)
+* Athena (VM 100)
+* Hestia (LXC 101)
 
-after Apollo reboot.
+following Apollo reboot.
 
-#### Chaos Recovery Testing
+### Chaos Recovery Testing
 
 Validated:
 
@@ -136,82 +184,86 @@ Validated:
 * VM recovery
 * Container recovery
 * Service recovery
+* Docker restart policies
 * Tailscale reconnection
 
-### Result
+## Result
 
-All recovery tests completed successfully.
+All recovery scenarios completed successfully.
 
 ---
 
-## Phase 5: Infrastructure as Code (IaC)
+# Phase 5: Infrastructure as Code (IaC)
 
-### Added
+## Added
 
-#### LocalStack
+### Local AWS Emulation
 
-Deployed local AWS-compatible environment providing:
+Initially deployed LocalStack providing:
 
 * S3
 * DynamoDB
 
-#### Terraform
+Later migrated to Floci.
+
+### Terraform
 
 Implemented Infrastructure as Code workflows.
 
-### Provisioned Resources
+## Provisioned Resources
 
-#### S3 Bucket
+### S3 Bucket
 
 ```text
 tf-homelab-storage-bucket
 ```
 
-#### DynamoDB Table
+### DynamoDB Table
 
 ```text
 tf-homelab-metadata
 ```
 
-### Validated
+## Validated
 
 * Resource creation
 * Resource persistence
 * State management
-* Terraform deployment lifecycle
+* Terraform lifecycle operations
+* Destroy and rebuild workflows
 
 ---
 
-## Phase 4: Monitoring, Logging & Alerting
+# Phase 4: Monitoring, Logging & Alerting
 
-### Added
+## Added
 
-#### Metrics Platform
+### Metrics Platform
 
 * Prometheus
 * Node Exporter
 * Proxmox Exporter
 
-#### Visualization Platform
+### Visualization Platform
 
 * Grafana
-* Infrastructure Dashboards
+* Infrastructure dashboards
 
-#### Logging Platform
+### Logging Platform
 
 * Loki
 * Promtail (later replaced by Alloy)
 
-#### Alerting Platform
+### Alerting Platform
 
 * Grafana Alerting
-* Telegram Contact Points
+* Telegram notifications
 
-### Architecture
+## Architecture
+
+### Metrics Pipeline
 
 ```text
-Metrics
-
 Node Exporter
         │
         ▼
@@ -219,9 +271,14 @@ Prometheus
         │
         ▼
 Grafana
+        │
+        ▼
+Telegram
+```
 
-Logs
+### Logging Pipeline
 
+```text
 Docker Containers
         │
         ▼
@@ -231,112 +288,122 @@ Grafana Alloy
 Loki
         │
         ▼
-Grafana
+Grafana Explore
 ```
 
-### Validated
+## Validated
 
 * Metrics collection
 * Dashboard rendering
 * Log aggregation
 * Alert delivery
-* Historical data visibility
+* Historical visibility
 
 ---
 
-## Phase 3: Core Services
+# Phase 3: Core Services
 
-### Added
+## Added
 
-#### Homepage
+### Homepage
 
 Features:
 
-* Service dashboard
-* Infrastructure visibility
+* Centralized dashboard
+* Service categorization
 * Widget integrations
 
-#### Vaultwarden
+### Vaultwarden
 
 Features:
 
-* Password management
+* Self-hosted password management
 * Persistent storage
-* Self-hosted credential management
+* Secure credential management
 
-### Validated
+### Portainer
 
-* Homepage dashboard functionality
+Features:
+
+* Container administration
+* Deployment visibility
+* Runtime inspection
+
+## Validated
+
+* Homepage functionality
 * Widget integrations
 * Vaultwarden authentication
 * Data persistence
+* Portainer accessibility
 
 ---
 
-## Phase 2: Remote Access
+# Phase 2: Remote Access & Security
 
-### Added
+## Added
 
-#### Tailscale Deployment
+### Tailscale Deployment
 
 Connected:
 
 * Artemis (Management Workstation)
 * Apollo (Proxmox Host)
-* Athena (Monitoring VM)
+* Athena (Operations VM)
 
-### Benefits
+## Benefits
 
 * Secure remote administration
 * SSH access
-* MagicDNS support
-* Elimination of port forwarding
+* MagicDNS resolution
+* Headless management
+* Elimination of router port forwarding
 
-### Validated
+## Validated
 
 * Remote connectivity
 * DNS resolution
 * Cross-node communication
-* Headless administration
+* Overlay network stability
 
 ---
 
-## Phase 1: Infrastructure Foundation
+# Phase 1: Infrastructure Foundation
 
-### Added
+## Added
 
-#### Physical Infrastructure
+### Physical Infrastructure
 
 * Apollo Proxmox VE Hypervisor
 
-#### Virtual Infrastructure
+### Virtual Infrastructure
 
 * Athena Ubuntu Server VM
-* Hestia Linux Container
+* Hestia Alpine Linux Container
 
-#### Platform Services
+### Platform Services
 
 * Docker
 * Docker Compose
 
-#### Networking
+### Networking
 
 * Proxmox bridge networking (`vmbr0`)
 * Internal virtual networking
 
-### Fixed
+## Fixed
 
-* DHCP allocation issues
-* Initial bridge configuration anomalies
-* Firewall routing conflicts
+* Initial DHCP allocation issues.
+* Bridge configuration anomalies.
+* Firewall routing conflicts.
 
-### Result
+## Result
 
-Stable virtualization platform established.
+A stable virtualization platform capable of hosting isolated workloads and future infrastructure growth was established.
 
 ---
 
-## Operational Milestones
+# Operational Milestones
 
 | Milestone                     | Status   |
 | ----------------------------- | -------- |
@@ -347,18 +414,20 @@ Stable virtualization platform established.
 | Centralized Logging           | Complete |
 | Alerting Platform             | Complete |
 | Infrastructure as Code        | Complete |
+| Floci Migration               | Complete |
+| Inter-Node Synchronization    | Complete |
 | Recovery Testing              | Complete |
 | Documentation Standardization | Complete |
 
 ---
 
-## Current Environment Status
+# Current Environment Status
 
 ```text
 Stable Operational Environment
 ```
 
-### Capabilities
+## Active Capabilities
 
 * Virtualization
 * Containerization
@@ -369,17 +438,19 @@ Stable Operational Environment
 * Disaster Recovery
 * Remote Administration
 * Documentation
+* Local AWS Emulation
+* Inter-Node Data Synchronization
 
 ---
 
-## Future Roadmap
+# Future Roadmap
 
-### Planned Improvements
+## Planned Improvements
 
 * Automated backup verification
 * Enhanced observability dashboards
 * Additional service integrations
-* CI/CD workflow experimentation
+* CI/CD experimentation
 * Infrastructure automation expansion
 * Long-term metrics retention strategy
 * Service health automation
@@ -387,12 +458,9 @@ Stable Operational Environment
 
 ---
 
-## Document Status
+# Document Status
 
 **Changelog Status:** Current
-
 **Infrastructure State:** Operational
-
 **Operational Readiness:** Validated
-
 **Documentation Coverage:** Complete

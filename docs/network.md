@@ -2,23 +2,24 @@
 
 ## Overview
 
-The HomeLab network is designed around a private-by-default model.
+The Olympus HomeLab network follows a **private-by-default** architecture designed to provide secure remote administration, reliable internal communication, and minimal external exposure.
 
-All infrastructure services operate within the local network and are accessed remotely through Tailscale.
+All infrastructure services operate within the internal network and are accessed remotely through Tailscale. No intentional public-facing services are exposed directly to the Internet.
 
-No intentional public-facing services are exposed to the Internet.
-
-Primary goals:
+### Design Goals
 
 * Security
 * Simplicity
 * Reliability
 * Remote Accessibility
 * Operational Independence
+* Segmentation of Sensitive Services
 
 ---
 
-# Physical Network Topology
+## Network Topology
+
+### Physical Topology
 
 ```text
 Internet
@@ -29,137 +30,209 @@ Airtel Fiber Router
     ▼
 Apollo (Proxmox VE)
     │
-    ├── Athena VM
+    ├── VM 100: Athena
     │
-    └── Hestia LXC
+    └── CT 101: Hestia
 ```
 
 ---
 
-# Logical Network Topology
+### Logical Topology
 
 ```text
-Artemis
-    │
-    ▼
+Artemis (Admin Workstation)
+        │
+        ▼
 Tailscale Network
-    │
-    ▼
-Apollo
-    │
-    ├── Athena
-    │
-    └── Hestia
+        │
+        ▼
+Apollo (100.81.86.51)
+        │
+        ├── Athena (100.117.35.70)
+        │
+        └── Hestia (Internal Only)
 ```
 
 ---
 
-# Infrastructure Components
+### Complete Infrastructure Flow
 
-## Apollo
+```text
+Artemis (Management Workstation)
+Tailscale: 100.100.252.87
+        │
+        │ Encrypted WireGuard Tunnel
+        ▼
+Apollo (Proxmox Hypervisor)
+LAN:       10.10.10.1
+Tailscale: 100.81.86.51
+        │
+        ├──────────── vmbr0 ────────────┐
+        │                               │
+        ▼                               ▼
+Athena (VM 100)                  Hestia (CT 101)
+LAN: 10.10.10.10                 LAN: 10.10.10.2
+TS:  100.117.35.70               Tailscale: None
 
-Role:
-
-Proxmox Hypervisor
-
-Responsibilities:
-
-* Virtual Networking
-* VM Hosting
-* LXC Hosting
-* Storage Management
-
-Network Functions:
-
-* Network Bridge Management
-* Internal Routing
-* VM Connectivity
-* Container Connectivity
-
----
-
-## Athena
-
-Role:
-
-Operations Platform
-
-Network Services:
-
-* Grafana
-* Prometheus
-* Loki
-* Grafana Alloy
-* Portainer
-* LocalStack
-
-Communication:
-
-* Internal Service Access
-* Metrics Collection
-* Log Aggregation
-* Alert Generation
+Services:                         Services:
+• Grafana                         • Homepage
+• Prometheus                      • Vaultwarden
+• Loki
+• Grafana Alloy
+• Portainer
+• Olympus API
+• Floci
+```
 
 ---
 
-## Hestia
+## Network Inventory
 
-Role:
-
-Application Services
-
-Hosted Services:
-
-* Homepage
-* Vaultwarden
-
-Communication:
-
-* Internal Service Access
-* Tailscale Administration Access
+| Node    | Type               | LAN Address   | Tailscale Address | Role                   |
+| ------- | ------------------ | ------------- | ----------------- | ---------------------- |
+| Artemis | Arch Linux Laptop  | Dynamic       | `100.100.252.87`  | Administration         |
+| Apollo  | Proxmox Hypervisor | `10.10.10.1`  | `100.81.86.51`    | Compute and Routing    |
+| Athena  | Ubuntu VM          | `10.10.10.10` | `100.117.35.70`   | Observability Platform |
+| Hestia  | Alpine LXC         | `10.10.10.2`  | None              | Application Services   |
 
 ---
 
-# Remote Access Design
+## Virtual Networking
 
-Remote access is implemented using Tailscale.
+Proxmox virtual networking is built on Linux bridges.
 
-Benefits:
-
-* Encrypted Communication
-* Device Authentication
-* No Port Forwarding
-* Reduced Attack Surface
-* Simplified Administration
-
-Current Nodes:
-
-* Artemis
-* Apollo
-* Athena
-
----
-
-# Virtual Networking
-
-Proxmox virtual networking is based on Linux bridges.
-
-Primary Bridge:
+### Primary Bridge
 
 ```text
 vmbr0
 ```
 
-Responsibilities:
+### Responsibilities
 
 * VM Connectivity
 * LXC Connectivity
-* External Network Access
 * Internal Service Communication
+* External Network Access
+
+### Connected Systems
+
+* Apollo
+* Athena
+* Hestia
 
 ---
 
-# Metrics Traffic Flow
+## Remote Access Design
+
+Remote administration is implemented using Tailscale.
+
+### Connected Nodes
+
+* Artemis
+* Apollo
+* Athena
+
+### Benefits
+
+* End-to-End Encryption
+* Device Authentication
+* WireGuard Transport
+* No Public SSH Exposure
+* Simplified Administration
+* Reduced Attack Surface
+
+---
+
+## Security Model
+
+### Default Posture
+
+Private by Default.
+
+### Characteristics
+
+* No intentional Internet-facing services
+* Internal service communication
+* Tailscale-based administration
+* Segmented application workloads
+* Controlled access paths
+
+---
+
+### Hestia Isolation Strategy
+
+Hestia intentionally does not participate in the Tailscale mesh.
+
+This design protects sensitive services such as Vaultwarden by restricting access to trusted internal routes managed through Apollo.
+
+Benefits include:
+
+* Reduced exposure
+* Limited attack surface
+* Separation of administrative and user workloads
+
+---
+
+## NAT and Traffic Routing
+
+Apollo serves as the network gateway between Tailscale and isolated internal workloads.
+
+### Inbound Service Forwarding
+
+Apollo forwards approved Tailscale traffic to Hestia.
+
+#### Homepage
+
+```bash
+iptables -t nat -A PREROUTING \
+    -d 100.81.86.51 \
+    -p tcp --dport 3000 \
+    -j DNAT --to-destination 10.10.10.2:3000
+
+iptables -t nat -A POSTROUTING \
+    -d 10.10.10.2 \
+    -p tcp --dport 3000 \
+    -j MASQUERADE
+```
+
+---
+
+#### Vaultwarden
+
+```bash
+iptables -t nat -A PREROUTING \
+    -d 100.81.86.51 \
+    -p tcp --dport 8080 \
+    -j DNAT --to-destination 10.10.10.2:8080
+
+iptables -t nat -A POSTROUTING \
+    -d 10.10.10.2 \
+    -p tcp --dport 8080 \
+    -j MASQUERADE
+```
+
+---
+
+### Outbound NAT
+
+Apollo provides Internet access for isolated internal workloads.
+
+```bash
+iptables -t nat -A POSTROUTING \
+    -s 10.10.10.0/24 \
+    -o wlx002e2df0393b \
+    -j MASQUERADE
+```
+
+Purpose:
+
+* API Access
+* Package Downloads
+* External Service Integration
+
+---
+
+## Metrics Traffic Flow
 
 ```text
 Node Exporter
@@ -176,15 +249,15 @@ Proxmox Exporter
 Prometheus
 ```
 
-Purpose:
+### Purpose
 
 * Host Monitoring
-* Capacity Analysis
+* Capacity Planning
 * Performance Visibility
 
 ---
 
-# Logging Traffic Flow
+## Logging Traffic Flow
 
 ```text
 Docker Containers
@@ -199,16 +272,16 @@ Loki
 Grafana
 ```
 
-Purpose:
+### Purpose
 
 * Centralized Logging
-* Log Search
 * Troubleshooting
 * Historical Analysis
+* Log Search
 
 ---
 
-# Alerting Traffic Flow
+## Alerting Traffic Flow
 
 ```text
 Prometheus
@@ -220,52 +293,50 @@ Grafana Alerting
 Telegram
 ```
 
-Purpose:
+### Purpose
 
-* Service Monitoring
 * Incident Notification
 * Infrastructure Awareness
+* Service Monitoring
 
 ---
 
-# Security Model
+## Automation Traffic Flow
 
-## Default Posture
+Homepage data is generated on Hestia and synchronized to Athena.
 
-Private by Default
+```text
+Hestia Cron Jobs
+        │
+        ▼
+Generate JSON Assets
+        │
+        ▼
+Secure SCP Transfer
+        │
+        ▼
+Athena Data Directory
+        │
+        ▼
+Olympus Dashboard API
+        │
+        ▼
+Homepage Widgets
+```
 
-Characteristics:
+### Characteristics
 
-* No Public Services
-* Internal Service Communication
-* Tailscale-Based Administration
-* Controlled Access Paths
+* SSH Transport
+* Ed25519 Authentication
+* Five-Minute Synchronization Interval
 
 ---
 
-## Remote Access Security
+## Network Validation
 
-Authentication provided by:
+The following checks are performed during routine validation.
 
-* Tailscale Identity
-* Device Authorization
-* Encrypted Transport
-
-Benefits:
-
-* No Exposed Management Ports
-* No Public SSH Access
-* Simplified Access Control
-
----
-
-# Network Validation
-
-The following checks are performed during infrastructure validation.
-
-## Connectivity Validation
-
-Verify:
+### Connectivity Validation
 
 ```bash
 ping <target>
@@ -279,9 +350,7 @@ Successful response
 
 ---
 
-## Tailscale Validation
-
-Verify:
+### Tailscale Validation
 
 ```bash
 tailscale status
@@ -295,9 +364,7 @@ All nodes connected
 
 ---
 
-## Bridge Validation
-
-Verify:
+### Bridge Validation
 
 ```bash
 brctl show
@@ -317,15 +384,29 @@ vmbr0 present and operational
 
 ---
 
-## Service Reachability
+### NAT Validation
 
-Verify:
+```bash
+iptables -t nat -L -n -v
+```
 
-* Grafana Accessible
-* Prometheus Accessible
-* Loki Accessible
-* Homepage Accessible
-* Vaultwarden Accessible
+Expected:
+
+```text
+Required forwarding rules present
+```
+
+---
+
+### Service Reachability
+
+Verify access to:
+
+* Grafana
+* Prometheus
+* Loki
+* Homepage
+* Vaultwarden
 
 Expected:
 
@@ -335,13 +416,11 @@ PASS
 
 ---
 
-# Major Network Incident
+## Major Network Incident
 
-## Proxmox Network Isolation Incident
+### Proxmox Network Isolation Incident
 
-### Symptoms
-
-Observed:
+#### Symptoms
 
 * VM connectivity failures
 * Internal communication failures
@@ -349,41 +428,35 @@ Observed:
 
 ---
 
-### Investigation
+#### Investigation
 
-Examined:
+Commands used:
 
 ```bash
 brctl show
-```
-
-```bash
 bridge link
-```
-
-```bash
 cat /etc/network/interfaces
 ```
 
 ---
 
-### Root Cause
+#### Root Cause
 
-Incomplete bridge configuration prevented proper attachment of virtual interfaces.
+Incomplete bridge configuration prevented virtual interfaces from attaching correctly to `vmbr0`.
 
 ---
 
-### Resolution
+#### Resolution
 
-Rebuilt and validated:
+Validated and rebuilt:
 
 * vmbr0
-* VM connectivity
-* LXC connectivity
+* VM networking
+* LXC networking
 
 ---
 
-### Verification
+#### Verification
 
 Confirmed:
 
@@ -392,30 +465,15 @@ Confirmed:
 * Container Communication
 * Internet Connectivity
 
-Infrastructure networking restored successfully.
+Infrastructure networking was successfully restored.
 
 ---
 
-# Future Improvements
+## Future Improvements
 
-## Hardware
+### Security
 
-Planned:
-
-5-meter CAT6 Ethernet cable
-
-Benefits:
-
-* Reduced Latency
-* Improved Stability
-* Consistent Throughput
-* Reduced Wi-Fi Dependency
-
----
-
-## Security
-
-Planned:
+Planned improvements:
 
 * Tailscale ACLs
 * Device Tagging
@@ -423,9 +481,9 @@ Planned:
 
 ---
 
-## Monitoring
+### Monitoring
 
-Planned:
+Planned improvements:
 
 * Network Latency Tracking
 * Uptime Monitoring
@@ -433,22 +491,39 @@ Planned:
 
 ---
 
-# Status
+### Hardware
 
-| Component             | Status      |
-| --------------------- | ----------- |
-| vmbr0                 | Operational |
-| Internal Networking   | Operational |
-| VM Connectivity       | Operational |
-| LXC Connectivity      | Operational |
-| Tailscale             | Operational |
-| Remote Administration | Operational |
-| Metrics Traffic       | Operational |
-| Logging Traffic       | Operational |
-| Alerting Traffic      | Operational |
+Planned improvements:
+
+* 5-meter CAT6 Ethernet Cable
+
+Expected benefits:
+
+* Lower Latency
+* Improved Stability
+* Consistent Throughput
+* Reduced Wi-Fi Dependency
 
 ---
 
-# Conclusion
+## Operational Status
 
-The network architecture provides secure, reliable, and remotely manageable connectivity for all infrastructure services while maintaining a minimal external attack surface through Tailscale-based administration and private-by-default design principles.
+| Component                  | Status      |
+| -------------------------- | ----------- |
+| vmbr0                      | Operational |
+| Internal Networking        | Operational |
+| VM Connectivity            | Operational |
+| LXC Connectivity           | Operational |
+| Tailscale                  | Operational |
+| Remote Administration      | Operational |
+| NAT Rules                  | Operational |
+| Metrics Traffic            | Operational |
+| Logging Traffic            | Operational |
+| Alerting Traffic           | Operational |
+| Automation Synchronization | Operational |
+
+---
+
+## Conclusion
+
+The Olympus HomeLab network architecture provides secure, remotely accessible, and resilient connectivity through a private-by-default design. Tailscale enables encrypted administration without exposing management interfaces to the Internet, while Apollo enforces segmentation and controlled routing between workloads. This approach balances operational simplicity with strong security practices and supports future growth of the homelab environment.
