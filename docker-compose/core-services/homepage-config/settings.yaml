@@ -1,7 +1,28 @@
 ---
-# For configuration options and examples, please see:
-# https://gethomepage.dev/configs/settings/
+title: Olympus
 
-providers:
-  openweathermap: openweathermapapikey
-  weatherapi: weatherapiapikey
+theme: dark
+color: slate
+
+headerStyle: clean
+
+layout:
+  Olympus:
+    style: row
+    columns: 3
+
+  Resources:
+    style: row
+    columns: 2
+
+  Operations:
+    style: row
+    columns: 2
+
+  Observability:
+    style: row
+    columns: 2
+
+  Infrastructure:
+    style: row
+    columns: 3

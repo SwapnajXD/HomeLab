@@ -1,0 +1,3425 @@
+now give me a summary of everything we did what broke and how we fixed it with dates for my docs
+
+
+# Olympus Dashboard Project Timeline & Postmortem
+
+### Period: 2026-06-11 → 2026-06-22
+
+---
+
+# Initial State (Before Refactor)
+
+Originally the dashboard lived entirely on **Hestia**.
+
+Hestia contained:
+
+```txt
+homepage-config/
+├── data/
+│   ├── pokemon.json
+│   ├── lastfm.json
+│   ├── weather.json
+│   ├── prices.json
+│   └── library.json
+│
+├── scripts/
+│   ├── fetch_pokemon.sh
+│   ├── fetch_lastfm.sh
+│   ├── fetch_weather.sh
+│   └── fetch_prices.sh
+│
+├── custom.js
+└── custom.css
+```
+
+The dashboard directly read local JSON files.
+
+Architecture:
+
+```txt
+Scripts
+   ↓
+JSON files
+   ↓
+Homepage
+```
+
+Problems:
+
+* Data collection tied to frontend machine
+* Duplicate logic
+* Hard to scale
+* No API layer
+* No clean separation between backend and frontend
+
+---
+
+# Phase 1 — Move Data Collection To Athena
+
+### Around 2026-06-17
+
+Decision:
+
+Athena should become the backend.
+
+New architecture:
+
+```txt
+Athena
+ ├── scripts
+ ├── data
+ └── Dashboard API
+
+Hestia
+ └── Homepage only
+```
+
+Goal:
+
+```txt
+Athena = source of truth
+Hestia = presentation layer
+```
+
+---
+
+# Phase 2 — FastAPI Dashboard Backend
+
+Created:
+
+```txt
+athena
+└── homelab/docker-compose/dashboard-api
+```
+
+Files:
+
+```txt
+main.py
+Dockerfile
+docker-compose.yml
+requirements.txt
+```
+
+API endpoints:
+
+```txt
+/pokemon
+/lastfm
+/library
+/prices
+/weather
+/mal
+/olympus
+```
+
+`/olympus` became:
+
+```json
+{
+  "pokemon": {},
+  "lastfm": {},
+  "library": {},
+  "prices": {},
+  "weather": {},
+  "mal": {}
+}
+```
+
+This became the frontend contract.
+
+---
+
+# Phase 3 — Athena Network Incident
+
+### 2026-06-21 → 2026-06-22
+
+Symptoms:
+
+Artemis reported:
+
+```txt
+Athena offline
+last seen 1d ago
+```
+
+Services unavailable:
+
+```txt
+Dashboard API
+Grafana
+Prometheus
+Loki
+```
+
+Investigation:
+
+Eventually regained Tailscale SSH access.
+
+Findings:
+
+Athena lost connectivity.
+
+Recovery confirmed:
+
+```txt
+2026-06-22
+```
+
+Result:
+
+Athena reachable again.
+
+Internet restored.
+
+No data loss.
+
+---
+
+# Phase 4 — Dashboard API Validation
+
+Verified:
+
+```bash
+curl http://localhost:8000/olympus | jq
+```
+
+Output showed:
+
+```json
+pokemon
+lastfm
+library
+prices
+weather
+mal
+```
+
+All endpoints functioning.
+
+Backend officially stable.
+
+---
+
+# Phase 5 — Hestia Cleanup
+
+### Major Refactor
+
+Discovered duplicated data.
+
+Hestia still contained:
+
+```txt
+homepage-config/data
+homepage-config/scripts
+```
+
+while Athena also contained:
+
+```txt
+athena/data
+athena/scripts
+```
+
+This created two competing sources.
+
+Decision:
+
+Remove all dashboard data generation from Hestia.
+
+Target architecture:
+
+```txt
+Athena
+ ├── scripts
+ ├── data
+ └── API
+
+Hestia
+ ├── custom.js
+ ├── custom.css
+ └── homepage
+```
+
+Result:
+
+Single source of truth established.
+
+---
+
+# Phase 6 — Script Audit
+
+Audited every fetch script.
+
+---
+
+## LastFM
+
+Working.
+
+Returns:
+
+```json
+{
+  "track": "...",
+  "artist": "...",
+  "album": "...",
+  "cover": "..."
+}
+```
+
+Album art added.
+
+Dashboard began displaying cover images.
+
+---
+
+## Weather
+
+Uses:
+
+```txt
+wttr.in
+```
+
+Returns:
+
+```json
+{
+  "city": "Nagpur",
+  "temperature": "31",
+  "description": "Haze"
+}
+```
+
+Working.
+
+---
+
+## Prices
+
+Originally returned:
+
+```json
+{
+  "goldbees": 122.12
+}
+```
+
+Frontend expected:
+
+```json
+{
+  "goldbees": {
+    "name": "...",
+    "price": ...
+  }
+}
+```
+
+This mismatch caused dashboard rendering issues.
+
+Fixed by rewriting:
+
+```bash
+fetch_prices.sh
+```
+
+New schema:
+
+```json
+{
+  "goldbees": {
+    "name": "Nippon Gold BeES",
+    "price": 119.83
+  },
+  "liquidcase": {
+    "name": "ICICI Liquid Case ETF",
+    "price": 114.64
+  }
+}
+```
+
+Problem resolved.
+
+---
+
+## Library
+
+Originally:
+
+```json
+{
+  "title": "The Pragmatic Programmer",
+  "progress": "42%"
+}
+```
+
+Later changed manually to:
+
+```json
+{
+  "title": "Lord of the Mysteries",
+  "progress": "-"
+}
+```
+
+Still placeholder data.
+
+Future automation planned.
+
+---
+
+# Phase 7 — Pokémon Upgrade
+
+Originally Pokémon data:
+
+```json
+{
+  "id": 511,
+  "name": "pansage",
+  "sprite": "...",
+  "type1": "grass",
+  "type2": ""
+}
+```
+
+Too basic.
+
+Decision:
+
+Make Pokémon card interesting.
+
+Added:
+
+```json
+{
+  "species": "...",
+  "height": "...",
+  "weight": "...",
+  "abilities": [],
+  "flavor": "..."
+}
+```
+
+---
+
+# Pokémon Script Failure
+
+After modifying:
+
+```bash
+fetch_pokemon.sh
+```
+
+Script started failing:
+
+```txt
+parse error:
+Invalid string:
+control characters must be escaped
+```
+
+Root cause:
+
+PokéAPI species flavor text contains:
+
+```txt
+newlines
+tabs
+control characters
+```
+
+which broke JSON generation.
+
+---
+
+# Fix
+
+Added sanitization.
+
+Cleaned:
+
+```bash
+tr
+sed
+jq escaping
+```
+
+before writing JSON.
+
+Result:
+
+```json
+{
+  "id": 713,
+  "name": "avalugg",
+  "height": "2.0 m",
+  "weight": "505.0 kg",
+  "abilities": [
+    "own-tempo",
+    "ice-body",
+    "sturdy"
+  ]
+}
+```
+
+Script stable.
+
+---
+
+# Phase 8 — Homepage Frontend Rewrite
+
+Original frontend:
+
+Simple text dump.
+
+Looked roughly like:
+
+```txt
+Pokemon
+Weather
+Prices
+Library
+```
+
+No design.
+
+No hierarchy.
+
+---
+
+## First Redesign
+
+Created:
+
+```txt
+Hero Layout
+```
+
+Structure:
+
+```txt
+Pokemon Left
+Everything Right
+```
+
+Like:
+
+```txt
+┌───────────────────────┐
+│ Pokemon │ Widgets     │
+└───────────────────────┘
+```
+
+Improved appearance significantly.
+
+---
+
+## Second Redesign
+
+Added:
+
+* Album cover
+* Weather card
+* Investment card
+* Reading card
+* MAL card
+
+Layout became:
+
+```txt
+Pokemon Hero
+Stats Row
+Widget Row
+```
+
+Closer to a dashboard.
+
+---
+
+## CSS Problem
+
+Multiple generations of CSS accumulated.
+
+File contained:
+
+```txt
+old grid styles
+old tile styles
+new hero styles
+duplicate layouts
+```
+
+Result:
+
+Conflicting selectors.
+
+Unexpected spacing.
+
+Difficult maintenance.
+
+Decision:
+
+Move toward complete CSS replacement.
+
+Rule established:
+
+```txt
+Always provide full files.
+Never partial snippets.
+```
+
+---
+
+# Phase 9 — MAL Investigation
+
+Goal:
+
+Show:
+
+```txt
+Last watched anime
+Current anime
+Progress
+Cover image
+```
+
+Attempted:
+
+```bash
+curl \
+-H "X-MAL-CLIENT-ID: ..." \
+https://api.myanimelist.net/v2/users/StarLordXD
+```
+
+Response:
+
+```json
+{
+  "error":"not_found"
+}
+```
+
+Even though:
+
+```txt
+https://myanimelist.net/profile/StarLordXD
+```
+
+worked.
+
+Conclusion:
+
+Profile exists.
+
+API lookup unavailable.
+
+Likely username/API mismatch.
+
+Current dashboard status:
+
+```txt
+MAL integration coming soon
+```
+
+Future solution:
+
+* Jikan
+* scraping
+* OAuth authenticated MAL access
+
+---
+
+# Phase 10 — Dashboard Vision Change
+
+Most important design decision.
+
+Originally:
+
+```txt
+Olympus = Pokémon Dashboard
+```
+
+After seeing the layout, realized:
+
+Pokémon should not be the focus.
+
+Instead:
+
+```txt
+Olympus = Personal Command Center
+```
+
+New concept:
+
+```txt
+Center Media Panel
+```
+
+Media can be:
+
+* Pokémon
+* Anime GIF
+* Wallpaper
+* Album cover
+* Video loop
+* Movie poster
+* Custom image
+
+Dynamic content.
+
+Not hardcoded.
+
+---
+
+# Current State (2026-06-22)
+
+Backend:
+
+✅ Athena online
+✅ FastAPI API running
+✅ Dashboard API stable
+✅ LastFM working
+✅ Weather working
+✅ Investments working
+✅ Pokémon enhanced
+✅ Hestia cleaned up
+✅ Single source of truth established
+
+Frontend:
+
+✅ Hero layout working
+✅ Pokémon card working
+✅ Album artwork working
+✅ Widget cards working
+
+Still Missing:
+
+⬜ MAL integration
+⬜ Real reading tracker
+⬜ Configurable investment watchlist
+⬜ Media panel system
+⬜ GIF/video support
+⬜ Dynamic widgets
+⬜ Widget configuration UI
+
+---
+
+# Current Architecture
+
+```txt
+                    ATHENA
+┌───────────────────────────────────┐
+│ Scripts                           │
+│  ├─ Pokemon                       │
+│  ├─ LastFM                        │
+│  ├─ Weather                       │
+│  ├─ Prices                        │
+│  └─ Library                       │
+│                                   │
+│ JSON Data Store                   │
+│                                   │
+│ Dashboard API                     │
+│  /olympus                         │
+└───────────────┬───────────────────┘
+                │
+                │ HTTP
+                │
+                ▼
+
+                    HESTIA
+┌───────────────────────────────────┐
+│ Homepage                          │
+│                                   │
+│ custom.js                         │
+│ custom.css                        │
+│                                   │
+│ Olympus Command Center            │
+└───────────────────────────────────┘
+```
+
+The next phase is no longer "improve the Pokémon card." The next phase is building a **media-centric Olympus Command Center** where the center panel becomes a configurable content area and Pokémon is just one possible content source.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Here's a merged, cleaned-up, and consolidated version that combines the best parts of both reports while keeping the timeline, investigation flow, lessons learned, and context around Floci.
+
+# Athena Network Incident Postmortem
+
+## Incident Date: 2026-06-21 → 2026-06-22
+
+---
+
+# Executive Summary
+
+Between **21 June 2026** and **22 June 2026**, Athena appeared offline from the Tailscale network and became unreachable from Artemis.
+
+Initial symptoms strongly suggested a Tailscale failure. However, deeper investigation revealed that Athena itself remained operational, local networking remained healthy, and the observed Tailscale failures were likely a downstream symptom of a temporary loss of Internet connectivity.
+
+By the end of the investigation, Internet access, Tailscale connectivity, and SSH access had all recovered without requiring configuration changes, indicating a transient network interruption rather than a failure of Athena, Apollo, Proxmox, or Tailscale.
+
+---
+
+# Environment
+
+## Physical Topology
+
+```text
+Internet
+    │
+    ▼
+Airtel Fiber Router (10.10.10.1)
+    │
+    ▼
+Apollo (Proxmox VE) (10.10.10.2)
+    │
+    ├── Athena VM (10.10.10.10)
+    │
+    └── Hestia LXC
+```
+
+---
+
+## Logical Topology
+
+```text
+Artemis
+    │
+    ▼
+Tailscale Network
+    │
+    ▼
+Apollo
+    ├── Athena
+    └── Hestia
+```
+
+---
+
+# Athena Responsibilities
+
+Athena serves as the Operations Platform for Olympus.
+
+Hosted services include:
+
+* Grafana
+* Prometheus
+* Loki
+* Grafana Alloy
+* Portainer
+* LocalStack
+* AWS/DevOps experimentation (Floci evaluation)
+
+---
+
+# Incident Timeline
+
+## 2026-06-21 — Initial Alert
+
+From Artemis:
+
+```bash
+tailscale status
+```
+
+Output:
+
+```text
+100.117.35.70 athena
+offline, last seen 1d ago
+```
+
+Further testing:
+
+```bash
+tailscale ping athena
+```
+
+```bash
+ping 100.117.35.70
+```
+
+```bash
+ssh ubuntu@100.117.35.70
+```
+
+All failed.
+
+### Initial Assessment
+
+Athena appeared:
+
+```text
+Offline
+Unreachable
+Disconnected from Tailnet
+```
+
+Primary hypothesis:
+
+```text
+Tailscale failure on Athena
+```
+
+---
+
+# 2026-06-22 — Investigation Begins
+
+## Access Through Proxmox
+
+Athena was accessed directly through the Proxmox console on Apollo.
+
+Finding:
+
+```text
+Athena VM running normally
+```
+
+This immediately ruled out:
+
+* VM crash
+* Kernel panic
+* Power failure
+* Proxmox VM failure
+
+---
+
+# Phase 1 — Network Verification
+
+## Interface Configuration
+
+```bash
+ip addr show
+```
+
+Result:
+
+```text
+ens18
+10.10.10.10/24
+```
+
+Healthy.
+
+---
+
+## Routing Verification
+
+```bash
+ip route
+```
+
+Result:
+
+```text
+default via 10.10.10.1
+```
+
+Healthy.
+
+---
+
+## Netplan Validation
+
+```bash
+cat /etc/netplan/*.yaml
+```
+
+Result:
+
+```yaml
+addresses:
+  - 10.10.10.10/24
+
+routes:
+  - to: default
+    via: 10.10.10.1
+
+nameservers:
+  - 8.8.8.8
+  - 1.1.1.1
+```
+
+Healthy.
+
+---
+
+# Phase 2 — LAN Connectivity Validation
+
+## Router Reachability
+
+```bash
+ping 10.10.10.1
+```
+
+Result:
+
+```text
+SUCCESS
+```
+
+---
+
+## Apollo Reachability
+
+```bash
+ping 10.10.10.2
+```
+
+Result:
+
+```text
+SUCCESS
+```
+
+---
+
+## Conclusion
+
+Confirmed operational:
+
+```text
+Athena NIC
+ens18
+vmbr0
+Layer 2 networking
+LAN routing
+Proxmox networking
+```
+
+At this stage the problem was clearly not local networking.
+
+---
+
+# Phase 3 — Internet Connectivity Failure
+
+## External Connectivity
+
+```bash
+ping 8.8.8.8
+```
+
+Result:
+
+```text
+100% packet loss
+```
+
+---
+
+## HTTPS Tests
+
+```bash
+curl https://1.1.1.1
+```
+
+Result:
+
+```text
+Timeout
+```
+
+```bash
+curl https://google.com
+```
+
+Result:
+
+```text
+Timeout
+```
+
+---
+
+## Assessment
+
+At this point:
+
+```text
+LAN connectivity works
+Internet connectivity appears unavailable
+```
+
+This shifted the investigation away from Proxmox networking.
+
+---
+
+# Phase 4 — Tailscale Investigation
+
+## Service Status
+
+```bash
+tailscale status
+```
+
+Reported:
+
+```text
+Unable to connect to the Tailscale coordination server
+```
+
+```text
+You are logged out
+```
+
+```text
+failed to resolve controlplane.tailscale.com
+```
+
+---
+
+## Important Discovery
+
+Originally we believed:
+
+```text
+Tailscale failure
+```
+
+After observing Internet failures the theory changed to:
+
+```text
+Internet failure
+    ↓
+Tailscale failure
+```
+
+Tailscale was becoming a symptom rather than the root cause.
+
+---
+
+# Phase 5 — Additional Validation
+
+## Firewall
+
+```bash
+sudo ufw status
+```
+
+Result:
+
+```text
+inactive
+```
+
+---
+
+## Routing
+
+Still healthy.
+
+```bash
+ip route
+```
+
+Correct default gateway present.
+
+---
+
+## Tracepath
+
+```bash
+tracepath 8.8.8.8
+```
+
+Output:
+
+```text
+1?: LOCALHOST pmtu 1500
+1:
+```
+
+Traffic appeared unable to progress beyond the local network.
+
+---
+
+# Working Theories
+
+At this stage the leading possibilities were:
+
+### Possibility A
+
+Temporary Airtel outage
+
+### Possibility B
+
+Router forwarding issue
+
+### Possibility C
+
+ARP/neighbor resolution issue
+
+### Possibility D
+
+Temporary upstream connectivity interruption
+
+### Possibility E
+
+Transient Tailscale control-plane issue
+
+---
+
+# Breakthrough
+
+Later, from Artemis:
+
+```bash
+ssh ubuntu@100.117.35.70
+```
+
+Succeeded.
+
+This completely changed the situation.
+
+---
+
+# What This Proved
+
+```text
+Athena online
+Tailscale online
+Tailnet connectivity restored
+SSH functioning
+```
+
+This disproved the earlier assumption that Athena remained disconnected.
+
+---
+
+# Recovery Validation
+
+## Tailscale Status
+
+```bash
+tailscale status
+```
+
+Result:
+
+```text
+athena
+apollo active
+artemis active
+```
+
+Healthy.
+
+---
+
+## Peer Reachability
+
+```bash
+tailscale ping apollo
+```
+
+Success.
+
+```bash
+tailscale ping artemis
+```
+
+Success.
+
+---
+
+## Internet Connectivity
+
+```bash
+ping 8.8.8.8
+```
+
+Result:
+
+```text
+0% packet loss
+~31ms latency
+```
+
+Healthy.
+
+---
+
+## HTTPS Validation
+
+```bash
+curl -I https://google.com
+```
+
+Result:
+
+```text
+HTTP/2 301
+```
+
+Healthy.
+
+---
+
+## Routing Validation
+
+```bash
+ip route
+```
+
+Unchanged and healthy.
+
+---
+
+# Root Cause Analysis
+
+## Most Likely Cause
+
+Evidence points toward a transient network interruption rather than a configuration problem.
+
+Most probable explanations:
+
+### Airtel WAN Interruption
+
+Temporary ISP outage or WAN reconnection.
+
+### Router State Issue
+
+Consumer routers occasionally lose forwarding state and later recover.
+
+### Temporary ARP / Neighbor Cache Issue
+
+Local forwarding interruption that resolved automatically.
+
+### Temporary Upstream Connectivity Loss
+
+Loss of Internet access caused Tailscale coordination failures.
+
+---
+
+# What Did NOT Break
+
+The investigation positively confirmed the following remained healthy throughout the incident:
+
+### Apollo
+
+Operational.
+
+### Proxmox
+
+Operational.
+
+### Athena VM
+
+Operational.
+
+### vmbr0
+
+Operational.
+
+### ens18
+
+Operational.
+
+### Netplan
+
+Correct configuration.
+
+### Routing
+
+Correct configuration.
+
+### Firewall
+
+Disabled.
+
+### Docker Networks
+
+Operational.
+
+### Tailscale Configuration
+
+Not misconfigured.
+
+---
+
+# Lessons Learned
+
+## Connectivity Ladder
+
+When a node appears offline:
+
+### Step 1 — Gateway
+
+```bash
+ping 10.10.10.1
+```
+
+### Step 2 — Internet
+
+```bash
+ping 8.8.8.8
+```
+
+### Step 3 — HTTPS
+
+```bash
+curl -I https://google.com
+```
+
+### Step 4 — Tailscale
+
+```bash
+tailscale status
+```
+
+### Step 5 — Peer Validation
+
+```bash
+tailscale ping apollo
+tailscale ping artemis
+```
+
+This sequence quickly isolates:
+
+```text
+LAN issues
+Internet issues
+DNS issues
+Tailscale issues
+```
+
+---
+
+# Side Investigation — Floci Evaluation
+
+During the incident, LocalStack alternatives were also evaluated.
+
+## Why Floci Is Interesting
+
+Compared to LocalStack Community:
+
+* No auth tokens
+* MIT licensed
+* Fully open source
+* Lightweight
+* Faster startup
+* Smaller memory footprint
+* Real Docker-backed services
+
+Interesting services for DevOps learning:
+
+* Lambda
+* ECS
+* EKS (k3s-backed)
+* RDS
+* Neptune
+* OpenSearch
+* MSK/Redpanda
+* Athena
+* CodeBuild
+
+For Olympus and Athena's role as a learning platform, Floci appears to be a strong replacement candidate for LocalStack.
+
+---
+
+# Final Environment Status (2026-06-22)
+
+| Component             | Status        |
+| --------------------- | ------------- |
+| Apollo                | ✅ Operational |
+| Athena                | ✅ Operational |
+| Hestia                | ✅ Operational |
+| vmbr0                 | ✅ Operational |
+| Internal Networking   | ✅ Operational |
+| LAN Connectivity      | ✅ Operational |
+| Internet Connectivity | ✅ Operational |
+| DNS Resolution        | ✅ Operational |
+| Tailscale             | ✅ Operational |
+| SSH Access            | ✅ Operational |
+| Docker Networking     | ✅ Operational |
+| Monitoring Stack      | ✅ Operational |
+| Logging Stack         | ✅ Operational |
+| Alerting Stack        | ✅ Operational |
+
+---
+
+# Final Conclusion
+
+Between **21 June 2026** and **22 June 2026**, Athena appeared offline from the Tailnet and became unreachable from Artemis. Initial evidence pointed toward a Tailscale failure, but investigation showed that Athena itself remained healthy and local networking continued functioning normally.
+
+Testing later revealed simultaneous Internet connectivity issues and Tailscale coordination failures, suggesting that Tailscale was a symptom rather than the primary cause. By the conclusion of the investigation, Internet access, Tailscale connectivity, and SSH access had all recovered without configuration changes.
+
+The incident ultimately validated the resilience of the Olympus architecture. Apollo, Proxmox, vmbr0, Athena, routing, Docker networking, and Tailscale configuration all remained intact. The most likely root cause was a transient network interruption affecting upstream connectivity rather than a fault within the homelab itself.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Olympus V2 Build Log & Incident Report
+
+**Date:** 21 June 2026
+**Host:** Athena
+**Project:** Olympus V2 Command Center
+
+---
+
+# Phase 1 — Dynamic Wallpaper System
+
+## Goal
+
+Replace static media with randomly selected wallpapers from your GitHub repository:
+
+* Repo: `SwapnajXD/Walls`
+* Data output: `media.json`
+* Displayed in Olympus hero panel
+
+---
+
+## Initial Python Version
+
+You started with:
+
+```python
+requests.get(
+    "https://api.github.com/repos/SwapnajXD/Walls/contents"
+)
+```
+
+The script:
+
+1. Fetched repository contents
+2. Filtered image files
+3. Picked a random wallpaper
+4. Wrote:
+
+```json
+{
+  "mode": "wallpaper",
+  "title": "...",
+  "subtitle": "Olympus Media",
+  "url": "..."
+}
+```
+
+into:
+
+```text
+/home/ubuntu/homelab/data/media.json
+```
+
+---
+
+## Conversion to Shell Script
+
+We rewrote the Python implementation into:
+
+```bash
+fetch_media.sh
+```
+
+using:
+
+* curl
+* jq
+* shuf
+
+This became the Olympus media provider.
+
+---
+
+# Phase 2 — Wallpaper 404 Incident
+
+## Symptom
+
+Homepage showed broken image.
+
+Browser console:
+
+```text
+404
+raw.githubusercontent.com/.../main/...
+```
+
+---
+
+## Investigation
+
+Checking GitHub:
+
+```bash
+curl -s https://api.github.com/repos/SwapnajXD/Walls | jq .default_branch
+```
+
+returned:
+
+```text
+master
+```
+
+---
+
+## Root Cause
+
+Script generated URLs using:
+
+```text
+/main/
+```
+
+but repository default branch was:
+
+```text
+master
+```
+
+---
+
+## Fix
+
+Changed:
+
+```bash
+RAW_URL=.../main/...
+```
+
+to:
+
+```bash
+RAW_URL=.../master/...
+```
+
+Result:
+
+```text
+Wallpapers loading correctly
+```
+
+---
+
+# Phase 3 — LastFM Integration
+
+## Goal
+
+Display:
+
+* Current song
+* Artist
+* Album
+* Album cover
+
+inside Olympus.
+
+---
+
+## Created
+
+```bash
+fetch_lastfm.sh
+```
+
+using:
+
+```text
+LastFM API
+```
+
+Output:
+
+```json
+{
+  "track": "...",
+  "artist": "...",
+  "album": "...",
+  "cover": "..."
+}
+```
+
+Stored in:
+
+```text
+data/lastfm.json
+```
+
+---
+
+# Phase 4 — JSON Corruption Incident
+
+## Symptom
+
+Every run of:
+
+```bash
+fetch_media.sh
+```
+
+showed:
+
+```text
+parse error: Invalid numeric literal
+```
+
+---
+
+## Investigation
+
+Running:
+
+```bash
+jq . lastfm.json
+```
+
+failed.
+
+Viewing file:
+
+```bash
+cat -n lastfm.json
+```
+
+revealed:
+
+```json
+{
+ "track": "Aap Jaisa Koi - From "Qurbani"",
+ ...
+}
+```
+
+---
+
+## Root Cause
+
+Song title contained quotes:
+
+```text
+"Qurbani"
+```
+
+which broke JSON.
+
+The script was manually generating JSON:
+
+```bash
+cat <<EOF
+{
+ "track": "$TRACK"
+}
+EOF
+```
+
+Unsafe.
+
+---
+
+## Fix
+
+Replaced manual JSON generation with:
+
+```bash
+jq -n
+```
+
+Example:
+
+```bash
+jq -n \
+ --arg track "$TRACK" \
+ '{
+   track:$track
+ }'
+```
+
+---
+
+## Result
+
+Proper escaping.
+
+Example:
+
+```json
+{
+  "track": "SPLINTER",
+  "artist": "F3miii"
+}
+```
+
+No more parse errors.
+
+---
+
+# Phase 5 — Media Priority Logic
+
+## Goal
+
+When music is playing:
+
+Show album art.
+
+Otherwise:
+
+Show random wallpaper.
+
+---
+
+## Implementation
+
+`fetch_media.sh`
+
+Priority order:
+
+```text
+LastFM Cover
+        ↓
+Wallpaper Fallback
+```
+
+If cover exists:
+
+```json
+{
+  "mode": "album"
+}
+```
+
+Else:
+
+```json
+{
+  "mode": "wallpaper"
+}
+```
+
+---
+
+# Phase 6 — "Album Cover Not Updating" Incident
+
+## Symptom
+
+Now Playing widget updated.
+
+Hero image stayed wallpaper.
+
+---
+
+## Investigation
+
+API still returned:
+
+```json
+{
+  "mode":"wallpaper"
+}
+```
+
+even while Spotify song changed.
+
+---
+
+## Discovery
+
+You were manually running:
+
+```bash
+fetch_lastfm.sh
+```
+
+but NOT:
+
+```bash
+fetch_media.sh
+```
+
+Therefore:
+
+```text
+lastfm.json updated
+media.json stale
+```
+
+---
+
+## Fix
+
+Created:
+
+```bash
+update_olympus.sh
+```
+
+which executes:
+
+```bash
+fetch_lastfm.sh
+fetch_media.sh
+fetch_weather.sh
+fetch_prices.sh
+```
+
+---
+
+# Phase 7 — Cron Automation
+
+## Discovery
+
+Checking:
+
+```bash
+crontab -l
+```
+
+returned:
+
+```text
+no crontab for ubuntu
+```
+
+Nothing automated.
+
+---
+
+## First Version
+
+```cron
+*/5 * * * * update_olympus.sh
+```
+
+Worked but updated everything every 5 minutes.
+
+---
+
+## Improvement
+
+You requested separate schedules.
+
+Final cron:
+
+```cron
+# Music
+*/1 * * * * fetch_lastfm.sh
+
+# Media
+*/1 * * * * fetch_media.sh
+
+# Weather
+*/15 * * * * fetch_weather.sh
+
+# Investments
+*/30 * * * * fetch_prices.sh
+
+# Pokemon
+0 */6 * * * fetch_pokemon.sh
+
+# Library
+0 */3 * * * fetch_library.sh
+```
+
+---
+
+## Verification
+
+Checked:
+
+```bash
+systemctl status cron
+```
+
+Cron active.
+
+Logs:
+
+```text
+(ubuntu) CMD (fetch_lastfm.sh)
+```
+
+confirmed jobs running.
+
+---
+
+# Phase 8 — MyAnimeList Widget
+
+## Goal
+
+Add Anime statistics panel.
+
+---
+
+## Created
+
+```bash
+anime.json
+```
+
+Output:
+
+```json
+{
+  "username":"StarLordXD",
+  "watching":43,
+  "completed":602,
+  "score":0
+}
+```
+
+---
+
+# Phase 9 — API Upgrade
+
+Originally:
+
+```python
+@app.get("/mal")
+def mal():
+    return {
+        "username":"StarLordXD",
+        "profile":"..."
+    }
+```
+
+Static.
+
+---
+
+## Updated
+
+```python
+@app.get("/mal")
+def mal():
+    return safe_load(
+        "anime",
+        ...
+    )
+```
+
+Reads:
+
+```text
+/data/anime.json
+```
+
+---
+
+# Phase 10 — Docker Cache Confusion
+
+## Symptom
+
+API still returned:
+
+```json
+{
+  "profile":"..."
+}
+```
+
+even after editing code.
+
+---
+
+## Investigation
+
+Container was running old image.
+
+Simple restart:
+
+```bash
+docker restart dashboard-api
+```
+
+did not rebuild.
+
+---
+
+## Fix
+
+Full rebuild:
+
+```bash
+docker compose down
+
+docker compose up -d --build
+```
+
+---
+
+## Verification
+
+```bash
+curl .../mal
+```
+
+returned:
+
+```json
+{
+  "username":"StarLordXD",
+  "watching":43,
+  "completed":602,
+  "score":0
+}
+```
+
+Success.
+
+---
+
+# Phase 11 — Homepage Anime Widget
+
+## Symptom
+
+Anime widget failed to render correctly.
+
+---
+
+## Root Cause
+
+Broken HTML template.
+
+Found:
+
+```html
+<div class="olympus-widget">
+<div class="olympus-widget">
+```
+
+Duplicate nesting.
+
+Also missing closing tags.
+
+---
+
+## Fix
+
+Rewrote Anime block:
+
+```html
+<div class="olympus-widget">
+  ...
+</div>
+```
+
+with correct closing structure.
+
+---
+
+# Current Olympus Components
+
+## Working
+
+### Media Hero
+
+Source:
+
+```text
+media.json
+```
+
+Modes:
+
+* Wallpaper
+* Album Cover
+
+---
+
+### LastFM
+
+Source:
+
+```text
+lastfm.json
+```
+
+Displays:
+
+* Track
+* Artist
+* Album
+* Cover
+
+---
+
+### Weather
+
+Source:
+
+```text
+weather.json
+```
+
+Refresh:
+
+```text
+15 minutes
+```
+
+---
+
+### Investments
+
+Source:
+
+```text
+prices.json
+```
+
+Assets:
+
+* GoldBeES
+* LiquidCase
+
+---
+
+### Pokemon
+
+Source:
+
+```text
+pokemon.json
+```
+
+Refresh:
+
+```text
+6 hours
+```
+
+---
+
+### Library
+
+Source:
+
+```text
+library.json
+```
+
+Refresh:
+
+```text
+3 hours
+```
+
+---
+
+### Anime
+
+Source:
+
+```text
+anime.json
+```
+
+Displays:
+
+* Username
+* Watching
+* Completed
+* Mean Score
+
+---
+
+### Dashboard API
+
+Container:
+
+```text
+dashboard-api
+```
+
+Endpoint:
+
+```text
+http://100.117.35.70:8000/olympus
+```
+
+Aggregates all widgets into a single JSON payload.
+
+---
+
+# Final State (End of Session)
+
+Athena now automatically updates:
+
+| Component   | Frequency                  |
+| ----------- | -------------------------- |
+| LastFM      | 1 minute                   |
+| Media Hero  | 1 minute                   |
+| Weather     | 15 minutes                 |
+| Investments | 30 minutes                 |
+| Library     | 3 hours                    |
+| Pokemon     | 6 hours                    |
+| Anime       | Manual / future automation |
+
+Olympus V2 currently has:
+
+* Dynamic wallpaper engine
+* Album-cover hero mode
+* Spotify/LastFM integration
+* Weather widget
+* Investment widget
+* Library widget
+* Pokemon widget
+* Anime widget
+* FastAPI backend
+* Dockerized API
+* Cron-based automation
+
+and the major issues encountered (GitHub branch mismatch, malformed JSON from quoted song titles, stale media state, missing cron jobs, Docker rebuild confusion, and broken Anime widget markup) were all identified and resolved.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Kubernetes / K3s Lab Journey Summary
+
+### Date: 21 June 2026 (based on your terminal timestamps)
+
+This is a chronological summary of what happened, what broke, and how you fixed it.
+
+---
+
+# Phase 1 — Initial K3s Installation
+
+## Goal
+
+Run a Kubernetes cluster on **Athena** and manage it remotely from **Artemis**.
+
+---
+
+## Problem #1: Pods stuck in `ContainerCreating`
+
+Early on you had:
+
+```text
+coredns                    ContainerCreating
+local-path-provisioner     ContainerCreating
+helm-install-traefik       ContainerCreating
+```
+
+K3s control plane came up but workloads weren't starting.
+
+---
+
+## Investigation
+
+You checked:
+
+```bash
+stat -fc %T /sys/fs/cgroup
+```
+
+Output:
+
+```text
+tmpfs
+```
+
+and
+
+```bash
+cat /proc/cgroups
+```
+
+showed legacy cgroups.
+
+---
+
+## Root Cause
+
+Ubuntu 20.04 was still running:
+
+```text
+cgroup v1
+```
+
+K3s/containerd on newer Kubernetes versions works best with:
+
+```text
+cgroup v2
+```
+
+---
+
+## Fix
+
+Edited:
+
+```bash
+/etc/default/grub
+```
+
+Changed:
+
+```bash
+GRUB_CMDLINE_LINUX_DEFAULT="systemd.unified_cgroup_hierarchy=1 maybe-ubiquity"
+```
+
+Then:
+
+```bash
+sudo update-grub
+sudo reboot
+```
+
+---
+
+## Verification
+
+After reboot:
+
+```bash
+stat -fc %T /sys/fs/cgroup
+```
+
+Output:
+
+```text
+cgroup2fs
+```
+
+Success.
+
+---
+
+# Phase 2 — Rebuild K3s
+
+To ensure a clean start:
+
+```bash
+sudo systemctl stop k3s
+sudo rm -rf /var/lib/rancher/k3s
+sudo systemctl start k3s
+```
+
+---
+
+## Verification
+
+```bash
+kubectl get nodes
+```
+
+Output:
+
+```text
+athena Ready control-plane
+```
+
+Pods gradually moved to:
+
+```text
+Running
+```
+
+Storage class:
+
+```bash
+kubectl get storageclass
+```
+
+Output:
+
+```text
+local-path (default)
+```
+
+This confirmed:
+
+* scheduler working
+* containerd working
+* storage provisioner working
+
+---
+
+# Phase 3 — Cluster Stabilized
+
+Eventually:
+
+```bash
+kubectl get pods -A
+```
+
+showed:
+
+```text
+coredns
+local-path-provisioner
+metrics-server
+traefik
+```
+
+all healthy.
+
+At this point Kubernetes itself was fully functional.
+
+---
+
+# Phase 4 — Remote Access From Artemis
+
+## Goal
+
+Control Athena's cluster from Artemis.
+
+---
+
+## Initial Kubeconfig
+
+K3s generated:
+
+```yaml
+server: https://127.0.0.1:6443
+```
+
+This only works locally on Athena.
+
+---
+
+## First Attempt
+
+You modified kubeconfig to:
+
+```yaml
+server: https://100.117.35.70:6443
+```
+
+(Tailscale IP)
+
+---
+
+## New Error
+
+```text
+tls: failed to verify certificate
+
+certificate valid for:
+10.10.10.10
+127.0.0.1
+10.43.0.1
+
+not 100.117.35.70
+```
+
+---
+
+## Root Cause
+
+Kubernetes API certificate SANs did not include:
+
+```text
+100.117.35.70
+```
+
+---
+
+## Discovery
+
+You checked:
+
+```bash
+kubectl get nodes -o wide
+```
+
+Output:
+
+```text
+INTERNAL-IP = 10.10.10.10
+```
+
+---
+
+## Fix
+
+Use:
+
+```yaml
+server: https://10.10.10.10:6443
+```
+
+instead of the Tailscale IP.
+
+That IP existed in the certificate.
+
+---
+
+## Result
+
+From Artemis:
+
+```bash
+kubectl get nodes
+```
+
+worked successfully.
+
+Remote management achieved.
+
+---
+
+# Phase 5 — First Kubernetes Practice
+
+Created namespace:
+
+```bash
+kubectl create namespace artemis-lab
+kubectl config set-context --current --namespace=artemis-lab
+```
+
+---
+
+## First Deployment
+
+```bash
+kubectl create deployment web --image=nginx
+```
+
+---
+
+### Confusion
+
+Immediately after creation:
+
+```bash
+kubectl get pods
+```
+
+returned:
+
+```text
+No resources found
+```
+
+---
+
+## Reason
+
+Deployment controller had not yet created the Pod.
+
+A few moments later:
+
+```bash
+kubectl rollout status deployment/web
+```
+
+showed:
+
+```text
+successfully rolled out
+```
+
+and Pod appeared.
+
+---
+
+# Phase 6 — Services
+
+Created service:
+
+```bash
+kubectl expose deployment web --port=80 --type=ClusterIP
+```
+
+---
+
+Verified:
+
+```bash
+kubectl get svc
+```
+
+Output:
+
+```text
+web ClusterIP
+```
+
+---
+
+Used:
+
+```bash
+kubectl port-forward svc/web 8080:80
+```
+
+Successfully viewed Nginx.
+
+---
+
+# Phase 7 — Self-Healing Demo
+
+Scaled deployment:
+
+```bash
+kubectl scale deployment web --replicas=3
+```
+
+Pods appeared.
+
+---
+
+Deleted them:
+
+```bash
+kubectl delete pod -l app=web
+```
+
+---
+
+Observed:
+
+```bash
+kubectl get pods -w
+```
+
+New pods immediately recreated.
+
+---
+
+### Concept Learned
+
+Kubernetes does not care about Pods.
+
+It cares about desired state:
+
+```text
+Deployment wants 3 replicas
+```
+
+Therefore it recreated them.
+
+---
+
+# Phase 8 — NodePort Access
+
+Created NodePort service.
+
+Output:
+
+```text
+80:30246/TCP
+```
+
+---
+
+Tested:
+
+```bash
+curl http://100.117.35.70:30246
+```
+
+Result:
+
+```html
+Welcome to nginx!
+```
+
+Success.
+
+---
+
+# Phase 9 — Portainer Integration
+
+Goal:
+
+```text
+See Kubernetes cluster inside existing Portainer
+```
+
+without installing Portainer on Artemis.
+
+---
+
+## Confusion
+
+Initially thought:
+
+```text
+Need Portainer on Artemis
+```
+
+Not true.
+
+Portainer already ran on Athena.
+
+---
+
+## Existing Container
+
+```bash
+docker ps
+```
+
+showed:
+
+```text
+portainer/portainer-ce
+```
+
+running.
+
+---
+
+## Added Kubernetes Environment
+
+Installed:
+
+```text
+portainer-agent
+```
+
+inside K3s.
+
+---
+
+Created environment using:
+
+```text
+100.117.35.70:<NodePort>
+```
+
+---
+
+## Problem
+
+Initially entered:
+
+```text
+http://100.117.35.70:<NodePort>
+```
+
+---
+
+### Fix
+
+Portainer expects:
+
+```text
+100.117.35.70:<NodePort>
+```
+
+without protocol.
+
+---
+
+### Result
+
+Portainer connected successfully.
+
+You could now see:
+
+* Namespaces
+* Pods
+* Deployments
+* Services
+
+through the GUI.
+
+---
+
+# Phase 10 — Namespace Confusion
+
+You created:
+
+```bash
+demo
+```
+
+from Athena.
+
+But on Artemis:
+
+```bash
+kubectl get all
+```
+
+showed nothing.
+
+---
+
+## Reason
+
+Athena created resources in:
+
+```text
+default
+```
+
+namespace.
+
+Artemis context was:
+
+```text
+artemis-lab
+```
+
+namespace.
+
+---
+
+## Fix
+
+Verified:
+
+```bash
+kubectl get deployments -A
+```
+
+and saw:
+
+```text
+default/demo
+```
+
+---
+
+Recreated workload inside:
+
+```text
+artemis-lab
+```
+
+instead.
+
+---
+
+# Phase 11 — Kubeconfig Permissions
+
+Problem:
+
+```text
+permission denied
+/etc/rancher/k3s/k3s.yaml
+```
+
+---
+
+## Cause
+
+K3s kubeconfig owned by root.
+
+---
+
+## Fix
+
+```bash
+sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+```
+
+After that:
+
+```bash
+kubectl
+```
+
+worked normally.
+
+---
+
+# Phase 12 — Cluster Cleanup
+
+You wanted:
+
+```text
+Minimal Kubernetes lab
+```
+
+---
+
+Deleted:
+
+```text
+test deployment
+web deployment
+services
+```
+
+from:
+
+```text
+artemis-lab
+```
+
+---
+
+Kept:
+
+```text
+coredns
+local-path-provisioner
+metrics-server
+portainer-agent
+```
+
+because they are useful infrastructure.
+
+---
+
+# Current State
+
+Athena:
+
+```text
+Ubuntu 20.04
+K3s
+Containerd
+cgroup v2
+```
+
+Running:
+
+```text
+CoreDNS
+Local Path Provisioner
+Metrics Server
+Portainer Agent
+```
+
+Portainer:
+
+```text
+Connected successfully
+```
+
+Artemis:
+
+```text
+kubectl configured
+```
+
+Remote management works.
+
+Namespace:
+
+```text
+artemis-lab
+```
+
+exists and is empty.
+
+---
+
+# Biggest Lessons Learned
+
+### 1. cgroup v2 matters
+
+Without it:
+
+```text
+Pods stuck
+```
+
+With it:
+
+```text
+Cluster healthy
+```
+
+---
+
+### 2. Kubernetes certificates matter
+
+Using:
+
+```text
+100.117.35.70
+```
+
+caused TLS failures.
+
+Using:
+
+```text
+10.10.10.10
+```
+
+matched certificate SANs.
+
+---
+
+### 3. Deployments own Pods
+
+Deleting Pods does not remove applications.
+
+Deployments recreate them automatically.
+
+---
+
+### 4. Namespaces isolate workloads
+
+`default` and `artemis-lab` are completely separate views of the same cluster.
+
+---
+
+### 5. Portainer is only a viewer/controller
+
+Portainer and kubectl are operating on the same Kubernetes API.
+
+Create something with kubectl → appears in Portainer.
+
+Delete it in Portainer → disappears from kubectl.
+
+---
+
+At the end of the day (21 Jun 2026), you went from **a freshly installed K3s cluster that couldn't start workloads** to **a fully functional remote-managed Kubernetes lab with Portainer and kubectl working from Artemis**. That's actually most of the hard infrastructure work; now the remaining work is learning Kubernetes itself.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Here’s a clean **documentation-style summary** of everything that happened, what broke, why it broke, and how it was fixed.
+
+---
+
+# 📘 Homelab Incident & Fix Report (LastFM + Media Pipeline)
+
+## 🗓️ Timeline (UTC / system time observed)
+
+* **2026-06-26 09:48–09:59 UTC**
+
+  * First visible failures in `fetch_media.sh`
+  * Repeated cron execution causing log spam
+  * System degradation observed in LastFM + media pipeline
+
+* **2026-06-26 10:00–10:20 UTC**
+
+  * Root cause investigation + script inspection
+  * GitHub API rate limit confirmed
+  * jq parsing issues identified
+  * Cron behavior analyzed
+
+* **2026-06-26 10:20–10:45 UTC**
+
+  * Fixes applied (flock + script corrections)
+  * Media pipeline corrected
+  * Final stabilization testing
+
+---
+
+# 🚨 What Broke
+
+## 1. Infinite / overlapping cron executions
+
+### Symptom:
+
+* Repeated logs like:
+
+  * `LASTFM UPDATED`
+  * multiple executions per minute
+  * system spam / duplicate runs
+
+### Cause:
+
+* No concurrency control in cron jobs
+* `fetch_lastfm.sh` triggering `fetch_media.sh`
+* overlapping execution every minute
+
+---
+
+## 2. jq parsing crash in media pipeline
+
+### Error:
+
+```
+jq: error: Cannot index string with string "name"
+```
+
+### Cause:
+
+* GitHub API response sometimes returned:
+
+  * error JSON
+  * non-array response
+  * rate-limit message
+* script assumed `.[]` always valid array
+
+---
+
+## 3. Broken media.json output
+
+### Output observed:
+
+```json
+{
+  "mode": "wallpaper",
+  "title": "",
+  "url": "https://raw.githubusercontent.com/.../"
+}
+```
+
+### Cause:
+
+* `$WALLPAPER` became empty
+* GitHub API rate-limited → no valid file list
+* fallback logic missing
+
+---
+
+## 4. GitHub API rate limiting
+
+### Error:
+
+```json
+{
+  "message": "API rate limit exceeded"
+}
+```
+
+### Cause:
+
+* Unauthenticated GitHub API usage
+* cron calling API too frequently (every minute)
+* no caching layer
+
+---
+
+# 🛠️ Fixes Applied
+
+## 1. Added `flock` to all cron jobs
+
+### Fix date: 2026-06-26 ~10:20 UTC
+
+### Change:
+
+```cron
+flock -n /tmp/fetch_lastfm.lock ...
+flock -n /tmp/fetch_media.lock ...
+```
+
+### Result:
+
+✔ Prevented overlapping executions
+✔ Eliminated cron spam loops
+✔ Stabilized system timing
+
+---
+
+## 2. Fixed LastFM script robustness
+
+### Fix date: 2026-06-26 ~10:25 UTC
+
+### Changes:
+
+* Added safe JSON validation:
+
+```bash
+jq empty "$TMP"
+```
+
+* Added safe jq access:
+
+```bash
+.track[0]?.name
+```
+
+### Result:
+
+✔ No more jq crashes
+✔ Safe fallback JSON output
+✔ Stable `lastfm.json` generation
+
+---
+
+## 3. Fixed media pipeline logic
+
+### Fix date: 2026-06-26 ~10:30 UTC
+
+### Changes:
+
+* Split logic cleanly:
+
+  * LastFM mode (priority)
+  * Wallpaper fallback mode
+
+* Added safe GitHub parsing:
+
+```bash
+try (.[] | select(...)) catch empty
+```
+
+* Added fallback wallpaper:
+
+```bash
+default.jpg
+```
+
+### Result:
+
+✔ No empty URLs
+✔ No broken JSON output
+✔ Stable media switching system
+
+---
+
+## 4. Identified GitHub API rate limit issue
+
+### Fix decision:
+
+* confirmed as external constraint (not script bug)
+* decided NOT to over-engineer caching yet
+
+### Result:
+
+✔ system continues to work when API resets
+✔ fallback ensures UI never breaks
+
+---
+
+# 🧾 Final System State (After Fixes)
+
+## ✔ LastFM pipeline
+
+* stable JSON output
+* safe parsing
+* no recursion issues
+
+## ✔ Media pipeline
+
+* LastFM priority mode works
+* wallpaper fallback safe
+* no broken URLs
+
+## ✔ Cron system
+
+* no overlaps (flock protection)
+* predictable execution
+* no infinite loops
+
+## ✔ External dependencies
+
+* GitHub API (rate limited but handled gracefully)
+* LastFM API (stable)
+
+---
+
+# 🧠 Key Lessons Learned
+
+* Cron without locking causes silent race conditions
+* jq assumes structure → must always validate API responses
+* GitHub API is not reliable for high-frequency polling
+* fallback logic is mandatory in homelab automation
+* recursive script calls must be strictly controlled
+
+---
+
+If you want, I can next turn this into a:
+
+* 📄 proper README.md for your repo
+* 🧱 architecture diagram (media pipeline flow)
+* 🔁 or a “v2 redesign plan” that removes all these classes of bugs permanently

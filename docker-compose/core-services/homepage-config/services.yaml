@@ -1,38 +1,54 @@
-# For configuration options and examples, please see:
-# https://gethomepage.dev/configs/services/
+---
+- Olympus:
+    - Command Center:
+        icon: mdi-view-dashboard
+        description: "Olumpus"
 
-- Infrastructure & Admin:
-    - Portainer:
-        icon: portainer.png
-        href: https://100.117.35.70:9443/
-        description: Master Container Control Board
-        server: my-docker
-        container: portainer
+- Resources:
+    - GitHub:
+        icon: github.png
+        href: https://github.com
+        description: "Source Control"
 
-    - Proxmox:
-        icon: proxmox.png
-        href: https://100.81.86.51:8006/
-        description: Hypervisor Cluster Manager
+    - AWS:
+        icon: aws.png
+        href: https://console.aws.amazon.com
+        description: "Cloud Platform"
 
-- Security & Gateways:
+- Operations:
     - Vaultwarden:
         icon: vaultwarden.png
-        href: http://100.117.35.70:8080/
-        description: Secure Encrypted Password Vault
-        server: my-docker
-        container: vaultwarden
+        href: http://100.81.86.51:8080
+        description: "Password Manager"
 
-- Metrics & Telemetry:
+    - Portainer:
+        icon: portainer.png
+        href: https://100.117.35.70:9443
+        description: "Container Management"
+
+- Observability:
     - Grafana:
         icon: grafana.png
-        href: http://100.117.35.70:3001/
-        description: Systems Observability Engine
-        server: my-docker
-        container: grafana
+        href: http://100.117.35.70:3001
+        description: "Dashboards"
 
     - Prometheus:
         icon: prometheus.png
-        href: http://100.117.35.70:9090/
-        description: Time-Series Telemetry Data
-        server: my-docker
-        container: prometheus
+        href: http://100.117.35.70:9090
+        description: "Metrics"
+
+- Infrastructure:
+    - Apollo:
+        icon: proxmox.png
+        href: https://100.81.86.51:8006
+        description: "Hypervisor & Gateway"
+
+    - Athena:
+        icon: mdi-server
+        href: http://100.117.35.70:8000
+        description: "Observability & API Platform"
+
+    - Hestia:
+        icon: alpine-linux.png
+        href: http://100.81.86.51:3000
+        description: "Personal Services Platform"

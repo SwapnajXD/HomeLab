@@ -1,18 +1,39 @@
 ---
-# For configuration options and examples, please see:
-# https://gethomepage.dev/configs/bookmarks
+- Documentation:
+    - Docker:
+        - abbr: DK
+          href: https://docs.docker.com
 
-- Developer:
-    - Github:
+    - Grafana:
+        - abbr: GF
+          href: https://grafana.com/docs
+
+    - Prometheus:
+        - abbr: PM
+          href: https://prometheus.io/docs
+
+    - Arch Wiki:
+        - abbr: AW
+          href: https://wiki.archlinux.org
+
+- Development:
+    - GitHub:
         - abbr: GH
-          href: https://github.com/
+          href: https://github.com
 
-- Social:
-    - Reddit:
-        - abbr: RE
-          href: https://reddit.com/
+    - AWS:
+        - abbr: AWS
+          href: https://console.aws.amazon.com
 
-- Entertainment:
-    - YouTube:
-        - abbr: YT
-          href: https://youtube.com/
+    - Terraform:
+        - abbr: TF
+          href: https://developer.hashicorp.com/terraform
+
+- Community:
+    - Reddit Homelab:
+        - abbr: RH
+          href: https://reddit.com/r/homelab
+
+    - Reddit SelfHosted:
+        - abbr: SH
+          href: https://reddit.com/r/selfhosted

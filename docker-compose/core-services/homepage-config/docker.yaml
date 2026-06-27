@@ -1,5 +1,10 @@
 # For configuration options and examples, please see:
 # https://gethomepage.dev/configs/docker/
 
+
 my-docker:
   socket: /var/run/docker.sock
+
+athena:
+  host: 10.10.10.10
+  port: 2375

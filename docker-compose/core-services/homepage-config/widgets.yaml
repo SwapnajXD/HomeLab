@@ -1,12 +1,15 @@
 ---
-# For configuration options and examples, please see:
-# https://gethomepage.dev/configs/info-widgets/
-
 - resources:
     cpu: true
     memory: true
     disk: /
 
+- datetime:
+    text_size: xl
+    format:
+      dateStyle: full
+      timeStyle: short
+
 - search:
-    provider: duckduckgo
+    provider: google
     target: _blank

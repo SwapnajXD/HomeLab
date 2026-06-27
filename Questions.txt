@@ -1,0 +1,260 @@
+## 🟢 Easy Questions
+
+1. Tell me about your homelab.
+2. Why did you build this project?
+3. What problems were you trying to solve?
+4. What is Proxmox?
+5. Why did you choose Proxmox?
+6. What is Apollo?
+7. What is Athena?
+8. What is Hestia?
+9. What is Artemis?
+10. Why use both a VM and an LXC?
+11. What services are running in your homelab?
+12. Which services run on Athena?
+13. Which services run on Hestia?
+14. What is Docker?
+15. Why use Docker Compose?
+16. What is Portainer?
+17. What is Homepage?
+18. Why use Vaultwarden?
+19. How do you access your homelab remotely?
+20. What technologies did you learn from this project?
+
+---
+
+## 🟡 Medium Questions
+
+### Architecture & Design
+
+21. Explain your overall architecture.
+22. Why separate workloads across hosts?
+23. Why isolate user-facing services?
+24. What is the benefit of workload isolation?
+25. Why use an Ubuntu VM?
+26. Why use Alpine LXC?
+27. Why not run everything on Apollo?
+
+### Monitoring & Observability
+
+28. Why Prometheus?
+29. How does Prometheus work?
+30. What is an exporter?
+31. What does Node Exporter do?
+32. What does Proxmox Exporter do?
+33. Explain your metrics pipeline.
+34. Why Grafana?
+35. How are dashboards used?
+36. How does Grafana Alerting work?
+37. How do Telegram alerts work?
+38. How do you verify Prometheus targets?
+
+### Logging
+
+39. Why Loki?
+40. Why not ELK?
+41. Explain your logging pipeline.
+42. What does Grafana Alloy do?
+43. How does Alloy discover containers?
+44. What are Loki labels?
+45. How do you query logs?
+46. What is Grafana Explore?
+
+### Networking
+
+47. Why Tailscale?
+48. What is WireGuard?
+49. What is MagicDNS?
+50. How does Tailscale improve security?
+51. Why avoid port forwarding?
+52. How do you SSH into Apollo?
+53. Explain your network topology.
+54. What is vmbr0?
+55. How does Proxmox networking work?
+
+### Terraform & AWS Emulation
+
+56. Why Terraform?
+57. Why practice IaC locally?
+58. What resources do you provision?
+59. What does terraform plan do?
+60. What does terraform apply do?
+61. What does terraform destroy do?
+62. Why Floci?
+63. What was LocalStack used for?
+64. Why keep LocalStack?
+65. What AWS services are emulated?
+66. How do you validate Terraform deployments?
+
+### Operations
+
+67. How do you perform health checks?
+68. How do you validate infrastructure readiness?
+69. How do you know your system is healthy?
+70. Why document everything?
+71. What operational procedures have you documented?
+72. What is your runbook?
+
+---
+
+## 🟠 Hard Questions
+
+### Networking
+
+73. Explain the NAT issue you encountered.
+74. How did you troubleshoot it?
+75. What symptoms did you observe?
+76. How did you identify the root cause?
+77. What tools did you use?
+78. What is NAT?
+79. What is SNAT?
+80. What is DNAT?
+81. What is masquerading?
+82. Why was masquerading required?
+83. How does packet flow work in your network?
+84. How would you troubleshoot connectivity failures?
+
+### Monitoring
+
+85. Pull vs Push monitoring?
+86. Why is Prometheus pull-based?
+87. What are the benefits of pull?
+88. What are the disadvantages?
+89. What is Pushgateway?
+90. When would you use Pushgateway?
+91. How would you monitor batch jobs?
+92. What happens if Prometheus goes down?
+93. How would you scale Prometheus?
+
+### Logging
+
+94. How does Loki store logs?
+95. Why doesn't Loki index log contents?
+96. What is label cardinality?
+97. Why are high-cardinality labels dangerous?
+98. How do you optimize Loki?
+99. How would you troubleshoot missing logs?
+100. What happens if Alloy fails?
+
+### Containers
+
+101. How do Docker restart policies work?
+102. How do you recover failed containers?
+103. How do you inspect Docker logs?
+104. How do you identify unhealthy containers?
+105. Why use Docker Compose instead of Kubernetes?
+
+### Recovery
+
+106. Explain your disaster recovery process.
+107. What happens when Apollo reboots?
+108. How do Athena and Hestia recover?
+109. How do Docker services restart?
+110. What services are critical?
+111. How do you prioritize recovery?
+112. How long would recovery take?
+113. How did you validate recovery?
+114. What is RTO?
+115. What is RPO?
+116. What are your estimated RTO/RPO values?
+
+### Documentation
+
+117. Why maintain a changelog?
+118. Why maintain validation reports?
+119. Why maintain a project timeline?
+120. How do these documents help operations?
+121. How would another engineer onboard?
+
+---
+
+## 🔴 Very Hard / Senior-Level Questions
+
+### Architecture Decisions
+
+122. Why did you choose this architecture?
+123. What trade-offs did you make?
+124. What would you redesign today?
+125. What would you do differently with more hardware?
+126. Why didn't you use Kubernetes?
+127. Why didn't you use cloud providers?
+128. Why didn't you use ELK?
+129. Why didn't you expose services publicly?
+130. Why separate telemetry from applications?
+
+### Reliability Engineering
+
+131. What SRE principles did you apply?
+132. How do you define operational readiness?
+133. What validation procedures do you perform?
+134. Why are validations important?
+135. How do you prevent configuration drift?
+136. How do you detect failures?
+137. How do you measure reliability?
+138. How would you improve resilience?
+
+### Incidents
+
+139. Tell me about a major failure you experienced.
+140. What was the impact?
+141. How did you investigate it?
+142. What was the root cause?
+143. How did you recover?
+144. What preventative measures did you implement?
+145. Did you document the incident?
+146. What did you learn?
+
+### Security
+
+147. How do you secure remote access?
+148. How do you manage secrets?
+149. Why Vaultwarden?
+150. What are the risks of self-hosting?
+151. How do you minimize attack surface?
+152. How would you improve security further?
+153. How would you implement TLS internally?
+154. How would you secure service-to-service communication?
+
+### Scaling & Future State
+
+155. How would you scale this environment?
+156. How would you introduce high availability?
+157. How would you implement backups?
+158. How would you verify backups?
+159. How would you add CI/CD?
+160. How would you implement GitOps?
+161. Would you use Gitea or Forgejo?
+162. How would you introduce Traefik or Caddy?
+163. How would you integrate Uptime Kuma?
+164. How would you integrate ESP32 telemetry?
+165. How would you migrate to Kubernetes?
+
+### Leadership & Ownership
+
+166. What are you most proud of?
+167. What was your biggest mistake?
+168. What was the hardest part of the project?
+169. What challenged your assumptions?
+170. What would you teach another engineer from this project?
+171. How did this project change your understanding of infrastructure?
+172. What skills did you gain?
+173. Which area do you want to deepen next?
+174. Why should we hire you based on this project?
+
+---
+
+# ⭐ Most Important Questions to Master
+
+175. Walk me through your homelab architecture.
+176. Why did you choose these technologies?
+177. Explain the end-to-end metrics pipeline.
+178. Explain the end-to-end logging pipeline.
+179. Tell me about the NAT outage and how you fixed it.
+180. Explain your disaster recovery process.
+181. How do you validate operational readiness?
+182. Why did you migrate from Promtail to Alloy?
+183. Why did you migrate from LocalStack to Floci?
+184. What would you improve next?
+185. What are you most proud of in this project?
+
+If you can confidently answer these **185 questions**, you'll be very well prepared for interviews ranging from **Junior DevOps/Cloud Engineer** to **mid-level SRE and Platform Engineering** discussions.
