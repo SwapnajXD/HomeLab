@@ -3423,3 +3423,1619 @@ If you want, I can next turn this into a:
 * 📄 proper README.md for your repo
 * 🧱 architecture diagram (media pipeline flow)
 * 🔁 or a “v2 redesign plan” that removes all these classes of bugs permanently
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Kubernetes & Homelab Progress Log
+
+**Period:** 2026-06-21 → 2026-06-22
+
+---
+
+# Initial Goal
+
+The original goal was to create a **dedicated Kubernetes learning environment** that could be managed remotely from Artemis while running on Athena.
+
+Desired architecture:
+
+```text
+Artemis (Arch Laptop)
+        │
+    Tailscale
+        │
+Athena (Ubuntu)
+        │
+      K3s
+        │
+ Kubernetes Practice Lab
+```
+
+The cluster would later be integrated into the existing homelab alongside Apollo, Hestia and Portainer.
+
+---
+
+# 2026-06-21 — Fresh K3s Installation
+
+## Cluster Installation
+
+Installed K3s on Athena.
+
+Verified installation.
+
+```bash
+kubectl get nodes
+```
+
+Output:
+
+```
+athena   Ready   control-plane
+```
+
+This confirmed:
+
+* Kubernetes API server running
+* Scheduler running
+* Controller Manager running
+* Embedded etcd/sqlite healthy
+* containerd functioning
+
+---
+
+# Initial Cluster State
+
+Immediately after installation:
+
+```
+coredns
+metrics-server
+local-path-provisioner
+traefik
+helm-install jobs
+```
+
+Everything was healthy.
+
+---
+
+# Problem #1
+
+## Wanted a Minimal Cluster
+
+Observation:
+
+The default K3s installation deployed:
+
+* Traefik
+* Service Load Balancer
+* Metrics Server
+* CoreDNS
+* Local Path Provisioner
+
+Initially considered removing many of them.
+
+After reviewing their purposes we decided:
+
+Keep:
+
+* CoreDNS
+* Metrics Server
+* Local Path Provisioner
+
+Initially removed:
+
+* Traefik
+* ServiceLB
+
+Reason:
+
+Wanted a lightweight practice cluster.
+
+Later realized Traefik would become useful for learning Ingress and reverse proxying.
+
+Decision:
+
+Traefik kept.
+
+---
+
+# Problem #2
+
+## Persistent Storage Issues
+
+While preparing the cluster we suspected previous storage state might interfere with learning.
+
+Solution:
+
+Stopped K3s.
+
+Deleted:
+
+```
+/var/lib/rancher/k3s
+```
+
+Restarted K3s.
+
+Everything recreated automatically.
+
+Verified:
+
+```
+kubectl get storageclass
+```
+
+Result:
+
+```
+local-path (default)
+```
+
+Storage working correctly.
+
+---
+
+# Problem #3
+
+## Pod Initialization
+
+Immediately after restart several pods stayed in:
+
+```
+ContainerCreating
+```
+
+Waited for initialization.
+
+Eventually everything transitioned into:
+
+```
+Running
+```
+
+No manual fixes required.
+
+---
+
+# Problem #4
+
+## Kubernetes Learning Strategy
+
+Initially considered:
+
+* Helm
+* Dashboards
+* Operators
+* Extra tooling
+
+Decided against this.
+
+New strategy:
+
+Learn only through kubectl.
+
+Created a structured 7-day practice roadmap focusing on:
+
+* Pods
+* Deployments
+* Services
+* Scaling
+* ConfigMaps
+* Volumes
+* Probes
+* Debugging
+
+---
+
+# Problem #5
+
+## Artemis Could Not Use kubectl
+
+Attempted:
+
+```
+kubectl create namespace artemis
+```
+
+Received:
+
+```
+Unknown command kubectl
+```
+
+Cause:
+
+kubectl not installed on Artemis.
+
+Solution:
+
+Installed kubectl on Arch.
+
+---
+
+# Problem #6
+
+## Remote kubeconfig
+
+Copied Athena's kubeconfig to Artemis.
+
+Initially:
+
+```
+server:
+https://127.0.0.1:6443
+```
+
+Worked only locally.
+
+Needed remote access.
+
+---
+
+# Problem #7
+
+## TLS Certificate Failure
+
+Modified kubeconfig:
+
+```
+127.0.0.1
+
+↓
+
+100.117.35.70
+```
+
+Result:
+
+```
+tls: certificate is valid for
+
+127.0.0.1
+10.10.10.10
+
+not
+
+100.117.35.70
+```
+
+Cause:
+
+K3s certificate SANs did not include the Tailscale IP.
+
+Instead of regenerating certificates we switched to using Athena's LAN IP for cluster communication where appropriate and ensured the kubeconfig matched a valid certificate subject. After correcting the server endpoint, Artemis could communicate successfully with the cluster.
+
+---
+
+# Problem #8
+
+## Namespace Isolation
+
+Created:
+
+```
+artemis-lab
+```
+
+Configured current context:
+
+```
+kubectl config set-context
+```
+
+Everything for learning would stay inside this namespace.
+
+---
+
+# First Kubernetes Workload
+
+Created first deployment.
+
+```
+kubectl create deployment web --image=nginx
+```
+
+Created service.
+
+Initially:
+
+```
+ClusterIP
+```
+
+Used:
+
+```
+kubectl port-forward
+```
+
+Successfully viewed nginx homepage.
+
+---
+
+# Problem #9
+
+## NodePort Already Exists
+
+Attempted:
+
+```
+kubectl expose deployment web
+```
+
+Received:
+
+```
+AlreadyExists
+```
+
+Reason:
+
+ClusterIP service already existed.
+
+Solution:
+
+Delete old service.
+
+Create NodePort service.
+
+Result:
+
+```
+80:30246/TCP
+```
+
+---
+
+# Remote Browser Success
+
+Opened from Artemis:
+
+```
+http://100.117.35.70:30246
+```
+
+Successfully viewed nginx homepage.
+
+Confirmed:
+
+Remote Kubernetes networking working.
+
+---
+
+# Problem #10
+
+## Self-Healing Demonstration
+
+Deleted running pod.
+
+```
+kubectl delete pod
+```
+
+Observed:
+
+ReplicaSet immediately created replacement pod.
+
+Demonstrated Kubernetes self-healing.
+
+---
+
+# Problem #11
+
+## Scaling
+
+Scaled deployment:
+
+```
+1 → 3 replicas
+```
+
+Observed:
+
+Three pods created.
+
+Deleted all three.
+
+Observed:
+
+Deployment recreated three new pods automatically.
+
+Learned:
+
+Deployments maintain desired state.
+
+---
+
+# Problem #12
+
+## Permission Errors on Athena
+
+Running:
+
+```
+kubectl
+```
+
+Produced:
+
+```
+permission denied
+
+/etc/rancher/k3s/k3s.yaml
+```
+
+Reason:
+
+kubeconfig readable only by root.
+
+Temporary fix:
+
+```
+sudo chmod 644
+```
+
+Later used:
+
+```
+sudo kubectl
+```
+
+when appropriate.
+
+---
+
+# Problem #13
+
+## Namespace Confusion
+
+Created deployment from Athena.
+
+Artemis could not see it.
+
+Reason:
+
+Deployment created in:
+
+```
+default
+```
+
+Artemis operating in:
+
+```
+artemis-lab
+```
+
+Solution:
+
+Recreated workloads inside:
+
+```
+artemis-lab
+```
+
+Both machines then displayed identical resources.
+
+---
+
+# Portainer Integration
+
+Existing Portainer Docker container already running on Apollo.
+
+Installed only:
+
+```
+Portainer Agent
+```
+
+inside Kubernetes.
+
+Connected Portainer to Kubernetes.
+
+Initially failed because the endpoint field included:
+
+```
+http://
+```
+
+Solution:
+
+Use only:
+
+```
+100.117.35.70:30XXX
+```
+
+without the protocol.
+
+Portainer connected successfully.
+
+Could now manage:
+
+* Pods
+* Deployments
+* Services
+* Namespaces
+
+through the existing Portainer instance.
+
+---
+
+# Cluster Cleanup
+
+Removed learning workloads:
+
+* test deployment
+* web deployment
+* services
+* replicas
+
+Kept:
+
+```
+artemis-lab
+```
+
+for future practice.
+
+Remaining cluster components:
+
+```
+CoreDNS
+Metrics Server
+Local Path Provisioner
+Traefik
+Portainer Agent
+```
+
+These are the minimum useful services for ongoing Kubernetes learning.
+
+---
+
+# Homelab Networking Discussion
+
+Reviewed current topology:
+
+```text
+Apollo
+│
+├── Hestia (LXC)
+│     Homepage Dashboard
+│
+└── Athena
+      K3s Cluster
+
+Artemis
+     │
+ Tailscale
+```
+
+Determined:
+
+Homepage cannot be reached directly over Tailscale because Hestia itself is not a Tailscale node.
+
+Possible future solutions:
+
+* Install Tailscale in Hestia
+* Reverse proxy via Apollo
+* Port forwarding through Apollo
+
+---
+
+# Remote Access
+
+Verified:
+
+Artemis controls Athena entirely through:
+
+```
+kubectl
+```
+
+without requiring SSH.
+
+Confirmed:
+
+Everything created on Athena appears immediately on Artemis.
+
+---
+
+# Current Cluster State (End of Session)
+
+Namespaces:
+
+```
+default
+kube-system
+portainer
+artemis-lab
+```
+
+System Components:
+
+* CoreDNS
+* Metrics Server
+* Local Path Provisioner
+* Traefik
+* Portainer Agent
+
+Practice Namespace:
+
+```
+artemis-lab
+```
+
+Empty and ready for learning.
+
+---
+
+# Major Concepts Learned
+
+* Kubernetes architecture
+* Control Plane basics
+* Namespaces
+* Pods
+* Deployments
+* ReplicaSets
+* Services
+* ClusterIP
+* NodePort
+* Port Forwarding
+* Scaling
+* Self-healing
+* kubectl workflow
+* kubeconfig management
+* Remote cluster administration
+* Portainer integration
+* Tailscale connectivity
+* Namespace isolation
+* Kubernetes troubleshooting
+* Resource cleanup and cluster hygiene
+
+---
+
+# Final Environment
+
+```text
+                 Internet
+                     │
+              Tailscale Tailnet
+                     │
+        ┌────────────┴────────────┐
+        │                         │
+   Artemis (Arch)           Apollo (Proxmox)
+        │                         │
+ kubectl over Tailscale           ├── Hestia (Homepage)
+        │                         │
+        └──────────────► Athena (Ubuntu)
+                           │
+                         K3s Cluster
+                           │
+          ┌────────────────┼─────────────────┐
+          │                │                 │
+      CoreDNS      Metrics Server    Local Storage
+                           │
+                       Traefik
+                           │
+                    Portainer Agent
+                           │
+                  artemis-lab (empty)
+```
+
+## Outcome
+
+By the end of this work, you had a clean, functional K3s cluster on Athena that you can manage remotely from Artemis via `kubectl`. The cluster is integrated with your existing Portainer instance on Apollo, the `artemis-lab` namespace is reserved for experimentation, and the environment is ready for structured Kubernetes practice without unnecessary workloads.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Homelab Development Log
+
+**Period Covered:** 18 June 2026 – 27 June 2026
+
+---
+
+# Objective
+
+The original objective was to transform Homepage from a simple dashboard into a personalized "Olympus" command center that displayed live information collected from various services running throughout the homelab.
+
+The dashboard was intended to become a real-time personal hub showing:
+
+* Currently playing music
+* Weather
+* Anime statistics
+* Reading progress
+* Investment prices
+* Dynamic wallpapers
+* Homelab health
+* Service status
+
+This required building an entirely new backend service and extensive Homepage customization.
+
+---
+
+# Initial Architecture (18–20 June)
+
+Infrastructure consisted of four primary machines.
+
+## Apollo
+
+* Proxmox VE Host
+* Runs virtual machines and LXC containers
+* Connected to Tailscale
+
+Hosted:
+
+* Athena VM
+* Hestia LXC
+
+---
+
+## Athena (Ubuntu VM)
+
+Purpose:
+
+Backend utility server
+
+Initially hosted:
+
+* Telemetry stack
+
+  * Prometheus
+  * Loki
+  * Alloy
+* LocalStack
+* Floci
+
+Later became the location for the Olympus backend.
+
+---
+
+## Hestia (LXC)
+
+Purpose:
+
+Personal services
+
+Running:
+
+* Homepage
+* Vaultwarden
+* Portainer Agent
+
+Homepage was accessible over Tailscale.
+
+---
+
+## Artemis
+
+Development laptop.
+
+Used for:
+
+* Git repository
+* Documentation
+* Development
+* Testing
+
+---
+
+# Phase 1 — Olympus Dashboard Design
+
+We designed a large custom Homepage widget called **Olympus**.
+
+Desired layout:
+
+```
+Music Widget
+
+Reading Widget
+
+Investments Widget
+
+Large Hero Panel
+(Video / Wallpaper / Album Art)
+
+Weather Widget
+
+Anime Widget
+
+Homelab Widget
+```
+
+The center panel was designed to dynamically change between:
+
+* Album artwork
+* Anime wallpaper
+* Movie posters
+* Wallpapers
+* Videos
+
+---
+
+# Phase 2 — Backend Development (Athena)
+
+Instead of Homepage directly querying multiple APIs, Athena became the aggregation layer.
+
+Created project:
+
+```
+~/homelab/
+```
+
+Containing:
+
+```
+data/
+scripts/
+docker-compose/
+```
+
+---
+
+## Fetch Scripts
+
+Created numerous scripts:
+
+```
+fetch_lastfm.sh
+fetch_weather.sh
+fetch_media.sh
+fetch_library.sh
+fetch_prices.sh
+fetch_anime.sh
+fetch_pokemon.sh
+fetch_homelab.sh
+```
+
+Each script generated JSON.
+
+Examples:
+
+```
+lastfm.json
+weather.json
+media.json
+library.json
+prices.json
+anime.json
+pokemon.json
+homelab.json
+```
+
+Cron jobs refreshed these every minute.
+
+---
+
+# Dashboard API
+
+Created a new Docker service.
+
+```
+dashboard-api
+```
+
+Built with FastAPI.
+
+Purpose:
+
+Serve one combined endpoint.
+
+```
+/olympus
+```
+
+Example response:
+
+```json
+{
+  "weather": {...},
+  "lastfm": {...},
+  "library": {...},
+  "media": {...},
+  "prices": {...},
+  "anime": {...},
+  "pokemon": {...},
+  "homelab": {...}
+}
+```
+
+Homepage only needed one request.
+
+---
+
+# Phase 3 — Homepage Widget
+
+Created:
+
+```
+custom.js
+custom.css
+```
+
+The widget:
+
+* Located Olympus section
+* Replaced Homepage contents
+* Rendered:
+
+Music
+
+Reading
+
+Weather
+
+Anime
+
+Investments
+
+Homelab
+
+Hero media
+
+Refresh interval:
+
+```
+10 seconds
+```
+
+---
+
+# Phase 4 — Homelab Widget
+
+Created new fetch script.
+
+```
+fetch_homelab.sh
+```
+
+Collected:
+
+* CPU
+* RAM
+* Uptime
+* Containers
+* Kubernetes pods
+
+Initially attempted:
+
+```
+Athena
+Apollo
+Hestia
+```
+
+status detection.
+
+---
+
+## First Problem
+
+Hestia is an LXC.
+
+Athena attempted:
+
+```
+ping hestia
+```
+
+Result:
+
+```
+Temporary failure in name resolution
+```
+
+Reason:
+
+Hestia does not participate directly in Tailscale.
+
+It exists only inside Proxmox.
+
+---
+
+# Fix
+
+Instead of checking Hestia directly:
+
+Athena checked Apollo.
+
+Then queried Homepage running through Apollo.
+
+```
+curl http://apollo:3000
+```
+
+If Homepage responded:
+
+Homepage = online
+
+Thus the Homelab widget became:
+
+```
+Athena
+
+Apollo
+
+Homepage
+
+Dashboard API
+
+Tailscale
+```
+
+instead of
+
+```
+Athena
+
+Apollo
+
+Hestia
+```
+
+This better represented actual service availability.
+
+---
+
+# Phase 5 — Mobile Widget Failure
+
+Desktop:
+
+Olympus worked perfectly.
+
+Phone:
+
+Blank widget.
+
+---
+
+## Investigation
+
+Verified:
+
+Dashboard API:
+
+```
+http://100.117.35.70:8000/olympus
+```
+
+reachable.
+
+Homepage loaded.
+
+No API failures.
+
+---
+
+Inserted debugging.
+
+Added:
+
+```javascript
+alert("VERSION 3");
+```
+
+Appeared on both desktop and phone.
+
+Meaning:
+
+custom.js loaded.
+
+---
+
+Added extensive logging.
+
+Desktop:
+
+```
+Fetch status 200
+
+Olympus rendered successfully
+```
+
+Phone:
+
+Only
+
+```
+VERSION 3
+```
+
+No rendering.
+
+---
+
+Root Cause
+
+Homepage had already completed loading before the custom script executed.
+
+The widget attempted to build before Homepage had fully created its disclosure panels.
+
+Desktop timing:
+
+slow enough to work.
+
+Phone timing:
+
+too fast.
+
+---
+
+# Fix
+
+Replaced
+
+```
+window.onload
+```
+
+logic with
+
+```javascript
+startOlympus()
+```
+
+guard.
+
+```javascript
+let olympusStarted = false;
+
+function startOlympus() {
+
+if (olympusStarted) return;
+
+olympusStarted = true;
+
+buildOlympus();
+
+setInterval(buildOlympus,10000);
+
+}
+
+if(document.readyState==="loading")
+document.addEventListener("DOMContentLoaded",startOlympus);
+
+else
+startOlympus();
+```
+
+Result:
+
+Widget loaded on both desktop and phone.
+
+---
+
+# Phase 6 — Stability Issues
+
+Although rendering worked,
+
+the widget became increasingly complex.
+
+Problems included:
+
+* Hundreds of lines of JavaScript
+* Dynamic DOM replacement
+* Homepage internal updates
+* Timing dependencies
+* Mobile-specific issues
+* Difficult maintenance
+
+Future Homepage updates could easily break the widget.
+
+---
+
+# Decision
+
+Olympus widget abandoned.
+
+Reason:
+
+Too fragile.
+
+Too tightly coupled to Homepage internals.
+
+Maintenance burden exceeded value.
+
+---
+
+# Phase 7 — Repository Synchronization
+
+Objective:
+
+Synchronize every machine back into Git.
+
+---
+
+## Athena
+
+Copied using:
+
+```
+rsync
+```
+
+Retrieved:
+
+Scripts
+
+Dashboard API
+
+JSON examples
+
+Docker compose
+
+---
+
+## First Issue
+
+Originally attempted:
+
+```
+scp ubuntu@athena:~/homelab/scripts/*
+```
+
+Fish shell expanded wildcard locally.
+
+Result:
+
+```
+No matches for wildcard
+```
+
+---
+
+## Fix
+
+Switched entirely to:
+
+```
+rsync
+```
+
+---
+
+## Hestia
+
+Could not SSH directly.
+
+Reason:
+
+LXC behind Proxmox.
+
+---
+
+Attempted:
+
+```
+rsync root@hestia
+```
+
+Failed.
+
+---
+
+## Fix
+
+Logged into Apollo.
+
+Used
+
+```
+pct exec 101
+```
+
+Created archive:
+
+```
+tar czf /tmp/homepage-config.tar.gz
+```
+
+Copied archive to Apollo.
+
+Downloaded archive.
+
+Extracted locally.
+
+---
+
+## Apollo
+
+Copied:
+
+```
+101.conf.backup
+
+interfaces.backup
+```
+
+Also temporarily copied Homepage files that had been staged there.
+
+---
+
+Repository updated.
+
+Git committed.
+
+Git pushed.
+
+---
+
+# Phase 8 — Cleanup
+
+After Git backup, entire Olympus project removed.
+
+---
+
+## Athena Cleanup
+
+Removed:
+
+```
+dashboard-api/
+
+data/
+
+fetch scripts
+
+cron jobs
+```
+
+Stopped:
+
+Dashboard API container.
+
+Deleted:
+
+Dashboard API project.
+
+Remaining services:
+
+```
+Telemetry
+
+LocalStack
+
+Floci
+```
+
+---
+
+## Hestia Cleanup
+
+Removed:
+
+```
+custom.js.working
+
+custom.css.working
+```
+
+Homepage restored to standard configuration.
+
+Running:
+
+Homepage
+
+Vaultwarden
+
+Portainer Agent
+
+---
+
+## Apollo Cleanup
+
+Deleted temporary transfer files.
+
+Removed:
+
+```
+custom.js
+
+custom.css
+
+docker-compose.yml
+
+homepage-config.tar.gz
+```
+
+Final root directory:
+
+```
+101.conf.backup
+
+interfaces.backup
+
+vault.crt
+
+vault.key
+```
+
+Clean.
+
+---
+
+# Final Architecture
+
+```
+Apollo
+│
+├── Proxmox
+│
+└── Hestia (LXC)
+    ├── Homepage
+    ├── Vaultwarden
+    └── Portainer Agent
+
+Athena
+├── Telemetry
+│   ├── Prometheus
+│   ├── Loki
+│   └── Alloy
+│
+├── LocalStack
+│
+└── Floci
+
+Artemis
+├── Git Repository
+├── Documentation
+└── Development
+```
+
+---
+
+# Lessons Learned
+
+### 1. Homepage is best treated as a dashboard, not an application framework.
+
+While Homepage supports custom CSS and JavaScript, deeply modifying its DOM creates maintenance and compatibility issues, especially across devices and future updates.
+
+### 2. Aggregate backend services only when they provide lasting value.
+
+The Dashboard API successfully unified data from multiple sources, but its complexity wasn't justified after the custom widget was abandoned.
+
+### 3. Test on multiple clients early.
+
+The mobile-only rendering issue highlighted how different browsers and loading sequences can expose timing bugs that don't appear on desktop.
+
+### 4. Keep the Git repository synchronized with live systems.
+
+Capturing the latest configurations from Athena, Hestia, and Apollo before cleanup preserved the complete implementation history and provided a reliable rollback point.
+
+### 5. Prefer simple, maintainable solutions.
+
+The final decision to return Homepage to its standard configuration reduced operational complexity while preserving a stable and easy-to-maintain homelab.
+
+---
+
+# Current Status (27 June 2026)
+
+**Apollo**
+
+* Proxmox host running normally
+* Temporary migration files removed
+* Configuration backups retained
+
+**Hestia**
+
+* Homepage restored to standard configuration
+* Vaultwarden and Portainer Agent operational
+* No Olympus widget code in active use
+
+**Athena**
+
+* Telemetry stack operational
+* LocalStack and Floci retained
+* Dashboard API, fetch scripts, cron jobs, and widget data removed
+
+**Artemis**
+
+* Git repository updated with the latest configurations and documentation from all systems
+* Repository serves as the canonical source of truth for the homelab configuration and history
