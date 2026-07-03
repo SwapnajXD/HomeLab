@@ -2,160 +2,190 @@
 
 ## Purpose
 
-This document defines the standard operational procedures for managing, validating, maintaining, and administering the Olympus HomeLab environment.
+This runbook defines the standard operating procedures (SOPs) for managing, maintaining, validating, and recovering the Olympus HomeLab environment.
 
-Its purpose is to provide a single reference for routine operations, preventative maintenance, and common administrative tasks.
+It serves as the operational reference for routine administration, preventative maintenance, infrastructure changes, and incident response.
 
 ---
 
 # Infrastructure Overview
 
-| Host    | Purpose                       |
-| ------- | ----------------------------- |
-| Apollo  | Proxmox VE Hypervisor         |
-| Athena  | Operations & Observability VM |
-| Hestia  | Core Services LXC             |
-| Artemis | Management Workstation        |
-
----
-
-# Service Inventory
-
-## Athena
-
-Hosted Services:
-
-* Grafana
-* Prometheus
-* Loki
-* Grafana Alloy
-* Node Exporter
-* Proxmox Exporter
-* Portainer
-* Olympus Dashboard API
-* Floci
-
----
-
-## Hestia
-
-Hosted Services:
-
-* Homepage
-* Vaultwarden
-* Personal Feed Collection Scripts
-* SSH Synchronization Endpoint
+| Host | Purpose |
+|------|---------|
+| Apollo | Proxmox VE Hypervisor & Network Gateway |
+| Athena | Operations, Observability & Kubernetes |
+| Hestia | Frontend Application Services |
+| Artemis | Management Workstation |
 
 ---
 
 # Daily Health Checks
 
-## Verify Tailscale Connectivity
+Perform these checks daily or after significant infrastructure changes.
 
-From Artemis:
+| Check | Command / Method | Expected Result |
+|--------|------------------|-----------------|
+| Tailscale | `tailscale status` | Apollo and Athena connected |
+| Compute | `qm list` / `pct list` | Athena and Hestia running |
+| Internet Access | `curl -I https://google.com` (Athena) | HTTP 200/301 |
+| Dashboard | Open Homepage | Widgets update successfully |
+| Kubernetes | `kubectl get nodes` | Athena reports **Ready** |
+
+---
+
+# Service Verification
+
+## Athena
+
+Verify critical services are running:
+
+- Grafana
+- Prometheus
+- Loki
+- Grafana Alloy
+- Node Exporter
+- Proxmox Exporter
+- Portainer
+- Dashboard API
+- Floci
+- K3s
+
+Check:
 
 ```bash
-tailscale ping apollo
-tailscale ping athena
+docker ps
 ```
 
-Expected:
+---
+
+## Hestia
+
+Verify:
+
+- Homepage
+- Vaultwarden
+
+Check:
+
+```bash
+docker ps
+```
+
+---
+
+# Kubernetes Operations
+
+Athena hosts a single-node K3s cluster used for experimentation.
+
+## Administration
+
+Management is performed from Artemis using `kubectl`.
+
+Use Athena's LAN address (`10.10.10.10:6443`) in the kubeconfig to match the cluster certificate SANs.
+
+## Namespace Policy
+
+Deploy learning workloads inside:
 
 ```text
-pong
+artemis-lab
+```
+
+Avoid deploying workloads into:
+
+- default
+- kube-system
+
+---
+
+## Common Commands
+
+View cluster status:
+
+```bash
+kubectl get nodes
+kubectl get pods -A
+```
+
+Scale a deployment:
+
+```bash
+kubectl scale deployment <deployment> \
+-n artemis-lab \
+--replicas=3
+```
+
+View services:
+
+```bash
+kubectl get svc -n artemis-lab
 ```
 
 ---
 
-## Verify Apollo Reachability
+# Dashboard Operations
 
-```bash
-ping -c 4 apollo
-```
-
-Expected:
+The dashboard follows a centralized API architecture.
 
 ```text
-0% packet loss
+External APIs
+        │
+        ▼
+Fetch Scripts
+        │
+        ▼
+Dashboard API
+        │
+        ▼
+Homepage
+```
+
+## Manual Refresh
+
+Run the update wrapper on Athena:
+
+```bash
+./olympus_update.sh
 ```
 
 ---
 
-## Verify Athena Access
+## Troubleshooting
+
+Check Dashboard API:
 
 ```bash
-ssh ubuntu@athena
+docker ps | grep dashboard-api
 ```
 
-Expected:
+Inspect logs:
 
-Successful SSH login.
+```bash
+tail -f /var/log/olympus_fetch.log
+```
+
+Validate JSON output:
+
+```bash
+jq .
+```
+
+All fetch scripts should use `flock` to prevent overlapping cron executions.
 
 ---
 
-## Verify Homepage Access
-
-```bash
-curl -I http://100.81.86.51:3000
-```
-
-Expected:
-
-```text
-HTTP/1.1 200 OK
-```
-
----
-
-## Verify Container Health
-
-Athena:
-
-```bash
-ssh ubuntu@athena \
-"docker ps --format 'table {{.Names}}\t{{.Status}}'"
-```
-
-Hestia:
-
-```bash
-ssh root@10.10.10.2 \
-"docker ps --format 'table {{.Names}}\t{{.Status}}'"
-```
-
-Expected services:
-
-### Athena
-
-* grafana
-* prometheus
-* loki
-* alloy
-* node-exporter
-* proxmox-exporter
-* portainer
-* dashboard-api
-* floci
-
-### Hestia
-
-* homepage
-* vaultwarden
-
----
-
-# Weekly Health Checks
+# Monitoring Operations
 
 ## Verify Prometheus
 
 ```bash
-curl -I http://10.10.10.10:9090/-/ready
+curl http://10.10.10.10:9090/-/ready
 ```
 
 Expected:
 
 ```text
-HTTP/1.1 200 OK
+HTTP 200
 ```
 
 ---
@@ -163,497 +193,156 @@ HTTP/1.1 200 OK
 ## Verify Loki
 
 ```bash
-curl -I http://10.10.10.10:3100/ready
+curl http://10.10.10.10:3100/ready
 ```
 
 Expected:
 
 ```text
-HTTP/1.1 200 OK
+HTTP 200
 ```
 
 ---
 
-## Verify Loki Labels
+## Verify Grafana
 
-```bash
-curl -s http://10.10.10.10:3100/loki/api/v1/labels
-```
+Confirm:
+
+- Dashboards load
+- Prometheus datasource healthy
+- Loki datasource healthy
+- Alerts configured
+
+---
+
+## Verify Alerting
+
+Send a test notification through Grafana Alerting.
 
 Expected:
 
-JSON label output.
+Telegram notification received.
 
 ---
 
-## Verify Exporters
+# Infrastructure as Code
 
-```bash
-curl -s http://localhost:9100/metrics | head -n 5
-curl -s http://localhost:9221/metrics | head -n 5
-```
+Terraform is the authoritative method for managing AWS-emulated infrastructure.
 
-Expected:
-
-Raw Prometheus metrics.
-
----
-
-## Verify Telegram Alerting
-
-Grafana:
+Working directory:
 
 ```text
-Alerting → Contact Points
+~/homelab/infrastructure/terraform/
 ```
 
-Send a test notification.
-
-Expected:
-
-Telegram message received.
-
----
-
-# Docker Stack Management
-
-## Telemetry Stack
-
-Location:
-
-```text
-~/homelab/docker-compose/telemetry/
-```
-
-### Start
+Recommended workflow:
 
 ```bash
-docker compose up -d
-```
-
-### Stop
-
-```bash
-docker compose down
-```
-
-### Restart
-
-```bash
-docker compose restart
-```
-
-### Logs
-
-```bash
-docker compose logs -f
-```
-
----
-
-## Core Services Stack
-
-Location:
-
-```text
-~/homelab/personal-services/
-```
-
-### Start
-
-```bash
-docker compose up -d
-```
-
-### Stop
-
-```bash
-docker compose down
-```
-
-### Recreate
-
-```bash
-docker compose down
-docker compose up -d --force-recreate
-```
-
-### Logs
-
-```bash
-docker compose logs -f
-```
-
----
-
-## Floci Stack
-
-Location:
-
-```text
-~/homelab/docker-compose/floci/
-```
-
-### Start
-
-```bash
-docker compose up -d
-```
-
-### Stop
-
-```bash
-docker compose down
-```
-
-### Restart
-
-```bash
-docker compose restart
-```
-
-### Logs
-
-```bash
-docker compose logs -f floci
-```
-
----
-
-# Monitoring Procedures
-
-## Check Prometheus Targets
-
-Open:
-
-```text
-http://10.10.10.10:9090/targets
-```
-
-Verify:
-
-* node-exporter
-* proxmox-exporter
-* prometheus
-
-Status:
-
-```text
-UP
-```
-
----
-
-## Check Grafana
-
-Open:
-
-```text
-http://10.10.10.10:3001
-```
-
-Verify:
-
-* Dashboards load
-* Prometheus datasource healthy
-* Loki datasource healthy
-
----
-
-## Check Logs in Grafana
-
-Grafana Explore → Loki
-
-Query:
-
-```text
-{container="vaultwarden"}
-```
-
-Expected:
-
-Continuous log output.
-
----
-
-## Verify Loki Status
-
-```bash
-docker logs loki
-```
-
-Expected components:
-
-* Distributor ACTIVE
-* Ingester ACTIVE
-* Scheduler ACTIVE
-* Compactor ACTIVE
-
----
-
-# Dashboard Operations
-
-## Verify API Endpoints
-
-Prices:
-
-```bash
-curl -s http://10.10.10.10:8000/prices | jq .
-```
-
-Weather:
-
-```bash
-curl -s http://10.10.10.10:8000/weather | jq .
-```
-
-Pokémon:
-
-```bash
-curl -s http://10.10.10.10:8000/pokemon | jq .
-```
-
-Expected:
-
-Valid JSON responses.
-
----
-
-## Manual Synchronization
-
-If widgets stop updating:
-
-```bash
-scp root@10.10.10.2:/root/homelab/personal-services/homepage-config/data/*.json \
-~/homelab/docker-compose/dashboard-api/data/
-```
-
----
-
-## Verify Synchronization Jobs
-
-```bash
-crontab -l
-```
-
-Expected:
-
-Scheduled feed collection jobs present.
-
----
-
-# Infrastructure as Code Operations
-
-Location:
-
-```text
-~/homelab/terraform/floci/
-```
-
----
-
-## Validate
-
-```bash
+terraform fmt
 terraform validate
-```
-
----
-
-## Plan
-
-```bash
 terraform plan
+terraform apply
 ```
+
+Verify Floci resources before modifying state.
 
 ---
 
-## Apply
+# Networking Operations
+
+Apollo provides routing and NAT for the internal network.
+
+After every Apollo reboot verify:
+
+- IP forwarding enabled
+- NAT rules present
+- Internet connectivity restored
+- Port forwarding operational
+
+Useful commands:
 
 ```bash
-terraform apply -auto-approve
-```
-
----
-
-## Destroy
-
-```bash
-terraform destroy -auto-approve
-```
-
----
-
-## Verify Resources
-
-List S3 Buckets:
-
-```bash
-aws --endpoint-url=http://10.10.10.10:4566 s3 ls
-```
-
-List DynamoDB Tables:
-
-```bash
-aws --endpoint-url=http://10.10.10.10:4566 dynamodb list-tables
-```
-
-Expected:
-
-* tf-homelab-storage-bucket
-* tf-homelab-metadata
-
----
-
-# Backup Validation
-
-## Verify Proxmox Backup Jobs
-
-Navigate to:
-
-```text
-Datacenter → Backup
-```
-
-Verify:
-
-* Scheduled jobs exist
-* Recent jobs completed successfully
-
----
-
-## Verify Backup Archives
-
-Navigate to:
-
-```text
-Storage → Backups
-```
-
-Expected:
-
-* .vma.zst files
-* .tar.zst files
-
----
-
-# Proxmox Operations
-
-## VM Status
-
-```bash
-qm status 100
-```
-
----
-
-## LXC Status
-
-```bash
-pct status 101
-```
-
----
-
-## Start Athena
-
-```bash
-qm start 100
-```
-
----
-
-## Start Hestia
-
-```bash
-pct start 101
+sysctl net.ipv4.ip_forward
+iptables -t nat -L -v -n
 ```
 
 ---
 
 # Emergency Procedures
 
-## Reboot Apollo
+## Connectivity Ladder
 
-From Artemis:
+Always troubleshoot in this order:
 
-```bash
-ssh root@apollo "reboot"
-```
+1. Ping Apollo (`10.10.10.1`)
+2. Ping `8.8.8.8`
+3. `curl -I https://google.com`
+4. `tailscale status`
+5. Verify LAN communication between nodes
 
-Verify:
-
-* Apollo returns online
-* Athena autostarts
-* Hestia autostarts
-* Services recover successfully
+Following this sequence isolates bridge, routing, DNS, internet, firewall, and Tailscale issues efficiently.
 
 ---
 
-## Router Outage Recovery
+## Cold Start Procedure
 
-Expected behavior:
+If the entire lab is powered down:
 
-Tailscale automatically re-establishes mesh connectivity once internet access returns.
-
-Manual intervention is typically unnecessary.
+1. Boot Apollo.
+2. Verify `vmbr0`.
+3. Verify NAT and forwarding.
+4. Start Athena.
+5. Start Hestia.
+6. Verify Homepage.
+7. Verify Vaultwarden.
+8. Verify Kubernetes.
+9. Verify monitoring stack.
 
 ---
 
-# Health Verification Checklist
+# Health Checklist
 
 ## Infrastructure
 
-* [ ] Apollo reachable
-* [ ] Athena reachable
-* [ ] Hestia reachable
-* [ ] Tailscale operational
-* [ ] NAT functioning
+- [ ] Apollo operational
+- [ ] Athena operational
+- [ ] Hestia operational
+- [ ] Tailscale connected
+- [ ] NAT functioning
 
----
+## Observability
 
-## Monitoring
+- [ ] Grafana
+- [ ] Prometheus
+- [ ] Loki
+- [ ] Grafana Alloy
+- [ ] Metrics collecting
+- [ ] Logs collecting
+- [ ] Alerting operational
 
-* [ ] Grafana operational
-* [ ] Prometheus operational
-* [ ] Loki operational
-* [ ] Alloy operational
-* [ ] Metrics available
-* [ ] Logs available
+## Applications
 
----
+- [ ] Homepage available
+- [ ] Vaultwarden available
+- [ ] Dashboard API responding
+- [ ] Dashboard widgets updating
 
-## Dashboard Services
+## Kubernetes
 
-* [ ] Dashboard API responding
-* [ ] Widgets updating
-* [ ] Synchronization jobs functioning
+- [ ] Cluster Ready
+- [ ] Pods healthy
+- [ ] Services reachable
 
----
+## Infrastructure as Code
 
-## Alerting
-
-* [ ] Telegram notifications operational
-
----
-
-## Development
-
-* [ ] Floci operational
-* [ ] Terraform validation successful
-
----
-
-## Core Services
-
-* [ ] Homepage accessible
-* [ ] Vaultwarden accessible
+- [ ] Terraform validation successful
+- [ ] Floci operational
 
 ---
 
 # Useful Commands
 
-General Resource Usage:
+System:
 
 ```bash
 uptime
@@ -662,35 +351,45 @@ df -h
 htop
 ```
 
-Tailscale Status:
-
-```bash
-tailscale status
-```
-
-Docker Status:
+Docker:
 
 ```bash
 docker ps
+docker logs <container>
+docker compose ps
+```
+
+Kubernetes:
+
+```bash
+kubectl get nodes
+kubectl get pods -A
+kubectl get svc -A
+```
+
+Networking:
+
+```bash
+tailscale status
+ping
+ip addr
+iptables -t nat -L -v
 ```
 
 ---
 
 # Related Documentation
 
-* architecture.md
-* inventory.md
-* network.md
-* troubleshooting.md
-* disaster-recovery.md
-* validation-report.md
+- architecture.md
+- network.md
+- inventory.md
+- troubleshooting.md
+- disaster-recovery.md
 
 ---
 
-# Current Operational Status
+# Current Status
 
-**Environment State:** Stable Operational Environment
+**Environment:** Stable Operational Environment
 
-**Operational Readiness:** Validated
-
-**Documentation Status:** Current
+The Olympus HomeLab is operating with validated networking, centralized observability, Kubernetes, Infrastructure as Code workflows, and secure remote administration. Routine operations, maintenance procedures, and recovery workflows are documented to support consistent day-to-day management.

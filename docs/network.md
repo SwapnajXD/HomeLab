@@ -2,24 +2,24 @@
 
 ## Overview
 
-The Olympus HomeLab network follows a **private-by-default** architecture designed to provide secure remote administration, reliable internal communication, and minimal external exposure.
+The Olympus HomeLab network follows a **private-by-default** architecture designed to provide secure remote administration, reliable inter-node communication, and minimal external exposure.
 
-All infrastructure services operate within the internal network and are accessed remotely through Tailscale. No intentional public-facing services are exposed directly to the Internet.
+All infrastructure services operate on an isolated internal network, with administrative access secured through a Tailscale mesh. Only explicitly approved services are reachable through Apollo's controlled routing.
 
 ### Design Goals
 
-* Security
-* Simplicity
-* Reliability
-* Remote Accessibility
-* Operational Independence
-* Segmentation of Sensitive Services
+- Private-by-default networking
+- Secure remote administration
+- Reliable internal communication
+- Minimal external exposure
+- Service isolation
+- Operational resilience
 
 ---
 
-## Network Topology
+# Network Topology
 
-### Physical Topology
+## Physical Topology
 
 ```text
 Internet
@@ -30,209 +30,170 @@ Airtel Fiber Router
     ▼
 Apollo (Proxmox VE)
     │
-    ├── VM 100: Athena
-    │
-    └── CT 101: Hestia
+    ├── Athena (Ubuntu VM)
+    └── Hestia (Alpine LXC)
 ```
 
 ---
 
-### Logical Topology
+## Logical Topology
 
 ```text
 Artemis (Admin Workstation)
         │
         ▼
-Tailscale Network
+Tailscale Mesh
         │
         ▼
-Apollo (100.81.86.51)
+Apollo (Gateway)
         │
-        ├── Athena (100.117.35.70)
-        │
-        └── Hestia (Internal Only)
+        ├── Athena
+        └── Hestia (LAN Only)
 ```
 
 ---
 
-### Complete Infrastructure Flow
+## Infrastructure Flow
 
 ```text
-Artemis (Management Workstation)
-Tailscale: 100.100.252.87
+Artemis
+TS: 100.100.252.87
         │
-        │ Encrypted WireGuard Tunnel
+        │ WireGuard Tunnel
         ▼
-Apollo (Proxmox Hypervisor)
-LAN:       10.10.10.1
-Tailscale: 100.81.86.51
+Apollo
+LAN: 10.10.10.1
+TS : 100.81.86.51
         │
-        ├──────────── vmbr0 ────────────┐
-        │                               │
-        ▼                               ▼
-Athena (VM 100)                  Hestia (CT 101)
-LAN: 10.10.10.10                 LAN: 10.10.10.2
-TS:  100.117.35.70               Tailscale: None
+        ├──────── vmbr0 ────────┐
+        │                       │
+        ▼                       ▼
+Athena                  Hestia
+LAN: 10.10.10.10        LAN: 10.10.10.2
+TS : 100.117.35.70      TS: None
 
-Services:                         Services:
-• Grafana                         • Homepage
-• Prometheus                      • Vaultwarden
+Services:               Services:
+• Grafana               • Homepage
+• Prometheus            • Vaultwarden
 • Loki
 • Grafana Alloy
+• K3s
+• Dashboard API
 • Portainer
-• Olympus API
 • Floci
 ```
 
 ---
 
-## Network Inventory
+# Network Inventory
 
-| Node    | Type               | LAN Address   | Tailscale Address | Role                   |
-| ------- | ------------------ | ------------- | ----------------- | ---------------------- |
-| Artemis | Arch Linux Laptop  | Dynamic       | `100.100.252.87`  | Administration         |
-| Apollo  | Proxmox Hypervisor | `10.10.10.1`  | `100.81.86.51`    | Compute and Routing    |
-| Athena  | Ubuntu VM          | `10.10.10.10` | `100.117.35.70`   | Observability Platform |
-| Hestia  | Alpine LXC         | `10.10.10.2`  | None              | Application Services   |
+| Node | Type | LAN Address | Tailscale | Role |
+|------|-------------|-------------|------------|---------------------------|
+| Artemis | Physical Workstation | Dynamic | `100.100.252.87` | Administration |
+| Apollo | Proxmox Hypervisor | `10.10.10.1` | `100.81.86.51` | Compute & Gateway |
+| Athena | Ubuntu VM | `10.10.10.10` | `100.117.35.70` | Operations & K3s |
+| Hestia | Alpine LXC | `10.10.10.2` | None | Frontend Services |
 
 ---
 
-## Virtual Networking
+# Virtual Networking
 
-Proxmox virtual networking is built on Linux bridges.
-
-### Primary Bridge
-
-```text
-vmbr0
-```
+The internal network is built on Proxmox's **vmbr0** bridge.
 
 ### Responsibilities
 
-* VM Connectivity
-* LXC Connectivity
-* Internal Service Communication
-* External Network Access
+- VM connectivity
+- LXC connectivity
+- Internal service communication
+- Internet access through Apollo
+- Kubernetes communication
 
-### Connected Systems
-
-* Apollo
-* Athena
-* Hestia
+All virtual workloads communicate over the `10.10.10.0/24` subnet.
 
 ---
 
-## Remote Access Design
+# Remote Access
 
-Remote administration is implemented using Tailscale.
+Remote administration is provided through a Tailscale mesh.
 
-### Connected Nodes
+## Connected Nodes
 
-* Artemis
-* Apollo
-* Athena
+- Artemis
+- Apollo
+- Athena
 
 ### Benefits
 
-* End-to-End Encryption
-* Device Authentication
-* WireGuard Transport
-* No Public SSH Exposure
-* Simplified Administration
-* Reduced Attack Surface
+- End-to-end WireGuard encryption
+- Device authentication
+- No public SSH exposure
+- Secure Proxmox administration
+- Remote infrastructure management
+
+Hestia is intentionally excluded from the Tailscale network to reduce the attack surface for user-facing applications.
 
 ---
 
-## Security Model
+# NAT & Traffic Routing
 
-### Default Posture
+Apollo functions as the network gateway for the homelab.
 
-Private by Default.
+## Outbound NAT
 
-### Characteristics
+Internal systems access the internet through a persistent MASQUERADE rule.
 
-* No intentional Internet-facing services
-* Internal service communication
-* Tailscale-based administration
-* Segmented application workloads
-* Controlled access paths
-
----
-
-### Hestia Isolation Strategy
-
-Hestia intentionally does not participate in the Tailscale mesh.
-
-This design protects sensitive services such as Vaultwarden by restricting access to trusted internal routes managed through Apollo.
-
-Benefits include:
-
-* Reduced exposure
-* Limited attack surface
-* Separation of administrative and user workloads
-
----
-
-## NAT and Traffic Routing
-
-Apollo serves as the network gateway between Tailscale and isolated internal workloads.
-
-### Inbound Service Forwarding
-
-Apollo forwards approved Tailscale traffic to Hestia.
-
-#### Homepage
-
-```bash
-iptables -t nat -A PREROUTING \
-    -d 100.81.86.51 \
-    -p tcp --dport 3000 \
-    -j DNAT --to-destination 10.10.10.2:3000
-
-iptables -t nat -A POSTROUTING \
-    -d 10.10.10.2 \
-    -p tcp --dport 3000 \
-    -j MASQUERADE
+```text
+10.10.10.0/24
+        │
+        ▼
+Apollo
+        │
+        ▼
+Internet
 ```
 
----
+This enables:
 
-#### Vaultwarden
-
-```bash
-iptables -t nat -A PREROUTING \
-    -d 100.81.86.51 \
-    -p tcp --dport 8080 \
-    -j DNAT --to-destination 10.10.10.2:8080
-
-iptables -t nat -A POSTROUTING \
-    -d 10.10.10.2 \
-    -p tcp --dport 8080 \
-    -j MASQUERADE
-```
+- Package updates
+- External API access
+- Container image downloads
+- General internet connectivity
 
 ---
 
-### Outbound NAT
+## Inbound Port Forwarding
 
-Apollo provides Internet access for isolated internal workloads.
+Only approved services are forwarded to the internal network.
 
-```bash
-iptables -t nat -A POSTROUTING \
-    -s 10.10.10.0/24 \
-    -o wlx002e2df0393b \
-    -j MASQUERADE
-```
+| External | Internal |
+|----------|----------|
+| Apollo:3000 | Hestia:3000 (Homepage) |
+| Apollo:8080 | Hestia:8080 (Vaultwarden) |
 
-Purpose:
+Vaultwarden requires HTTPS at the application layer and will reject plain HTTP connections.
 
-* API Access
-* Package Downloads
-* External Service Integration
+Persistent `iptables` rules ensure forwarding survives host reboots.
 
 ---
 
-## Metrics Traffic Flow
+# Kubernetes Networking
+
+Athena hosts a single-node K3s cluster.
+
+## Networking Characteristics
+
+- API Server: **6443**
+- NodePort services for testing workloads
+- Internal LAN communication
+- Certificate SANs bound to Athena's LAN IP
+
+Remote `kubectl` access must use Athena's LAN address (`10.10.10.10`) because the cluster certificates are issued for the LAN interface rather than the Tailscale address.
+
+---
+
+# Network Traffic
+
+## Metrics
 
 ```text
 Node Exporter
@@ -242,288 +203,115 @@ Prometheus
         │
         ▼
 Grafana
-
-Proxmox Exporter
-        │
-        ▼
-Prometheus
 ```
 
-### Purpose
-
-* Host Monitoring
-* Capacity Planning
-* Performance Visibility
+Collects infrastructure metrics from hosts and services.
 
 ---
 
-## Logging Traffic Flow
+## Logging
 
 ```text
-Docker Containers
-        │
-        ▼
+Containers
+      │
+      ▼
 Grafana Alloy
-        │
-        ▼
+      │
+      ▼
 Loki
-        │
-        ▼
+      │
+      ▼
 Grafana
 ```
 
-### Purpose
-
-* Centralized Logging
-* Troubleshooting
-* Historical Analysis
-* Log Search
+Provides centralized log collection and historical analysis.
 
 ---
 
-## Alerting Traffic Flow
+## Alerting
 
 ```text
 Prometheus
-        │
-        ▼
+      │
+      ▼
 Grafana Alerting
-        │
-        ▼
+      │
+      ▼
 Telegram
 ```
 
-### Purpose
-
-* Incident Notification
-* Infrastructure Awareness
-* Service Monitoring
+Monitors infrastructure health and service availability.
 
 ---
 
-## Automation Traffic Flow
-
-Homepage data is generated on Hestia and synchronized to Athena.
+## Dashboard Data Flow
 
 ```text
-Hestia Cron Jobs
+External APIs
         │
         ▼
-Generate JSON Assets
+Collection Scripts
         │
         ▼
-Secure SCP Transfer
+Dashboard API (Athena)
         │
         ▼
-Athena Data Directory
-        │
-        ▼
-Olympus Dashboard API
-        │
-        ▼
-Homepage Widgets
+Homepage (Hestia)
 ```
 
-### Characteristics
-
-* SSH Transport
-* Ed25519 Authentication
-* Five-Minute Synchronization Interval
+The Dashboard API acts as the single source of truth, separating backend data collection from frontend presentation.
 
 ---
 
-## Network Validation
+# Connectivity Validation
 
-The following checks are performed during routine validation.
+Routine network validation follows a fixed troubleshooting sequence.
 
-### Connectivity Validation
+| Step | Validation |
+|------|------------|
+| 1 | Ping Apollo (`10.10.10.1`) |
+| 2 | Ping `8.8.8.8` |
+| 3 | `curl -I https://google.com` |
+| 4 | `tailscale status` |
+| 5 | Verify LAN connectivity between nodes |
 
-```bash
-ping <target>
-```
-
-Expected:
-
-```text
-Successful response
-```
+This progression quickly isolates failures involving local networking, internet connectivity, DNS, Tailscale, or internal routing.
 
 ---
 
-### Tailscale Validation
+# Security Model
 
-```bash
-tailscale status
-```
+The network follows a defense-in-depth approach.
 
-Expected:
+## Principles
 
-```text
-All nodes connected
-```
-
----
-
-### Bridge Validation
-
-```bash
-brctl show
-```
-
-or
-
-```bash
-bridge link
-```
-
-Expected:
-
-```text
-vmbr0 present and operational
-```
+- Private-by-default networking
+- No unnecessary public exposure
+- Device-authenticated administration
+- Encrypted WireGuard tunnels
+- Internal service communication
+- Controlled ingress through Apollo
+- Reduced attack surface through workload isolation
 
 ---
 
-### NAT Validation
+# Operational Status
 
-```bash
-iptables -t nat -L -n -v
-```
-
-Expected:
-
-```text
-Required forwarding rules present
-```
-
----
-
-### Service Reachability
-
-Verify access to:
-
-* Grafana
-* Prometheus
-* Loki
-* Homepage
-* Vaultwarden
-
-Expected:
-
-```text
-PASS
-```
+| Component | Status |
+|----------|--------|
+| vmbr0 Bridge | Operational |
+| Internal Networking | Operational |
+| Tailscale Mesh | Operational |
+| Remote Administration | Operational |
+| Outbound NAT | Persistent |
+| Port Forwarding | Operational |
+| Kubernetes Networking | Operational |
+| Metrics Pipeline | Operational |
+| Logging Pipeline | Operational |
+| Alerting Pipeline | Operational |
 
 ---
 
-## Major Network Incident
+# Current State
 
-### Proxmox Network Isolation Incident
-
-#### Symptoms
-
-* VM connectivity failures
-* Internal communication failures
-* Missing bridge connectivity
-
----
-
-#### Investigation
-
-Commands used:
-
-```bash
-brctl show
-bridge link
-cat /etc/network/interfaces
-```
-
----
-
-#### Root Cause
-
-Incomplete bridge configuration prevented virtual interfaces from attaching correctly to `vmbr0`.
-
----
-
-#### Resolution
-
-Validated and rebuilt:
-
-* vmbr0
-* VM networking
-* LXC networking
-
----
-
-#### Verification
-
-Confirmed:
-
-* Host Communication
-* VM Communication
-* Container Communication
-* Internet Connectivity
-
-Infrastructure networking was successfully restored.
-
----
-
-## Future Improvements
-
-### Security
-
-Planned improvements:
-
-* Tailscale ACLs
-* Device Tagging
-* Access Segmentation
-
----
-
-### Monitoring
-
-Planned improvements:
-
-* Network Latency Tracking
-* Uptime Monitoring
-* Service-Level Monitoring
-
----
-
-### Hardware
-
-Planned improvements:
-
-* 5-meter CAT6 Ethernet Cable
-
-Expected benefits:
-
-* Lower Latency
-* Improved Stability
-* Consistent Throughput
-* Reduced Wi-Fi Dependency
-
----
-
-## Operational Status
-
-| Component                  | Status      |
-| -------------------------- | ----------- |
-| vmbr0                      | Operational |
-| Internal Networking        | Operational |
-| VM Connectivity            | Operational |
-| LXC Connectivity           | Operational |
-| Tailscale                  | Operational |
-| Remote Administration      | Operational |
-| NAT Rules                  | Operational |
-| Metrics Traffic            | Operational |
-| Logging Traffic            | Operational |
-| Alerting Traffic           | Operational |
-| Automation Synchronization | Operational |
-
----
-
-## Conclusion
-
-The Olympus HomeLab network architecture provides secure, remotely accessible, and resilient connectivity through a private-by-default design. Tailscale enables encrypted administration without exposing management interfaces to the Internet, while Apollo enforces segmentation and controlled routing between workloads. This approach balances operational simplicity with strong security practices and supports future growth of the homelab environment.
+The Olympus HomeLab network provides a secure, resilient, and production-inspired foundation for infrastructure experimentation. Apollo acts as the central gateway, enforcing routing and network isolation, while Tailscale enables encrypted remote administration without exposing management interfaces to the public internet. The architecture supports observability, Kubernetes, and self-hosted applications while maintaining a minimal attack surface and operational simplicity.

@@ -1,722 +1,360 @@
-# Troubleshooting Guide
+# Troubleshooting Guide & Incident Log
 
 ## Purpose
 
-This document records significant incidents encountered during the design, deployment, operation, and evolution of the Olympus HomeLab environment.
+This document serves as the operational knowledge base for the Olympus HomeLab.
 
-Each incident includes an overview, symptoms, investigation, root cause analysis, resolution, verification, impact, and lessons learned. The objective is to preserve operational knowledge, reduce future recovery time, document engineering decisions, and maintain a historical record of infrastructure changes.
-
----
-
-## Incident Summary
-
-| Incident                                                   | Severity | Status    |
-| ---------------------------------------------------------- | -------- | --------- |
-| Permission Denied During Infrastructure Refactoring        | Low      | Resolved  |
-| Docker Container Name Conflicts During Stack Consolidation | Low      | Resolved  |
-| VM and LXC Autostart Failure                               | Medium   | Resolved  |
-| Apollo Network Outage and NAT Recovery                     | High     | Resolved  |
-| Stale `vmbr1` Bridge Configuration                         | Low      | Resolved  |
-| Loki Centralized Logging Integration                       | Low      | Completed |
-| Loki Readiness Endpoint Investigation                      | Medium   | Resolved  |
-| Homepage Weather Widget Failure                            | Low      | Resolved  |
-| Cross-Node Synchronization Failure                         | Medium   | Resolved  |
-| AWS Emulation and Terraform Validation                     | Low      | Completed |
-| Telegram Alerting Validation                               | Low      | Completed |
-| Headless Operations Validation                             | Low      | Completed |
-| Chaos Reboot Recovery Testing                              | Medium   | Completed |
+It records significant incidents, root cause analyses (RCA), verified resolutions, and lessons learned to reduce future recovery time and improve infrastructure reliability.
 
 ---
 
-# 1. Permission Denied During Infrastructure Refactoring
+# Incident Summary
 
-## Overview
-
-During consolidation of multiple Docker Compose projects into a unified infrastructure layout, several directories could not be modified within the homelab workspace.
-
-## Symptoms
-
-* `Permission denied` errors
-* Failed directory creation
-* Failed file moves
-* Repository restructuring blocked
-
-## Investigation
-
-```bash
-ls -la
-```
-
-Several directories were owned by `root` instead of the intended user account.
-
-## Root Cause
-
-Previous Docker operations executed using `sudo` created root-owned directories.
-
-## Resolution
-
-```bash
-sudo chown -R ubuntu:ubuntu ~/homelab
-```
-
-## Verification
-
-* Directory creation successful
-* Git operations successful
-* File modifications successful
-
-## Impact
-
-* Temporary repository restructuring delay
-* No service outage
-* No data loss
-
-## Lessons Learned
-
-Avoid unnecessary use of `sudo` during routine Docker operations.
+| Incident | Severity | Status |
+|----------|----------|--------|
+| VM & LXC Autostart Failure | Medium | Resolved |
+| Apollo NAT Gateway Failure | High | Resolved |
+| Athena "Offline" Investigation | High | Resolved |
+| K3s Pods Stuck in `ContainerCreating` | High | Resolved |
+| Remote kubectl TLS Failure | Medium | Resolved |
+| Namespace Visibility Confusion | Low | Resolved |
+| Dashboard JSON Corruption | Medium | Resolved |
+| Wallpaper 404 Errors | Low | Resolved |
+| Cron Job Overlap | Low | Resolved |
+| Vaultwarden HTTPS Mismatch | Low | Resolved |
 
 ---
 
-# 2. Docker Container Name Conflicts During Stack Consolidation
+# Infrastructure Incidents
 
-## Overview
+## VM & LXC Autostart Failure
 
-While consolidating monitoring services into a unified telemetry stack, Docker failed to create containers due to naming conflicts.
-
-## Symptoms
-
-Conflicts occurred for:
-
-* grafana
-* prometheus
-* loki
-* promtail
-* node-exporter
-
-## Investigation
-
-```bash
-docker ps -a
-```
-
-Legacy containers remained registered.
-
-## Root Cause
-
-Existing containers were not removed before deploying the new stack.
-
-## Resolution
-
-```bash
-docker rm -f grafana prometheus promtail node-exporter loki
-docker compose up -d
-```
-
-## Verification
-
-All telemetry containers started successfully.
-
-## Impact
-
-* Deployment temporarily blocked
-* No data loss
-
-## Lessons Learned
-
-Always decommission legacy stacks before migrations.
-
----
-
-# 3. VM and LXC Autostart Failure
-
-## Overview
-
-A planned reboot revealed critical workloads were not configured to start automatically.
-
-## Symptoms
+### Symptoms
 
 After reboot:
 
-* Athena offline
-* Hestia offline
-* Services unavailable
+- Athena remained offline
+- Hestia remained offline
+- Core services unavailable
 
-## Investigation
+### Root Cause
 
-Reviewed Proxmox startup settings.
+Proxmox **Start at Boot** was disabled for:
 
-## Root Cause
+- VM 100 (Athena)
+- CT 101 (Hestia)
 
-**Start at Boot** was disabled for:
+### Resolution
 
-* VM 100 (Athena)
-* CT 101 (Hestia)
+Enabled automatic startup for both workloads and validated recovery through reboot testing.
 
-## Resolution
+### Lessons Learned
 
-Enabled autostart for both workloads.
-
-## Verification
-
-Subsequent reboots restored services automatically.
-
-## Impact
-
-Temporary service outage after host reboot.
-
-## Lessons Learned
-
-Validate autostart configuration during infrastructure testing.
+Always verify autostart settings after provisioning new virtual workloads.
 
 ---
 
-# 4. Apollo Network Outage and NAT Recovery
+## K3s Pods Stuck in `ContainerCreating`
 
-## Severity
+### Symptoms
 
-**High**
-
-## Overview
-
-Following a scheduled reboot of Apollo, all virtual workloads lost Internet access and remote administration capabilities.
-
-This became the most significant networking incident experienced within the homelab environment.
-
-## Symptoms
-
-* Athena reported disconnected Tailscale status
-* `ping 8.8.8.8` failed
-* DNS resolution failures
-* SSH sessions hung indefinitely
-* Remote administration unavailable
-* Internal workloads could not reach external networks
-
-## Investigation Timeline
-
-### Application Validation
-
-Verified application health locally:
-
-```bash
-curl http://localhost:8000
-```
-
-Result:
-
-* Olympus API functioning correctly
-* Applications healthy
-
----
-
-### Virtual Network Validation
-
-Examined:
-
-```bash
-brctl show
-bridge link
-```
-
-Verified:
-
-* `vmbr0` operational
-* Apollo: `10.10.10.1`
-* Athena: `10.10.10.10`
-* Hestia: `10.10.10.2`
-
----
-
-### Failure Isolation
-
-Determined that:
-
-* Athena could communicate with Apollo
-* Internal networking remained functional
-* External traffic failed at Apollo
-
-## Root Cause Analysis
-
-Apollo relied on a dynamically added outbound NAT rule that was not persisted across reboots.
-
-After restart, the MASQUERADE rule disappeared from the kernel packet processing tables.
-
-As a result, traffic originating from the internal subnet (`10.10.10.0/24`) could not be translated through the physical network interface.
-
-## Resolution
-
-Restored outbound NAT:
-
-```bash
-iptables -t nat -A POSTROUTING \
-    -s 10.10.10.0/24 \
-    -o wlx002e2df0393b \
-    -j MASQUERADE
-```
-
-## Verification
-
-Confirmed recovery of:
-
-* Tailscale synchronization
-* DNS resolution
-* Internet connectivity
-* SSH access
-* API reachability
-
-## Impact
-
-* Complete loss of remote administration
-* External service disruption
-* Temporary observability degradation
-
-## Lessons Learned
-
-* Critical networking rules must persist across reboots.
-* Gateway systems represent high-value failure domains.
-* Validate outbound routing after maintenance activities.
-
----
-
-# 5. Stale vmbr1 Bridge Configuration
-
-## Overview
-
-An unused bridge interface was discovered during network auditing.
-
-## Symptoms
-
-`vmbr1` existed without attached workloads.
-
-## Investigation
-
-Reviewed Proxmox network configuration.
-
-## Root Cause
-
-Legacy bridge from earlier experimentation.
-
-## Resolution
-
-Removed `vmbr1` and standardized networking on `vmbr0`.
-
-## Verification
-
-Infrastructure inventory matched deployed architecture.
-
-## Impact
-
-No service outage.
-
-## Lessons Learned
-
-Remove obsolete infrastructure components after testing.
-
----
-
-# 6. Loki Centralized Logging Integration
-
-## Overview
-
-Container logs were initially distributed across multiple hosts without aggregation.
-
-## Architecture
+Pods never progressed beyond:
 
 ```text
-Docker Containers
-        │
-        ▼
-Grafana Alloy
-        │
-        ▼
-Loki
-        │
-        ▼
-Grafana Explore
+ContainerCreating
 ```
 
-## Symptoms
+### Root Cause
 
-* No centralized log access
-* Difficult troubleshooting
-* Limited historical visibility
+Ubuntu was using legacy **cgroup v1**, which conflicted with modern K3s/containerd requirements.
 
-## Root Cause
+### Resolution
 
-Containers only stored local logs.
-
-## Resolution
-
-Implemented:
-
-* Loki
-* Grafana Alloy
-* Centralized forwarding
-
-## Verification
-
-Grafana Explore query:
+Enabled cgroup v2 by updating GRUB:
 
 ```text
-{container="vaultwarden"}
+systemd.unified_cgroup_hierarchy=1
 ```
 
-returned expected logs.
+Rebooted Athena and verified normal pod scheduling.
 
-## Impact
+### Lessons Learned
 
-Significantly improved troubleshooting capability.
-
-## Lessons Learned
-
-Centralized logging should be implemented early.
+Modern Kubernetes distributions expect cgroup v2. Validate kernel configuration before deployment.
 
 ---
 
-# 7. Loki Readiness Endpoint Investigation
+# Networking Incidents
 
-## Overview
+## Apollo NAT Gateway Failure
 
-Loki appeared unhealthy despite functioning correctly.
+**Severity:** High
 
-## Symptoms
+### Symptoms
 
-* Health checks failed
-* Readiness probes unstable
+- No internet access from Athena or Hestia
+- DNS failures
+- Tailscale disconnected
+- SSH unavailable
+- External APIs unreachable
 
-## Investigation
+### Investigation
 
-```bash
-curl -I http://localhost:3100/ready
-docker logs loki
-```
+Confirmed:
 
-Observed:
+- Internal networking operational
+- `vmbr0` healthy
+- Athena reachable from Apollo
+- Failure occurred at the gateway
 
-* Distributor ACTIVE
-* Ingester ACTIVE
-* Scheduler ACTIVE
-* Compactor ACTIVE
+### Root Cause
 
-## Root Cause
+Apollo relied on a temporary outbound MASQUERADE rule that disappeared after reboot.
 
-Default clustering assumptions conflicted with single-node deployment.
+### Resolution
 
-## Resolution
+Restored persistent NAT rules and documented verification procedures in the network architecture and operations runbook.
 
-Configured Loki for standalone operation:
+### Lessons Learned
 
-```yaml
-replication_factor: 1
-kvstore:
-  store: inmemory
-```
+Gateway configuration must persist across reboots. Always validate routing after maintenance.
 
-## Verification
+---
 
-```bash
-curl -I http://localhost:3100/ready
-```
+## Athena "Offline" Investigation
 
-Returned:
+### Symptoms
+
+Athena appeared offline from Artemis.
+
+- SSH unavailable
+- Tailscale disconnected
+- Dashboard unreachable
+
+### Investigation
+
+Local console access showed:
+
+- VM healthy
+- Internal networking functional
+- External HTTPS requests failed
+
+### Root Cause
+
+Temporary upstream ISP outage.
+
+Tailscale loss was a downstream symptom rather than the primary failure.
+
+### Resolution
+
+Created the **Connectivity Ladder** troubleshooting process to distinguish local failures from upstream connectivity issues.
+
+### Lessons Learned
+
+Always isolate local networking before investigating higher-level services.
+
+---
+
+## Vaultwarden HTTPS Mismatch
+
+### Symptoms
+
+Homepage worked correctly, but Vaultwarden returned:
 
 ```text
-HTTP/1.1 200 OK
+400 Bad Request
 ```
 
-## Impact
+### Root Cause
 
-False-positive health failures.
+HTTP requests were sent to a service configured for HTTPS only.
 
-## Lessons Learned
+### Resolution
 
-Validate health checks against deployment architecture.
+Access Vaultwarden using HTTPS.
+
+Networking and port forwarding required no changes.
+
+### Lessons Learned
+
+Application-layer protocol mismatches can resemble network failures.
 
 ---
 
-# 8. Homepage Weather Widget Failure
+# Kubernetes Incidents
 
-## Overview
+## Remote kubectl TLS Failure
 
-Homepage weather widgets began failing intermittently.
+### Symptoms
 
-## Symptoms
+`kubectl` returned certificate validation errors from Artemis.
 
-* Widget failures
-* `ECONNRESET`
-* Unexpected EOF errors
-* Missing weather information
+### Root Cause
 
-## Investigation
+The K3s API certificate SANs were issued for Athena's LAN IP rather than its Tailscale address.
 
-Network tracing identified intermittent TLS failures with Open-Meteo.
+### Resolution
 
-Stable connectivity existed to other external services.
-
-## Root Cause
-
-Unreliable upstream TLS handshakes with the weather provider.
-
-## Resolution
-
-Replaced the native Homepage widget with a custom solution:
-
-* Queried `wttr.in`
-* Processed responses locally
-* Generated structured JSON assets
-* Served data through the existing dashboard pipeline
-
-## Verification
-
-Weather widgets rendered consistently.
-
-## Impact
-
-Temporary dashboard degradation.
-
-## Lessons Learned
-
-Critical dashboards should tolerate external API instability.
-
----
-
-# 9. Cross-Node Synchronization Failure
-
-## Overview
-
-Automation pipelines initially failed to synchronize data between Hestia and Athena.
-
-## Symptoms
-
-* Connection refused errors
-* Failed SCP transfers
-* Missing Homepage data updates
-
-## Investigation
-
-Verified network connectivity and authentication paths.
-
-## Root Cause
-
-Alpine Linux containers do not enable SSH services by default.
-
-Hestia lacked an operational SSH daemon.
-
-## Resolution
-
-Enabled SSH services:
-
-```bash
-apk add openssh
-ssh-keygen -A
-rc-service sshd start
-```
-
-Configured passwordless Ed25519 authentication.
-
-## Verification
-
-* SCP successful
-* Automated synchronization operational
-* Dashboard data updated correctly
-
-## Impact
-
-Automation pipeline interruption.
-
-## Lessons Learned
-
-Minimal operating systems require explicit enablement of supporting services.
-
----
-
-# 10. AWS Emulation and Terraform Validation
-
-## Overview
-
-Validated Infrastructure as Code workflows using AWS emulation.
-
-## Objective
-
-Verify Terraform provisioning workflows.
-
-## Resolution
-
-Successfully provisioned:
-
-* `tf-homelab-storage-bucket`
-* `tf-homelab-metadata`
-
-using:
-
-```bash
-terraform apply
-```
-
-## Verification
-
-```bash
-aws --endpoint-url=http://localhost:4566 s3 ls
-aws --endpoint-url=http://localhost:4566 dynamodb list-tables
-```
-
-Resources created successfully.
-
-## Impact
-
-Established reproducible IaC workflows.
-
-## Lessons Learned
-
-Infrastructure should be reproducible through code.
-
----
-
-# 11. Telegram Alerting Validation
-
-## Overview
-
-Validated Grafana alert delivery.
-
-## Alert Flow
+Updated kubeconfig to connect using:
 
 ```text
-Prometheus
-        │
-        ▼
-Grafana Alerting
-        │
-        ▼
-Telegram
+10.10.10.10:6443
 ```
 
-## Verification
+### Lessons Learned
 
-Triggered test alerts through Grafana Contact Points.
-
-Telegram notifications received successfully.
-
-## Result
-
-**PASS**
-
-## Lessons Learned
-
-Alerting systems require routine validation.
+Certificate SANs must match the endpoint used for cluster administration.
 
 ---
 
-# 12. Headless Operations Validation
+## Namespace Visibility Confusion
 
-## Overview
+### Symptoms
 
-Validated complete remote administration capability.
+Resources appeared missing when queried remotely.
 
-## Procedure
+### Root Cause
 
-Disconnected:
+Workloads were deployed into `artemis-lab` while commands were executed in the default namespace.
 
-* Monitor
-* Keyboard
-* Mouse
+### Resolution
 
-## Verification
+Standardized all learning workloads inside:
 
-Successfully administered infrastructure using:
-
-* Tailscale
-* SSH
-* Grafana
-* Portainer
-* Homepage
-
-## Result
-
-**PASS**
-
-## Impact
-
-Confirmed remote-only operational capability.
-
-## Lessons Learned
-
-Routine administration should not require physical access.
-
----
-
-# 13. Chaos Reboot Recovery Testing
-
-## Overview
-
-Validated automatic recovery after complete infrastructure reboot.
-
-## Procedure
-
-Rebooted Apollo and monitored:
-
-* Hypervisor startup
-* VM startup
-* Container startup
-* Network restoration
-* Service recovery
-
-## Verification
-
-Automatically recovered:
-
-* Athena
-* Hestia
-* Grafana
-* Prometheus
-* Loki
-* Homepage
-* Vaultwarden
-* Portainer
-* Floci
-
-Verified using:
-
-```bash
-tailscale ping
+```text
+artemis-lab
 ```
 
-and service accessibility checks.
+Updated the default kubectl context.
 
-## Result
+### Lessons Learned
 
-**PASS**
-
-## Impact
-
-Validated disaster recovery readiness.
-
-## Lessons Learned
-
-Recovery testing is as important as deployment testing.
+Use dedicated namespaces consistently during development.
 
 ---
 
-## Key Takeaways
+# Dashboard Incidents
 
-1. Infrastructure should be reproducible through code.
-2. Monitoring should exist before major workloads are deployed.
-3. Centralized logging dramatically reduces troubleshooting time.
-4. Recovery procedures must be tested regularly.
-5. Documentation is part of the infrastructure.
-6. Critical network rules must persist across reboots.
-7. Remote administration should not require physical access.
-8. Configuration should be version controlled.
-9. Alerting systems should be tested regularly.
-10. Operational knowledge should be preserved through documentation.
+## JSON Corruption
+
+### Symptoms
+
+Homepage widgets displayed:
+
+- Invalid JSON
+- Missing media information
+
+### Root Cause
+
+Manual JSON generation failed when external data contained quotation marks.
+
+### Resolution
+
+Replaced manual string construction with `jq` for all JSON generation.
+
+### Lessons Learned
+
+Always use structured tools for serialization.
 
 ---
 
-## Status
+## Wallpaper 404 Errors
 
-| Item                       | Status    |
-| -------------------------- | --------- |
-| Incident Log               | Current   |
-| Historical Records         | Preserved |
-| Operational Knowledge Base | Active    |
-| Environment Stability      | Stable    |
+### Symptoms
 
-**Overall Environment State: Stable Operational Environment**
+Homepage hero images failed to load.
+
+### Root Cause
+
+Wallpaper URLs referenced the wrong GitHub branch.
+
+### Resolution
+
+Updated the image generation logic to reference the correct repository branch.
+
+### Lessons Learned
+
+Validate external asset paths after repository changes.
+
+---
+
+## Cron Job Overlap
+
+### Symptoms
+
+- Duplicate executions
+- Log spam
+- Race conditions
+- Stale widget data
+
+### Root Cause
+
+Cron jobs could start before previous executions completed.
+
+### Resolution
+
+Added `flock` to all scheduled jobs to prevent concurrent execution.
+
+### Lessons Learned
+
+High-frequency automation should always include concurrency control.
+
+---
+
+# Operational Lessons
+
+## Persistence Matters
+
+Critical infrastructure settings—including NAT rules, VM autostart, and forwarding—must survive reboots.
+
+---
+
+## Validate External Data
+
+Always use structured tools such as `jq` when processing API responses to prevent malformed data.
+
+---
+
+## Isolate Before Escalating
+
+Follow the Connectivity Ladder:
+
+1. Gateway
+2. Internet
+3. DNS / HTTPS
+4. Tailscale
+5. Internal communication
+
+This prevents unnecessary investigation of unrelated systems.
+
+---
+
+## Separate Infrastructure Layers
+
+Many failures initially appeared to be networking problems but originated at different layers:
+
+- ISP connectivity
+- TLS certificates
+- HTTP vs HTTPS
+- Kubernetes namespaces
+
+Identifying the affected layer dramatically reduces troubleshooting time.
+
+---
+
+## Test Recovery Regularly
+
+Recovery procedures should be validated through controlled reboot and failover testing rather than assumed to work.
+
+---
+
+# Current Status
+
+| Item | Status |
+|------|--------|
+| Incident Knowledge Base | Current |
+| Recovery Procedures | Verified |
+| Operational Documentation | Current |
+| Infrastructure Stability | Stable |
+
+**Environment State:** Stable Operational Environment

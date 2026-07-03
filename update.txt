@@ -5039,3 +5039,482 @@ The final decision to return Homepage to its standard configuration reduced oper
 
 * Git repository updated with the latest configurations and documentation from all systems
 * Repository serves as the canonical source of truth for the homelab configuration and history
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Homelab Network Bring-up & Port Forwarding Notes
+
+**Date:** 2026-06-30
+
+## Objective
+
+Configure the Proxmox host (**Apollo**) to:
+
+* Provide internet access to the isolated VM network (`10.10.10.0/24`)
+* Allow VMs to access the internet through Apollo's Wi-Fi interface
+* Forward external connections from Apollo to services running on the Alpine VM (**Hestia**)
+
+---
+
+# Network Topology
+
+```
+Internet
+    │
+192.168.1.1
+    │
+Wi-Fi
+    │
+Apollo (Proxmox)
+192.168.1.20
+10.10.10.1
+    │
+vmbr0
+    │
+──────────────────────────────
+│                            │
+Hestia (Alpine)          Athena (Ubuntu)
+10.10.10.2              10.10.10.10
+```
+
+---
+
+# Initial Problem
+
+The VMs had no internet connectivity.
+
+Symptoms included:
+
+* Unable to reach external hosts
+* `apt`, Docker pulls, etc. failed
+* Default routes existed but packets never reached the internet
+
+---
+
+# Fix #1 — Enable IPv4 Forwarding
+
+Verified:
+
+```bash
+cat /proc/sys/net/ipv4/ip_forward
+```
+
+Result:
+
+```
+1
+```
+
+This confirmed kernel forwarding was enabled.
+
+---
+
+# Fix #2 — Configure Source NAT (MASQUERADE)
+
+Added:
+
+```bash
+iptables -t nat -A POSTROUTING \
+    -s 10.10.10.0/24 \
+    -o wlx002e2df0393b \
+    -j MASQUERADE
+```
+
+Verified with:
+
+```bash
+iptables -t nat -L -n -v
+```
+
+Packets incremented correctly.
+
+VM internet access was restored.
+
+---
+
+# Fix #3 — Verify Routing
+
+Apollo routing table:
+
+```
+default -> 192.168.1.1
+
+10.10.10.0/24 -> vmbr0
+
+192.168.1.0/24 -> Wi-Fi
+```
+
+Athena routing:
+
+```
+default -> 10.10.10.1
+```
+
+Everything routed correctly.
+
+---
+
+# Goal #2 — Forward Homepage
+
+Wanted:
+
+```
+Apollo:3000
+        │
+        ▼
+Hestia:3000
+```
+
+Added DNAT:
+
+```bash
+iptables -t nat -A PREROUTING \
+    -p tcp \
+    --dport 3000 \
+    -j DNAT --to 10.10.10.2:3000
+```
+
+Added return-path MASQUERADE.
+
+Result:
+
+Homepage worked immediately.
+
+Verified by:
+
+```
+curl http://10.10.10.2:3000
+```
+
+which returned the Homepage HTML.
+
+---
+
+# Goal #3 — Forward Vaultwarden
+
+Added:
+
+```bash
+iptables -t nat -A PREROUTING \
+    -p tcp \
+    --dport 8080 \
+    -j DNAT --to 10.10.10.2:8080
+```
+
+Counters increased:
+
+```
+DNAT packets:
+3000 -> increasing
+8080 -> increasing
+```
+
+This proved packets reached Hestia.
+
+---
+
+# Problem
+
+Homepage worked.
+
+Vaultwarden did not.
+
+Using:
+
+```bash
+curl http://10.10.10.2:8080
+```
+
+returned:
+
+```
+Received HTTP/0.9 when not allowed
+```
+
+Even raw TCP:
+
+```
+GET / HTTP/1.1
+```
+
+returned
+
+```
+2
+```
+
+This initially looked like a networking issue.
+
+---
+
+# Network Investigation
+
+Verified:
+
+### Forward chain
+
+```
+ACCEPT
+```
+
+### NAT
+
+DNAT counters increasing.
+
+### Ping
+
+```
+Apollo -> Hestia
+```
+
+worked.
+
+### Curl
+
+```
+Apollo -> Homepage
+```
+
+worked.
+
+### Docker
+
+Confirmed Vaultwarden container:
+
+```
+80 -> host 8080
+```
+
+Everything indicated networking was functioning correctly.
+
+---
+
+# Root Cause Discovery
+
+Inspection showed:
+
+```
+ROCKET_TLS={
+ certs=...
+ key=...
+}
+```
+
+Vaultwarden logs:
+
+```
+Rocket has launched from
+
+https://0.0.0.0:80
+```
+
+This was the critical clue.
+
+Vaultwarden was serving **HTTPS**, not HTTP.
+
+---
+
+# Why It Failed
+
+Apollo forwarded TCP correctly.
+
+However we were testing using
+
+```
+http://10.10.10.2:8080
+```
+
+Vaultwarden expected:
+
+```
+TLS ClientHello
+```
+
+Instead it received:
+
+```
+GET / HTTP/1.1
+```
+
+Vaultwarden logged:
+
+```
+tls handshake failed:
+received corrupt message of type InvalidContentType
+```
+
+This error was entirely due to the client speaking HTTP to an HTTPS endpoint.
+
+---
+
+# Resolution
+
+Changed the client to:
+
+```
+https://apollo:8080
+```
+
+or
+
+```
+curl -k https://10.10.10.2:8080
+```
+
+Vaultwarden immediately loaded successfully.
+
+No networking changes were required.
+
+---
+
+# Final iptables Configuration
+
+Outbound internet:
+
+```
+POSTROUTING
+
+MASQUERADE
+10.10.10.0/24
+→ Wi-Fi interface
+```
+
+Homepage:
+
+```
+PREROUTING
+
+3000
+↓
+
+10.10.10.2:3000
+```
+
+Vaultwarden:
+
+```
+PREROUTING
+
+8080
+↓
+
+10.10.10.2:8080
+```
+
+Return-path NAT:
+
+```
+MASQUERADE
+
+destination 10.10.10.2
+
+ports
+
+3000
+8080
+```
+
+---
+
+# Lessons Learned
+
+1. **Always verify packet counters before assuming NAT is broken.**
+
+   * Increasing DNAT counters proved packets reached Hestia.
+
+2. **A successful TCP connection does not guarantee the application protocol is correct.**
+
+   * TCP connectivity was fine; the issue was HTTP vs HTTPS.
+
+3. **Application logs are invaluable.**
+
+   * The Vaultwarden log (`Rocket has launched from https://0.0.0.0:80`) immediately identified the protocol mismatch.
+
+4. **Validate each network layer independently.**
+
+   * Routing
+   * Forwarding
+   * NAT
+   * Docker port publishing
+   * Application protocol
+
+5. **Don't assume a service on port 80 speaks HTTP.**
+
+   * Vaultwarden was explicitly configured to serve HTTPS on container port 80 via `ROCKET_TLS`.
+
+---
+
+# Final Working State
+
+## Apollo (Proxmox)
+
+* Wi-Fi uplink: **192.168.1.20**
+* Internal bridge: **10.10.10.1**
+* NAT enabled
+* IPv4 forwarding enabled
+* DNAT forwarding configured
+
+## Hestia (Alpine)
+
+* **Homepage:** `http://10.10.10.2:3000`
+* **Vaultwarden:** `https://10.10.10.2:8080`
+
+## Athena (Ubuntu)
+
+* Internet connectivity restored through Apollo's NAT.
+
+---
+
+# Status (2026-06-30)
+
+* ✅ IPv4 forwarding enabled.
+* ✅ Outbound NAT (MASQUERADE) operational.
+* ✅ VM internet access restored.
+* ✅ Port forwarding from Apollo to Hestia configured.
+* ✅ Homepage accessible over **HTTP** on port **3000**.
+* ✅ Vaultwarden accessible over **HTTPS** on port **8080**.
+* ✅ Root cause identified as an **application-layer protocol mismatch (HTTP vs HTTPS)** rather than a networking or firewall issue.

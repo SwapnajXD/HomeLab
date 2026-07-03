@@ -2,42 +2,63 @@
 
 ## Overview
 
-This document records the validation procedures performed against the homelab infrastructure to verify operational stability, service health, network functionality, observability pipelines, automated workflows, and recovery capabilities.
+This document records the formal validation procedures performed against the Olympus HomeLab infrastructure.
 
-Validation is executed after major infrastructure changes, maintenance activities, incident remediation efforts, and platform upgrades to ensure the environment remains production-ready.
+Validation is performed after major infrastructure changes, maintenance windows, recovery testing, and platform upgrades to verify operational stability, networking, observability, automation, Kubernetes functionality, and disaster recovery readiness.
+
+The current report reflects the infrastructure following the June 2026 Kubernetes deployment and Dashboard V2 architecture refactor.
 
 ---
 
 # Environment Under Test
 
-| Component             | Role                              |
-| --------------------- | --------------------------------- |
-| Apollo                | Proxmox VE Hypervisor             |
-| Athena                | Ubuntu Operations VM              |
-| Hestia                | Alpine Linux Application LXC      |
-| Artemis               | Arch Linux Management Workstation |
-| Grafana               | Visualization and Alerting        |
-| Prometheus            | Metrics Collection                |
-| Loki                  | Log Aggregation                   |
-| Grafana Alloy         | Log Collection                    |
-| Node Exporter         | Host Metrics                      |
-| Proxmox Exporter      | Hypervisor Metrics                |
-| Portainer             | Container Management              |
-| Floci                 | Local AWS Emulation               |
-| Olympus Dashboard API | Custom Dashboard Backend          |
-| Homepage              | Service Dashboard                 |
-| Vaultwarden           | Password Management               |
-| Tailscale             | Secure Remote Access              |
+| Component | Role | Status |
+|------------|-----------------------------|--------|
+| Apollo | Proxmox VE Hypervisor & Gateway | PASS |
+| Artemis | Management Workstation | PASS |
+| Athena | Ubuntu Operations VM | PASS |
+| Hestia | Alpine Application LXC | PASS |
+| K3s Cluster | Kubernetes Control Plane | PASS |
+| Olympus Dashboard API | FastAPI Backend | PASS |
+| Grafana | Visualization | PASS |
+| Prometheus | Metrics Collection | PASS |
+| Loki | Centralized Logging | PASS |
+| Grafana Alloy | Log Collection | PASS |
+| Portainer | Container Management | PASS |
+| Floci | AWS Emulator | PASS |
+| Homepage | Service Dashboard | PASS |
+| Vaultwarden | Password Manager | PASS |
+| Tailscale | Secure Remote Access | PASS |
+
+---
+
+# Validation Scope
+
+The following areas are validated:
+
+- Compute Infrastructure
+- Virtualization
+- Network Routing
+- NAT Persistence
+- Remote Administration
+- Kubernetes Operations
+- Dashboard Backend
+- Monitoring
+- Logging
+- Automation
+- Infrastructure as Code
+- Disaster Recovery
+- Operational Readiness
 
 ---
 
 # Infrastructure Validation
 
-## Test 01: Hypervisor Accessibility
+## Test 01 — Hypervisor Accessibility
 
 ### Objective
 
-Verify that the Proxmox host is operational and reachable.
+Verify Apollo is operational and reachable.
 
 ### Procedure
 
@@ -47,7 +68,7 @@ ssh root@apollo
 
 ### Expected Result
 
-Administrative shell access is established successfully.
+Administrative shell access is established.
 
 ### Result
 
@@ -55,11 +76,7 @@ Administrative shell access is established successfully.
 
 ---
 
-## Test 02: Athena VM Status
-
-### Objective
-
-Verify that the operations virtual machine is running.
+## Test 02 — Virtual Machine Health
 
 ### Procedure
 
@@ -79,11 +96,7 @@ status: running
 
 ---
 
-## Test 03: Hestia Container Status
-
-### Objective
-
-Verify that the application container is operational.
+## Test 03 — Container Health
 
 ### Procedure
 
@@ -103,13 +116,32 @@ status: running
 
 ---
 
-# Network & Remote Access Validation
-
-## Test 04: Tailscale Mesh Connectivity
+## Test 04 — Guest Autostart Validation
 
 ### Objective
 
-Validate secure administrative connectivity.
+Verify Athena and Hestia automatically recover following an Apollo reboot.
+
+### Procedure
+
+1. Reboot Apollo.
+2. Wait for Proxmox to become available.
+3. Verify guest status.
+
+### Expected Result
+
+- Athena automatically starts.
+- Hestia automatically starts.
+
+### Result
+
+**PASS**
+
+---
+
+# Network & Remote Access Validation
+
+## Test 05 — Tailscale Connectivity
 
 ### Procedure
 
@@ -120,45 +152,21 @@ tailscale ping athena
 
 ### Expected Result
 
-Successful responses from both nodes.
-
-### Result
-
-**PASS**
-
----
-
-## Test 05: Inbound DNAT Validation
-
-### Objective
-
-Verify that Apollo correctly forwards requests to isolated services hosted on Hestia.
-
-### Procedure
-
-```bash
-curl -I http://100.81.86.51:3000
-curl -I http://100.81.86.51:8080
+```text
+pong
 ```
 
-### Expected Result
-
-HTTP 200 responses from:
-
-* Homepage
-* Vaultwarden
-
 ### Result
 
 **PASS**
 
 ---
 
-## Test 06: Outbound NAT Validation
+## Test 06 — Persistent NAT Validation
 
 ### Objective
 
-Verify outbound internet connectivity from internal workloads.
+Verify Apollo restores outbound NAT after reboot.
 
 ### Procedure
 
@@ -168,9 +176,277 @@ From Athena:
 ping -c 4 8.8.8.8
 ```
 
+Verify on Apollo:
+
+```bash
+iptables -t nat -L -v
+```
+
 ### Expected Result
 
-External connectivity succeeds without packet loss.
+- Internet connectivity available.
+- MASQUERADE rules active.
+
+### Result
+
+**PASS**
+
+---
+
+## Test 07 — Port Forwarding Validation
+
+Verify Homepage:
+
+```bash
+curl -I http://100.81.86.51:3000
+```
+
+Verify Vaultwarden:
+
+```bash
+curl -Ik https://100.81.86.51:8080
+```
+
+### Expected Result
+
+HTTP 200 responses.
+
+### Result
+
+**PASS**
+
+---
+
+## Test 08 — Connectivity Ladder Validation
+
+### Objective
+
+Verify the standardized troubleshooting workflow.
+
+### Procedure
+
+Simulate a network interruption and verify:
+
+1. Apollo reachable.
+2. Internet reachable.
+3. HTTPS connectivity.
+4. Tailscale connected.
+5. Peer communication functional.
+
+### Result
+
+**PASS**
+
+---
+
+# Kubernetes Validation
+
+## Test 09 — Cluster Health
+
+### Procedure
+
+```bash
+kubectl get nodes
+```
+
+### Expected Result
+
+```text
+Ready
+```
+
+### Result
+
+**PASS**
+
+---
+
+## Test 10 — System Pods
+
+### Procedure
+
+```bash
+kubectl get pods -A
+```
+
+### Expected Result
+
+CoreDNS, Metrics Server, Traefik, Portainer Agent, and system workloads are all in the **Running** state.
+
+### Result
+
+**PASS**
+
+---
+
+## Test 11 — Remote Kubernetes Administration
+
+### Procedure
+
+From Artemis:
+
+```bash
+kubectl get pods -n artemis-lab
+```
+
+### Expected Result
+
+Successful TLS connection using Athena's LAN IP (`10.10.10.10`).
+
+### Result
+
+**PASS**
+
+---
+
+## Test 12 — cgroup v2 Validation
+
+### Procedure
+
+```bash
+stat -fc %T /sys/fs/cgroup
+```
+
+### Expected Result
+
+```text
+cgroup2fs
+```
+
+### Result
+
+**PASS**
+
+---
+
+## Test 13 — Namespace Isolation
+
+### Procedure
+
+```bash
+kubectl get all -n artemis-lab
+```
+
+### Expected Result
+
+Learning workloads remain isolated from the `default` and `kube-system` namespaces.
+
+### Result
+
+**PASS**
+
+# Dashboard & Automation Validation
+
+## Test 14 — Olympus Dashboard API
+
+### Objective
+
+Verify the Dashboard V2 backend aggregates and serves data correctly.
+
+### Procedure
+
+```bash
+curl http://10.10.10.10:8000/olympus | jq .
+```
+
+### Expected Result
+
+The API returns valid JSON containing:
+
+- LastFM (including album artwork)
+- Weather
+- Pokémon
+- Financial data
+
+### Result
+
+**PASS**
+
+---
+
+## Test 15 — Dashboard Endpoint Validation
+
+### Procedure
+
+```bash
+curl http://10.10.10.10:8000/weather | jq .
+curl http://10.10.10.10:8000/prices | jq .
+curl http://10.10.10.10:8000/pokemon | jq .
+```
+
+### Expected Result
+
+Each endpoint returns valid JSON without errors.
+
+### Result
+
+**PASS**
+
+---
+
+## Test 16 — Widget Synchronization
+
+### Objective
+
+Verify Homepage widgets receive updated data.
+
+### Procedure
+
+1. Execute the synchronization wrapper.
+2. Refresh Homepage.
+
+### Expected Result
+
+Widgets display current:
+
+- Weather
+- LastFM
+- Pokémon
+- Market data
+
+### Result
+
+**PASS**
+
+---
+
+## Test 17 — Cron & Concurrency Validation
+
+### Objective
+
+Verify scheduled fetch scripts do not overlap.
+
+### Procedure
+
+Start a fetch script manually while Cron executes the same script.
+
+### Expected Result
+
+The second execution exits immediately because `flock` holds the lock.
+
+### Result
+
+**PASS**
+
+---
+
+## Test 18 — JSON Integrity Validation
+
+### Objective
+
+Ensure API responses remain valid when external data contains special characters.
+
+### Procedure
+
+Validate generated JSON files.
+
+```bash
+jq . data/*.json
+```
+
+### Expected Result
+
+All JSON files validate successfully.
 
 ### Result
 
@@ -180,16 +456,12 @@ External connectivity succeeds without packet loss.
 
 # Observability Validation
 
-## Test 07: Prometheus Readiness
-
-### Objective
-
-Verify Prometheus availability.
+## Test 19 — Prometheus Readiness
 
 ### Procedure
 
 ```bash
-curl -I http://localhost:9090/-/ready
+curl -I http://10.10.10.10:9090/-/ready
 ```
 
 ### Expected Result
@@ -204,16 +476,14 @@ HTTP/1.1 200 OK
 
 ---
 
-## Test 08: Prometheus Target Health
-
-### Objective
-
-Validate metrics collection across monitored systems.
+## Test 20 — Prometheus Targets
 
 ### Procedure
 
-```bash
-curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].health'
+Open:
+
+```text
+http://10.10.10.10:9090/targets
 ```
 
 ### Expected Result
@@ -221,7 +491,7 @@ curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].health'
 All configured targets report:
 
 ```text
-"up"
+UP
 ```
 
 ### Result
@@ -230,15 +500,11 @@ All configured targets report:
 
 ---
 
-## Test 09: Grafana Validation
-
-### Objective
-
-Verify visualization services.
+## Test 21 — Grafana Validation
 
 ### Procedure
 
-Access Grafana.
+Open Grafana.
 
 ```text
 http://10.10.10.10:3001
@@ -246,9 +512,10 @@ http://10.10.10.10:3001
 
 ### Expected Result
 
-* Dashboards load correctly
-* Datasources connect successfully
-* Panels render live metrics
+- Dashboards load successfully.
+- Prometheus datasource is healthy.
+- Loki datasource is healthy.
+- Panels display current metrics.
 
 ### Result
 
@@ -256,62 +523,12 @@ http://10.10.10.10:3001
 
 ---
 
-## Test 10: Node Exporter Validation
-
-### Objective
-
-Verify host metric collection.
+## Test 22 — Loki Validation
 
 ### Procedure
 
 ```bash
-curl -s http://localhost:9100/metrics | head
-```
-
-### Expected Result
-
-CPU, memory, disk, and network metrics are returned.
-
-### Result
-
-**PASS**
-
----
-
-## Test 11: Proxmox Exporter Validation
-
-### Objective
-
-Verify hypervisor metric collection.
-
-### Procedure
-
-```bash
-curl -s http://localhost:9221/metrics | head
-```
-
-### Expected Result
-
-Node, VM, and storage metrics are exposed.
-
-### Result
-
-**PASS**
-
----
-
-# Logging Validation
-
-## Test 12: Loki Readiness
-
-### Objective
-
-Verify Loki availability.
-
-### Procedure
-
-```bash
-curl -I http://localhost:3100/ready
+curl -I http://10.10.10.10:3100/ready
 ```
 
 ### Expected Result
@@ -326,59 +543,19 @@ HTTP/1.1 200 OK
 
 ---
 
-## Test 13: Grafana Alloy Validation
-
-### Objective
-
-Validate active log collection.
+## Test 23 — End-to-End Logging Pipeline
 
 ### Procedure
 
-```bash
-docker logs grafana-alloy
-```
-
-### Expected Result
-
-* Docker discovery active
-* No ingestion failures
-* Logs forwarded successfully
-
-### Result
-
-**PASS**
-
----
-
-## Test 14: End-to-End Logging Pipeline
-
-### Objective
-
-Verify centralized log visibility.
-
-### Validation Path
+In Grafana Explore, execute:
 
 ```text
-Containers
-    ↓
-Grafana Alloy
-    ↓
-Loki
-    ↓
-Grafana Explore
-```
-
-### Procedure
-
-Query:
-
-```text
-{container="vaultwarden"}
+{container_name=~".+"}
 ```
 
 ### Expected Result
 
-Live logs appear in Grafana Explore.
+Live logs from Docker containers and Kubernetes workloads are visible.
 
 ### Result
 
@@ -386,24 +563,19 @@ Live logs appear in Grafana Explore.
 
 ---
 
-# Data Automation Validation
-
-## Test 15: Inter-Node Synchronization
-
-### Objective
-
-Verify secure synchronization between Hestia and Athena.
+## Test 24 — Grafana Alloy Validation
 
 ### Procedure
 
 ```bash
-ssh root@10.10.10.2 \
-"ls /root/homelab/personal-services/homepage-config/data/*.json"
+docker logs alloy
 ```
 
 ### Expected Result
 
-Data files are accessible and synchronized successfully.
+- Docker discovery active
+- No ingestion failures
+- Logs successfully forwarded to Loki
 
 ### Result
 
@@ -411,21 +583,19 @@ Data files are accessible and synchronized successfully.
 
 ---
 
-## Test 16: Dashboard API Validation
+# Infrastructure as Code Validation
 
-### Objective
-
-Verify custom API functionality.
+## Test 25 — Floci Validation
 
 ### Procedure
 
 ```bash
-curl -s http://10.10.10.10:8000/prices | jq .
+curl http://10.10.10.10:4566
 ```
 
 ### Expected Result
 
-Structured JSON responses are returned successfully.
+Floci endpoint responds successfully.
 
 ### Result
 
@@ -433,52 +603,19 @@ Structured JSON responses are returned successfully.
 
 ---
 
-# Local Cloud & Infrastructure as Code Validation
-
-## Test 17: Floci Validation
-
-### Objective
-
-Verify local AWS emulation.
-
-### Procedure
-
-```bash
-curl -I http://localhost:4566
-```
-
-### Expected Result
-
-Endpoint responds successfully.
-
-### Result
-
-**PASS**
-
----
-
-## Test 18: Terraform Validation
-
-### Objective
-
-Verify Infrastructure as Code workflows.
+## Test 26 — Terraform Workflow
 
 ### Procedure
 
 ```bash
 terraform validate
 terraform plan
-terraform apply -auto-approve
 ```
 
 ### Expected Result
 
-Resources are created successfully.
-
-Expected resources:
-
-* tf-homelab-storage-bucket
-* tf-homelab-metadata
+- Configuration validates successfully.
+- Execution plan completes without errors.
 
 ### Result
 
@@ -486,26 +623,49 @@ Expected resources:
 
 ---
 
-# Recovery Validation
-
-## Test 19: Hypervisor Reboot Recovery
-
-### Objective
-
-Verify autonomous recovery following a host reboot.
+## Test 27 — Resource Validation
 
 ### Procedure
 
-Reboot Apollo and observe recovery behavior.
+```bash
+aws --endpoint-url=http://10.10.10.10:4566 s3 ls
+
+aws --endpoint-url=http://10.10.10.10:4566 dynamodb list-tables
+```
 
 ### Expected Result
 
-* Apollo boots successfully
-* Athena autostarts
-* Hestia autostarts
-* Docker services recover automatically
-* Tailscale reconnects
-* Monitoring resumes
+Resources include:
+
+- `tf-homelab-storage-bucket`
+- `tf-homelab-metadata`
+
+### Result
+
+**PASS**
+
+# Disaster Recovery Validation
+
+## Test 28 — Hypervisor Recovery
+
+### Objective
+
+Verify the environment recovers automatically following an Apollo reboot.
+
+### Procedure
+
+1. Reboot Apollo.
+2. Wait for Proxmox services to become available.
+3. Verify guest startup.
+4. Verify container recovery.
+
+### Expected Result
+
+- Apollo boots successfully.
+- Athena autostarts.
+- Hestia autostarts.
+- Docker restart policies restore all services.
+- Tailscale reconnects automatically.
 
 ### Result
 
@@ -513,19 +673,104 @@ Reboot Apollo and observe recovery behavior.
 
 ---
 
-## Test 20: Disaster Recovery Procedure Validation
+## Test 29 — Kubernetes Recovery
 
 ### Objective
 
-Verify documented recovery procedures.
+Verify the K3s cluster recovers after a VM restart.
 
 ### Procedure
 
-Execute simulated failure scenarios using the disaster recovery runbook.
+```bash
+kubectl get nodes
+kubectl get pods -A
+```
 
 ### Expected Result
 
-Services are restored successfully within documented RTO targets.
+- Athena reports **Ready**.
+- System workloads recover automatically.
+- No pods remain in `ContainerCreating`.
+
+### Result
+
+**PASS**
+
+---
+
+## Test 30 — Dashboard Recovery
+
+### Objective
+
+Verify Dashboard V2 resumes normal operation following service interruption.
+
+### Procedure
+
+1. Restart Dashboard API.
+2. Wait for scheduled synchronization.
+3. Refresh Homepage.
+
+### Expected Result
+
+- API responds successfully.
+- Widgets update automatically.
+- No stale or corrupted data.
+
+### Result
+
+**PASS**
+
+---
+
+## Test 31 — Connectivity Ladder Validation
+
+### Objective
+
+Validate the documented troubleshooting methodology.
+
+### Procedure
+
+Perform the following checks in order:
+
+1. Ping Apollo.
+2. Ping `8.8.8.8`.
+3. Execute:
+
+```bash
+curl -I https://google.com
+```
+
+4. Verify:
+
+```bash
+tailscale status
+```
+
+5. Verify peer-to-peer communication.
+
+### Expected Result
+
+The fault domain can be isolated without unnecessary troubleshooting.
+
+### Result
+
+**PASS**
+
+---
+
+## Test 32 — Disaster Recovery Runbook
+
+### Objective
+
+Validate documented recovery procedures.
+
+### Procedure
+
+Execute simulated recovery scenarios using the Disaster Recovery Runbook.
+
+### Expected Result
+
+Recovery objectives are achieved within documented RTO targets.
 
 ### Result
 
@@ -535,56 +780,77 @@ Services are restored successfully within documented RTO targets.
 
 # Operational Readiness Matrix
 
-| Capability             | Status |
-| ---------------------- | ------ |
-| Virtualization         | PASS   |
-| Containerization       | PASS   |
-| Network Routing        | PASS   |
-| NAT Translation        | PASS   |
-| Remote Access          | PASS   |
-| Monitoring             | PASS   |
-| Logging                | PASS   |
-| Alerting               | PASS   |
-| Data Synchronization   | PASS   |
-| Custom API Services    | PASS   |
-| Infrastructure as Code | PASS   |
-| Local Cloud Emulation  | PASS   |
-| Recovery Procedures    | PASS   |
+| Capability | Status | Verification |
+|------------|--------|--------------|
+| Virtualization | PASS | Apollo operational |
+| Containerization | PASS | Docker & K3s workloads healthy |
+| Network Routing | PASS | NAT & DNAT persistence verified |
+| Remote Administration | PASS | SSH, Tailscale & kubectl operational |
+| Kubernetes | PASS | Cluster Ready |
+| Dashboard API | PASS | FastAPI responding |
+| Monitoring | PASS | Prometheus targets healthy |
+| Logging | PASS | Loki ingestion verified |
+| Alerting | PASS | Grafana notifications operational |
+| Automation | PASS | Cron & `flock` validated |
+| Infrastructure as Code | PASS | Terraform & Floci operational |
+| Disaster Recovery | PASS | Recovery procedures validated |
 
 ---
 
 # Validation Summary
 
-The homelab environment has been validated across compute infrastructure, network routing, observability pipelines, automation workflows, cloud emulation capabilities, and recovery operations.
+The Olympus HomeLab has been successfully validated across every operational layer, including compute infrastructure, networking, Kubernetes orchestration, observability, automation, Infrastructure as Code, and disaster recovery.
 
-All critical services are functioning as expected.
+The June 2026 platform upgrades—including the K3s deployment, Dashboard V2 refactor, and improved network persistence—have been verified to operate reliably under both normal and recovery conditions.
 
-The platform demonstrates operational maturity through:
+The environment demonstrates production-inspired operational practices through:
 
-* Secure remote administration using Tailscale
-* Isolated service boundaries with controlled ingress paths
-* Centralized metrics and logging pipelines
-* Automated inter-node data synchronization
-* Repeatable Infrastructure as Code workflows
-* Tested disaster recovery procedures
-* Autonomous recovery following infrastructure failures
+- Secure remote administration with Tailscale
+- Kubernetes-based workload orchestration
+- Persistent NAT and port forwarding
+- Centralized monitoring with Prometheus and Grafana
+- Centralized logging with Grafana Alloy and Loki
+- Dashboard V2 using a FastAPI backend
+- Automated synchronization with `cron` and `flock`
+- Safe JSON generation using `jq`
+- Infrastructure as Code with Terraform and Floci
+- Dependency-aware disaster recovery procedures
+- Comprehensive operational documentation
 
 ---
 
-## Overall Validation Status
+# Overall Validation Status
 
-**Infrastructure Validation:** PASS
+| Category | Status |
+|----------|--------|
+| Infrastructure | PASS |
+| Networking | PASS |
+| Kubernetes | PASS |
+| Dashboard Services | PASS |
+| Monitoring | PASS |
+| Logging | PASS |
+| Automation | PASS |
+| Infrastructure as Code | PASS |
+| Disaster Recovery | PASS |
 
-**Network Validation:** PASS
+---
 
-**Observability Validation:** PASS
+# Final Assessment
 
-**Automation Validation:** PASS
+## Operational Readiness
 
-**Infrastructure as Code Validation:** PASS
+**FULLY VALIDATED**
 
-**Recovery Validation:** PASS
+The Olympus HomeLab is operating as a stable, production-inspired SRE platform. All critical infrastructure components, networking, Kubernetes services, observability pipelines, automation workflows, and recovery procedures have been validated successfully and meet the documented operational requirements.
 
-# Final Result
+---
 
-**Overall Operational Readiness: FULLY VALIDATED**
+## Document Information
+
+| Field | Value |
+|-------|-------|
+| Document Status | Current |
+| Validation Status | PASS |
+| Operational Readiness | Fully Validated |
+| Last Validation | June 2026 |
+| Next Validation | Following major infrastructure changes or quarterly review |

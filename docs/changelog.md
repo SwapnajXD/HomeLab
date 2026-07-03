@@ -2,465 +2,288 @@
 
 ## Purpose
 
-This document records significant infrastructure changes, deployments, migrations, validations, refactoring efforts, and operational milestones within the HomeLab environment.
+This document records the major infrastructure changes, architectural decisions, and operational milestones throughout the evolution of the Olympus HomeLab.
 
-It serves as a historical record of the environment's evolution, architectural decisions, technical debt reduction, and reliability improvements.
+It captures **what changed, why it changed, and the impact of those changes**, providing historical context for the platform's progression into a production-inspired infrastructure environment.
 
 ---
 
-# Phase 8: Documentation & Standardization (Current)
+# Phase 9 — Kubernetes & Dashboard V2 (June 2026)
+
+A major architectural milestone introducing Kubernetes and a centralized dashboard backend.
 
 ## Added
 
-* `docs/architecture.md` — Infrastructure topology and service relationships
-* `docs/network.md` — Network design, routing, and connectivity documentation
-* `docs/inventory.md` — Infrastructure asset inventory
-* `docs/runbook.md` — Operational procedures and maintenance tasks
-* `docs/troubleshooting.md` — Incident history and resolutions
-* `docs/disaster-recovery.md` — Recovery procedures and priorities
-* `docs/validation-report.md` — Infrastructure validation records
-* `docs/project-timeline.md` — Project evolution and milestones
-* `docs/changelog.md` — Historical change tracking
+### K3s Kubernetes Cluster
 
-## Changed
+- Deployed a single-node K3s cluster on Athena.
+- Enabled cgroup v2 support for compatibility with modern Kubernetes.
+- Configured secure remote administration from Artemis using `kubectl`.
+- Integrated Portainer for graphical Kubernetes management.
 
-* Repository structure standardized across all documentation.
-* Consistent Markdown formatting and naming conventions adopted.
-* README files added throughout the repository.
+### Olympus Dashboard V2
 
-## Benefits
+The dashboard architecture was redesigned around a centralized backend.
 
-* Improved maintainability.
-* Reduced operational knowledge loss.
-* Faster onboarding and troubleshooting.
-* Portfolio-ready documentation comparable to enterprise environments.
+Changes included:
+
+- Migrated all data collection from Hestia to Athena.
+- Introduced a FastAPI-based Dashboard API.
+- Established Athena as the single source of truth.
+- Decoupled backend processing from frontend presentation.
+
+### Dashboard Improvements
+
+- LastFM album artwork support
+- Pokémon species descriptions
+- Hero panel media prioritization
+- Safe JSON generation using `jq`
+- Improved widget reliability
 
 ---
 
-# Phase 7: Infrastructure Consolidation & Platform Refactoring (June 2026)
+## Fixed
+
+### Network Persistence
+
+Resolved loss of NAT and port forwarding rules after Apollo reboot by implementing persistent networking configuration.
+
+### Vaultwarden Access
+
+Resolved HTTP/HTTPS protocol mismatch causing `400 Bad Request` responses.
+
+### Automation Reliability
+
+Added `flock` to scheduled fetch jobs to eliminate overlapping cron executions and race conditions.
+
+---
+
+# Phase 8 — Documentation & Operational Standardization
+
+Infrastructure documentation was redesigned to follow production-oriented engineering practices.
+
+## Added
+
+- Architecture documentation
+- Network documentation
+- Operations runbook
+- Disaster recovery procedures
+- Troubleshooting knowledge base
+- Validation reports
+- Infrastructure inventory
+- Project timeline
+- Changelog
+
+## Benefits
+
+- Standardized operational procedures
+- Improved maintainability
+- Reduced knowledge loss
+- Faster troubleshooting
+- Portfolio-ready documentation
+
+---
+
+# Phase 7 — Platform Refactoring & Telemetry
+
+Focused on simplifying the platform while improving observability.
 
 ## Added
 
 ### Grafana Alloy
 
-Deployed Grafana Alloy as the centralized telemetry agent for log collection.
+Replaced Promtail with Grafana Alloy for centralized log collection.
 
-### Floci Migration
+### Floci
 
-Migrated from LocalStack to Floci Native AWS Emulator.
+Migrated from LocalStack to Floci.
 
 Benefits:
 
-* Faster startup (~0.015 seconds)
-* Lower memory usage (~13 MiB)
-* Persistent mode support
-* Native AWS API compatibility
+- Faster startup
+- Lower memory usage
+- Native AWS API compatibility
+- Improved Terraform workflows
 
-### Inter-Node Synchronization
+### Platform Improvements
 
-Implemented passwordless Ed25519 SSH authentication between Athena and Hestia to support automated data synchronization.
+- Passwordless Ed25519 SSH authentication
+- Unified telemetry deployment
+- Improved Docker Compose organization
+- Single-node Loki optimization
 
-Features:
-
-* Secure file transfers
-* Automated cron-based synchronization
-* Dashboard data replication
-
-### Loki Hardening
-
-Configured single-node Loki deployment using:
-
-```yaml
-replication_factor: 1
-
-kvstore:
-  store: inmemory
-```
-
-## Changed
-
-Previous structure:
-
-```text
-~/homelab/
-├── monitoring/
-└── core-services/
-```
-
-New structure:
-
-```text
-~/homelab/docker-compose/
-├── telemetry/
-├── core-services/
-└── floci/
-```
-
-### Telemetry Consolidation
-
-Unified:
-
-* Grafana
-* Prometheus
-* Loki
-* Grafana Alloy
-* Exporters
-
-into a single deployment stack.
-
-### Deployment Standardization
-
-* Docker deployment workflows standardized.
-* `.gitignore` hardened for persistent volumes and state files.
-
-## Removed
-
-* Promtail
-* Legacy monitoring directories
-* Obsolete network artifacts
-* Unused Proxmox bridge (`vmbr1`)
-* Active LocalStack deployment (retained only for historical reference)
+---
 
 ## Fixed
 
-* Apollo outbound NAT failures after Proxmox reboot.
-* Missing masquerade rules causing guest connectivity loss.
-* Docker container naming conflicts.
-* Loki readiness endpoint instability.
-* Root-owned directory permission inconsistencies.
-
-## Validated
-
-* Metrics pipeline functionality.
-* Logging pipeline functionality.
-* Grafana Explore integration.
-* Telemetry deployment workflows.
-* Inter-node synchronization.
-* Floci operation and Terraform compatibility.
+- Apollo NAT persistence
+- Docker container conflicts
+- Loki readiness configuration
+- File permission inconsistencies
+- Legacy bridge cleanup
 
 ---
 
-# Phase 6: Reliability Engineering & Recovery Testing
+# Phase 6 — Infrastructure as Code
+
+Infrastructure provisioning became reproducible through Terraform.
 
 ## Added
 
-* Structured recovery validation procedures.
-* Recovery testing methodology.
-* Headless operations verification.
-* Disaster recovery playbooks.
+- Terraform workflows
+- Local AWS emulation
+- S3 bucket provisioning
+- DynamoDB provisioning
 
-## Validated
+### Managed Resources
 
-### Headless Operations
-
-Verified complete infrastructure administration without:
-
-* Monitor
-* Keyboard
-* Mouse
-
-Managed successfully using:
-
-* Tailscale
-* SSH
-* Grafana
-* Portainer
-* Homepage
-
-### Autostart Validation
-
-Verified automatic startup of:
-
-* Athena (VM 100)
-* Hestia (LXC 101)
-
-following Apollo reboot.
-
-### Chaos Recovery Testing
-
-Validated:
-
-* Hypervisor reboot recovery
-* VM recovery
-* Container recovery
-* Service recovery
-* Docker restart policies
-* Tailscale reconnection
-
-## Result
-
-All recovery scenarios completed successfully.
+- `tf-homelab-storage-bucket`
+- `tf-homelab-metadata`
 
 ---
 
-# Phase 5: Infrastructure as Code (IaC)
+# Phase 5 — Observability Platform
+
+Established centralized monitoring, logging, and alerting.
 
 ## Added
 
-### Local AWS Emulation
+### Monitoring
 
-Initially deployed LocalStack providing:
+- Prometheus
+- Node Exporter
+- Proxmox Exporter
 
-* S3
-* DynamoDB
+### Visualization
 
-Later migrated to Floci.
+- Grafana dashboards
 
-### Terraform
+### Logging
 
-Implemented Infrastructure as Code workflows.
+- Loki
+- Grafana Alloy
 
-## Provisioned Resources
+### Alerting
 
-### S3 Bucket
-
-```text
-tf-homelab-storage-bucket
-```
-
-### DynamoDB Table
-
-```text
-tf-homelab-metadata
-```
-
-## Validated
-
-* Resource creation
-* Resource persistence
-* State management
-* Terraform lifecycle operations
-* Destroy and rebuild workflows
+- Grafana Alerting
+- Telegram notifications
 
 ---
 
-# Phase 4: Monitoring, Logging & Alerting
+# Phase 4 — Core Services
+
+Introduced user-facing applications.
 
 ## Added
 
-### Metrics Platform
+- Homepage
+- Vaultwarden
+- Portainer
 
-* Prometheus
-* Node Exporter
-* Proxmox Exporter
-
-### Visualization Platform
-
-* Grafana
-* Infrastructure dashboards
-
-### Logging Platform
-
-* Loki
-* Promtail (later replaced by Alloy)
-
-### Alerting Platform
-
-* Grafana Alerting
-* Telegram notifications
-
-## Architecture
-
-### Metrics Pipeline
-
-```text
-Node Exporter
-        │
-        ▼
-Prometheus
-        │
-        ▼
-Grafana
-        │
-        ▼
-Telegram
-```
-
-### Logging Pipeline
-
-```text
-Docker Containers
-        │
-        ▼
-Grafana Alloy
-        │
-        ▼
-Loki
-        │
-        ▼
-Grafana Explore
-```
-
-## Validated
-
-* Metrics collection
-* Dashboard rendering
-* Log aggregation
-* Alert delivery
-* Historical visibility
+These services established the primary self-hosted application platform.
 
 ---
 
-# Phase 3: Core Services
+# Phase 3 — Secure Remote Administration
+
+Implemented secure remote infrastructure management.
 
 ## Added
 
-### Homepage
+- Tailscale mesh networking
+- MagicDNS
+- Headless administration
+- Secure SSH access
 
-Features:
-
-* Centralized dashboard
-* Service categorization
-* Widget integrations
-
-### Vaultwarden
-
-Features:
-
-* Self-hosted password management
-* Persistent storage
-* Secure credential management
-
-### Portainer
-
-Features:
-
-* Container administration
-* Deployment visibility
-* Runtime inspection
-
-## Validated
-
-* Homepage functionality
-* Widget integrations
-* Vaultwarden authentication
-* Data persistence
-* Portainer accessibility
+This eliminated the need for direct public management interfaces.
 
 ---
 
-# Phase 2: Remote Access & Security
+# Phase 2 — Virtual Infrastructure
+
+Established the virtualized workload architecture.
 
 ## Added
 
-### Tailscale Deployment
-
-Connected:
-
-* Artemis (Management Workstation)
-* Apollo (Proxmox Host)
-* Athena (Operations VM)
-
-## Benefits
-
-* Secure remote administration
-* SSH access
-* MagicDNS resolution
-* Headless management
-* Elimination of router port forwarding
-
-## Validated
-
-* Remote connectivity
-* DNS resolution
-* Cross-node communication
-* Overlay network stability
+- Athena (Ubuntu VM)
+- Hestia (Alpine LXC)
+- Docker
+- Docker Compose
+- Proxmox virtual networking
 
 ---
 
-# Phase 1: Infrastructure Foundation
+# Phase 1 — Foundation
+
+The initial deployment of the homelab.
 
 ## Added
 
-### Physical Infrastructure
+- Apollo Proxmox VE host
+- Internal networking
+- Storage configuration
+- Base virtualization platform
 
-* Apollo Proxmox VE Hypervisor
-
-### Virtual Infrastructure
-
-* Athena Ubuntu Server VM
-* Hestia Alpine Linux Container
-
-### Platform Services
-
-* Docker
-* Docker Compose
-
-### Networking
-
-* Proxmox bridge networking (`vmbr0`)
-* Internal virtual networking
-
-## Fixed
-
-* Initial DHCP allocation issues.
-* Bridge configuration anomalies.
-* Firewall routing conflicts.
-
-## Result
-
-A stable virtualization platform capable of hosting isolated workloads and future infrastructure growth was established.
+This established the foundation for all future infrastructure development.
 
 ---
 
 # Operational Milestones
 
-| Milestone                     | Status   |
-| ----------------------------- | -------- |
-| Proxmox Deployment            | Complete |
-| Remote Administration         | Complete |
-| Core Services Deployment      | Complete |
-| Monitoring Platform           | Complete |
-| Centralized Logging           | Complete |
-| Alerting Platform             | Complete |
-| Infrastructure as Code        | Complete |
-| Floci Migration               | Complete |
-| Inter-Node Synchronization    | Complete |
-| Recovery Testing              | Complete |
+| Milestone | Status |
+|-----------|--------|
+| Virtualization Platform | Complete |
+| Secure Remote Administration | Complete |
+| Core Services | Complete |
+| Observability Stack | Complete |
+| Centralized Logging | Complete |
+| Infrastructure as Code | Complete |
+| Floci Migration | Complete |
+| Kubernetes Deployment | Complete |
+| Dashboard V2 | Complete |
 | Documentation Standardization | Complete |
 
 ---
 
-# Current Environment Status
+# Current Environment
 
-```text
-Stable Operational Environment
-```
+**Infrastructure State:** Stable Operational Environment
 
 ## Active Capabilities
 
-* Virtualization
-* Containerization
-* Monitoring
-* Logging
-* Alerting
-* Infrastructure as Code
-* Disaster Recovery
-* Remote Administration
-* Documentation
-* Local AWS Emulation
-* Inter-Node Data Synchronization
+- Proxmox virtualization
+- Docker containerization
+- K3s Kubernetes
+- Centralized observability
+- Infrastructure as Code
+- Secure remote administration
+- Self-hosted applications
+- Dashboard API
+- Local AWS emulation
+- Disaster recovery procedures
+- Production-inspired documentation
 
 ---
 
 # Future Roadmap
 
-## Planned Improvements
+Planned areas of exploration include:
 
-* Automated backup verification
-* Enhanced observability dashboards
-* Additional service integrations
-* CI/CD experimentation
-* Infrastructure automation expansion
-* Long-term metrics retention strategy
-* Service health automation
-* ESP32 telemetry integration
+- Automated backup validation
+- Enhanced Grafana dashboards
+- CI/CD experimentation
+- Infrastructure automation
+- Long-term metrics retention
+- Service health automation
+- Additional Kubernetes workloads
+- ESP32 telemetry integration
 
 ---
 
-# Document Status
+# Current Status
 
-**Changelog Status:** Current
-**Infrastructure State:** Operational
-**Operational Readiness:** Validated
-**Documentation Coverage:** Complete
+**Last Updated:** June 2026
+
+**Environment:** Stable Operational Environment
+
+The Olympus HomeLab has evolved from a simple virtualization host into a production-inspired infrastructure platform featuring Kubernetes, centralized observability, Infrastructure as Code, secure remote administration, and comprehensive operational documentation.

@@ -2,11 +2,23 @@
 
 ## Purpose
 
-This document defines recovery procedures for the Olympus HomeLab environment.
+This document defines the disaster recovery procedures for the Olympus HomeLab environment.
 
-Its objective is to restore critical services as quickly as possible following hardware failures, software failures, networking issues, configuration drift, or complete infrastructure outages.
+Its objective is to restore critical infrastructure and services as quickly as possible following hardware failures, software failures, networking issues, configuration drift, or complete infrastructure outages.
 
-The runbook prioritizes restoring foundational infrastructure before dependent services.
+Recovery follows a **dependency-aware** model, ensuring foundational infrastructure is restored before application services. All procedures have been validated against the current production-inspired architecture.
+
+---
+
+# Recovery Objectives
+
+| Priority | Components | Target RTO |
+|----------|------------|------------|
+| Priority 1 | Apollo, vmbr0, NAT Gateway, Tailscale | < 5 Minutes |
+| Priority 2 | Athena, Dashboard API, K3s Cluster | < 3 Minutes |
+| Priority 3 | Hestia, Homepage, Vaultwarden | < 2 Minutes |
+| Priority 4 | Observability Stack (Grafana, Prometheus, Loki, Alloy) | < 2 Minutes |
+| Priority 5 | Floci & Terraform Services | < 1 Minute |
 
 ---
 
@@ -14,70 +26,414 @@ The runbook prioritizes restoring foundational infrastructure before dependent s
 
 ## Apollo
 
-**Role:** Proxmox Hypervisor
+**Platform**
 
-Responsibilities:
+- Proxmox VE
 
-* Virtual Machine Hosting
-* LXC Hosting
-* Virtual Networking
-* Storage Management
-* NAT Gateway Functions
+**Responsibilities**
+
+- Hypervisor
+- Virtual Networking
+- NAT Gateway
+- VM/LXC Hosting
+- Storage Management
 
 ---
 
 ## Athena (VM 100)
 
-**Role:** Operations Platform
+**Platform**
 
-Hosted Services:
+Ubuntu Server VM
 
-* Grafana
-* Prometheus
-* Loki
-* Grafana Alloy
-* Node Exporter
-* Proxmox Exporter
-* Portainer
-* Olympus Dashboard API
-* Floci
+**Responsibilities**
+
+- Grafana
+- Prometheus
+- Loki
+- Grafana Alloy
+- Node Exporter
+- Proxmox Exporter
+- Portainer
+- Olympus Dashboard API
+- K3s Cluster
+- Floci
+
+Athena functions as the operational backbone of the HomeLab.
 
 ---
 
 ## Hestia (CT 101)
 
-**Role:** Application Platform
+**Platform**
 
-Hosted Services:
+Alpine Linux LXC
 
-* Homepage
-* Vaultwarden
-* Personal Feed Collection Scripts
-* SSH Synchronization Endpoint
+**Responsibilities**
+
+- Homepage
+- Vaultwarden
+
+Hestia hosts lightweight frontend services while backend processing remains on Athena.
+
+---
+
+# Recovery Dependency Model
+
+Infrastructure must always be restored in dependency order.
+
+```text
+Physical Power
+        │
+        ▼
+Apollo (Hypervisor)
+        │
+        ▼
+vmbr0 Bridge
+        │
+        ▼
+Outbound NAT
+        │
+        ▼
+Tailscale Connectivity
+        │
+        ▼
+Athena
+    ├── Dashboard API
+    ├── K3s
+    ├── Grafana
+    ├── Prometheus
+    ├── Loki
+    ├── Alloy
+    └── Floci
+        │
+        ▼
+Hestia
+    ├── Homepage
+    └── Vaultwarden
+        │
+        ▼
+Infrastructure Validation
+```
+
+Application services should never be restored before their dependencies.
 
 ---
 
-# Recovery Priorities
+# Initial Diagnostics
 
-| Priority   | Components                                 | RTO         |
-| ---------- | ------------------------------------------ | ----------- |
-| Priority 1 | Apollo, vmbr0, NAT Gateway, Tailscale      | < 5 Minutes |
-| Priority 2 | Hestia, Homepage, Vaultwarden              | < 2 Minutes |
-| Priority 3 | Grafana, Prometheus, Loki, Alloy, Telegram | < 2 Minutes |
-| Priority 4 | Floci, Terraform                           | < 1 Minute  |
+Before performing recovery, determine where the failure originates.
+
+## Connectivity Ladder
+
+Follow this sequence exactly.
+
+### Step 1 — Gateway
+
+```bash
+ping 10.10.10.1
+```
+
+Expected:
+
+```text
+Successful response
+```
 
 ---
+
+### Step 2 — Internet
+
+From Athena:
+
+```bash
+ping 8.8.8.8
+```
+
+Expected:
+
+```text
+Packets received
+```
+
+---
+
+### Step 3 — HTTPS Connectivity
+
+```bash
+curl -I https://google.com
+```
+
+Expected:
+
+```text
+HTTP/2 200
+```
+
+Confirms:
+
+- Internet connectivity
+- DNS
+- SSL
+
+---
+
+### Step 4 — Tailscale
+
+```bash
+tailscale status
+```
+
+Expected:
+
+- Apollo connected
+- Athena connected
+
+---
+
+### Step 5 — Internal Connectivity
+
+Verify:
+
+```bash
+ping 10.10.10.10
+ping 10.10.10.2
+```
+
+This isolates:
+
+- Firewall problems
+- Routing problems
+- Bridge failures
+
+---
+
+# Cold-Start Recovery
+
+Use this procedure after a complete infrastructure shutdown.
+
+## Step 1 — Restore Apollo
+
+Verify:
+
+- Power
+- Storage
+- Network Interfaces
+- vmbr0
+
+```bash
+ip addr
+bridge link
+```
+
+---
+
+## Step 2 — Verify IP Forwarding
+
+```bash
+sysctl net.ipv4.ip_forward
+```
+
+Expected
+
+```text
+1
+```
+
+---
+
+## Step 3 — Verify NAT Rules
+
+```bash
+iptables -t nat -L -n -v
+```
+
+Confirm:
+
+- MASQUERADE rule
+- Homepage forwarding
+- Vaultwarden forwarding
+
+If required, restore outbound NAT.
+
+```bash
+iptables -t nat -A POSTROUTING \
+-s 10.10.10.0/24 \
+-o wlan0 \
+-j MASQUERADE
+```
+
+> If your outbound interface changes, replace `wlan0` with the active interface.
+
+---
+
+## Step 4 — Verify Tailscale
+
+```bash
+tailscale status
+```
+
+Ensure:
+
+- Apollo connected
+- Athena connected
+
+---
+
+## Step 5 — Start Athena
+
+```bash
+qm start 100
+```
+
+Verify:
+
+```bash
+qm status 100
+```
+
+Expected:
+
+```text
+status: running
+```
+
+---
+
+## Step 6 — Verify Athena
+
+```bash
+ssh ubuntu@athena
+```
+
+Then verify Docker:
+
+```bash
+docker ps
+```
+
+Expected services include:
+
+- grafana
+- prometheus
+- loki
+- alloy
+- portainer
+- dashboard-api
+- floci
+
+---
+
+## Step 7 — Verify K3s
+
+From Artemis:
+
+```bash
+kubectl get nodes
+```
+
+Expected:
+
+```text
+STATUS: Ready
+```
+
+If nodes are not Ready, verify:
+
+- cgroup v2
+- kubeconfig
+- certificate SANs
+
+---
+
+## Step 8 — Start Hestia
+
+```bash
+pct start 101
+```
+
+Verify:
+
+```bash
+pct status 101
+```
+
+Expected:
+
+```text
+status: running
+```
+
+---
+
+## Step 9 — Validate Services
+
+Homepage
+
+```text
+http://Apollo:3000
+```
+
+Dashboard API
+
+```text
+http://Athena:8000/olympus
+```
+
+Vaultwarden
+
+```text
+https://Apollo:8080
+```
+
+Always access Vaultwarden using HTTPS.
+
+---
+
+## Step 10 — Validate Observability
+
+Verify:
+
+- Grafana
+- Prometheus
+- Loki
+- Alloy
+
+Check:
+
+```bash
+docker ps
+```
+
+Confirm all telemetry containers are healthy.
+
+---
+
+## Step 11 — Final Validation
+
+Verify:
+
+- Dashboard widgets update
+- Metrics available
+- Logs available
+- Kubernetes Ready
+- Homepage loads
+- Vaultwarden login page accessible
+
+Once all validation checks pass, the environment has returned to a **Stable Operational State**.
+
 
 # Failure Scenarios & Recovery Procedures
 
-## Scenario 1: Apollo Unreachable
+## Scenario 1 — Apollo Unreachable
 
 ### Symptoms
 
-* SSH unavailable
-* Proxmox UI unavailable
-* Tailscale unreachable
-* Internal services inaccessible
+- Proxmox Web UI unavailable
+- SSH inaccessible
+- Athena and Hestia offline
+- Tailscale unreachable
+- All hosted services unavailable
 
 ### Verification
 
@@ -87,57 +443,53 @@ From Artemis:
 tailscale ping apollo
 ```
 
+If unreachable, verify local connectivity:
+
+```bash
+ping 10.10.10.1
+```
+
 ### Recovery
 
-1. Verify Airtel Fiber router is online.
-2. Verify Apollo is powered on.
-3. Verify network interfaces are active.
-4. Verify Tailscale status.
-5. If internal workloads cannot reach external networks, verify NAT rules.
+1. Verify the Airtel Fiber router is online.
+2. Confirm Apollo is powered on.
+3. Check physical network connectivity.
+4. Verify `vmbr0` exists.
+5. Confirm Tailscale is running.
+6. Validate outbound NAT rules.
 
-Restore outbound NAT if required:
+If internet access is unavailable from internal nodes:
+
+```bash
+iptables -t nat -L -n -v
+```
+
+Restore the outbound NAT rule if necessary:
 
 ```bash
 iptables -t nat -A POSTROUTING \
 -s 10.10.10.0/24 \
--o wlx002e2df0393b \
+-o wlan0 \
 -j MASQUERADE
 ```
 
-> Physical intervention is required if Apollo cannot be reached remotely.
+Verify inbound forwarding for:
+
+- Homepage (3000)
+- Vaultwarden (8080)
 
 ---
 
-## Scenario 2: Apollo Rebooted Unexpectedly
+## Scenario 2 — Athena Offline
 
-### Verification
+### Symptoms
 
-Check Proxmox status.
-
-Expected:
-
-* Athena running
-* Hestia running
-
-### Recovery
-
-If guests failed to autostart:
-
-```bash
-qm start 100
-pct start 101
-```
-
-Verify:
-
-```bash
-qm status 100
-pct status 101
-```
-
----
-
-## Scenario 3: Athena Offline
+- Grafana unavailable
+- Prometheus unavailable
+- Dashboard widgets stale
+- Dashboard API unavailable
+- `kubectl` fails
+- Portainer unavailable
 
 ### Verification
 
@@ -153,16 +505,36 @@ Start Athena:
 qm start 100
 ```
 
-Verify access:
+Verify SSH:
 
 ```bash
 ssh ubuntu@athena
-tailscale ping athena
 ```
+
+Verify containers:
+
+```bash
+docker ps
+```
+
+Expected containers:
+
+- grafana
+- prometheus
+- loki
+- alloy
+- dashboard-api
+- portainer
+- floci
 
 ---
 
-## Scenario 4: Hestia Offline
+## Scenario 3 — Hestia Offline
+
+### Symptoms
+
+- Homepage unavailable
+- Vaultwarden unavailable
 
 ### Verification
 
@@ -171,6 +543,8 @@ pct status 101
 ```
 
 ### Recovery
+
+Start Hestia:
 
 ```bash
 pct start 101
@@ -182,290 +556,20 @@ Verify:
 ping 10.10.10.2
 ```
 
----
+Then confirm:
 
-## Scenario 5: Docker Services Not Running
-
-### Verification
-
-SSH into Athena or Hestia:
-
-```bash
-docker ps
-```
-
-### Recovery
-
-Restart affected stacks.
-
-Telemetry Stack:
-
-```bash
-cd ~/homelab/docker-compose/telemetry
-docker compose down
-docker compose up -d
-```
-
-Core Services:
-
-```bash
-cd ~/homelab/docker-compose/core-services
-docker compose down
-docker compose up -d
-```
-
-Floci:
-
-```bash
-cd ~/homelab/docker-compose/floci
-docker compose down
-docker compose up -d
-```
+- Homepage loads
+- Vaultwarden login page loads
 
 ---
 
-## Scenario 6: Grafana Unavailable
-
-### Verification
-
-Open:
-
-```text
-http://<athena-ip>:3001
-```
-
-### Recovery
-
-1. Restart telemetry stack.
-2. Verify Prometheus datasource.
-3. Verify Loki datasource.
-
----
-
-## Scenario 7: Prometheus Targets Down
-
-### Verification
-
-```text
-http://<athena-ip>:9090/targets
-```
-
-### Recovery
-
-Review configuration:
-
-```bash
-docker logs prometheus
-```
-
-Validate:
-
-```bash
-cat prometheus.yml
-```
-
-Restart:
-
-```bash
-docker restart prometheus
-```
-
----
-
-## Scenario 8: Loki Unavailable
-
-### Verification
-
-```bash
-curl -I http://localhost:3100/ready
-```
-
-Expected:
-
-```text
-HTTP/1.1 200 OK
-```
-
-Inspect logs:
-
-```bash
-docker logs loki
-```
-
-### Recovery
-
-Restart Loki:
-
-```bash
-docker restart loki
-```
-
-If readiness failures persist, verify standalone configuration:
-
-```yaml
-replication_factor: 1
-
-kvstore:
-  store: inmemory
-```
-
----
-
-## Scenario 9: Logs Missing in Grafana
-
-### Verification
-
-```bash
-curl -s http://localhost:3100/loki/api/v1/labels
-```
-
-Check Grafana Explore.
-
-### Recovery
-
-1. Restart Alloy.
-
-```bash
-docker restart alloy
-```
-
-2. Verify Docker discovery.
-3. Confirm Loki ingestion.
-
----
-
-## Scenario 10: Homepage Unavailable
-
-### Verification
-
-Inspect:
-
-* services.yaml
-* widgets.yaml
-* settings.yaml
-
-### Recovery
-
-1. Restore configuration from Git.
-2. Restart core services.
-
-```bash
-docker compose restart
-```
-
----
-
-## Scenario 11: Vaultwarden Unavailable
-
-### Verification
-
-Confirm login page accessibility.
-
-### Recovery
-
-```bash
-docker restart vaultwarden
-```
-
----
-
-## Scenario 12: Floci Failure
-
-### Verification
-
-```bash
-curl http://localhost:4566
-```
-
-### Recovery
-
-```bash
-cd ~/homelab/docker-compose/floci
-docker compose down
-docker compose up -d
-```
-
-Validate Terraform workflows afterward.
-
----
-
-## Scenario 13: Terraform Failure
-
-### Verification
-
-```bash
-terraform plan
-```
-
-or
-
-```bash
-terraform apply
-```
-
-### Recovery
-
-Verify resources:
-
-* tf-homelab-storage-bucket
-* tf-homelab-metadata
-
-If state corruption exists:
-
-```bash
-terraform destroy
-terraform apply
-```
-
----
-
-## Scenario 14: Dashboard Synchronization Failure
+## Scenario 4 — Tailscale Failure
 
 ### Symptoms
 
-Homepage widgets show stale or missing data.
-
-Examples:
-
-* Weather
-* Prices
-* Pokémon
-* Last.fm
-
-### Verification
-
-Check API responses:
-
-```bash
-curl http://10.10.10.10:8000/prices
-```
-
-Verify Hestia SSH:
-
-```bash
-rc-service sshd status
-```
-
-Test synchronization:
-
-```bash
-scp root@10.10.10.2:/root/homelab/personal-services/homepage-config/data/*.json \
-~/homelab/docker-compose/dashboard-api/data/
-```
-
-### Recovery
-
-1. Restart sshd if necessary.
-2. Verify Ed25519 keys.
-3. Review cron jobs.
-
-```bash
-crontab -l
-```
-
----
-
-## Scenario 15: Tailscale Failure
+- Remote administration unavailable
+- SSH via MagicDNS fails
+- Tailnet devices unreachable
 
 ### Verification
 
@@ -475,152 +579,835 @@ tailscale status
 
 ### Recovery
 
+Restart Tailscale:
+
 ```bash
-tailscale up
+sudo tailscale up
 ```
 
-### Validation
+Verify:
 
-Verify connectivity:
+```bash
+tailscale ping apollo
+tailscale ping athena
+```
 
-* Artemis
-* Apollo
-* Athena
-
----
-
-## Scenario 16: Telegram Alert Failure
-
-### Verification
-
-Review Grafana contact points:
-
-* Bot Token
-* Chat ID
-* Notification Policies
-
-### Recovery
-
-1. Reconfigure Telegram integration.
-2. Send a test notification.
-
-### Validation
-
-Confirm message delivery.
+If only Athena is disconnected, verify internet connectivity before troubleshooting Tailscale.
 
 ---
 
-## Scenario 17: Storage Exhaustion
+## Scenario 5 — NAT Gateway Failure
+
+### Symptoms
+
+- Athena cannot access the Internet
+- Package updates fail
+- Dashboard API data becomes stale
+- External APIs unreachable
 
 ### Verification
 
 ```bash
-df -h
+curl -I https://google.com
+```
+
+If unsuccessful:
+
+```bash
+iptables -t nat -L -n -v
+```
+
+Verify:
+
+- IP forwarding enabled
+- MASQUERADE rule present
+
+Restore if required.
+
+---
+
+## Scenario 6 — Dashboard API Failure
+
+### Symptoms
+
+- Homepage widgets unavailable
+- Dashboard displays stale data
+- API endpoints fail
+
+### Verification
+
+```bash
+docker ps | grep dashboard-api
+```
+
+Test API:
+
+```bash
+curl http://10.10.10.10:8000/olympus
 ```
 
 ### Recovery
 
-1. Remove obsolete backups.
-2. Remove stale logs.
-3. Prune unused Docker resources.
+Restart the service:
 
 ```bash
-docker system prune
+docker restart dashboard-api
+```
+
+If data remains stale:
+
+- Check fetch script logs
+- Verify cron execution
+- Verify outbound Internet connectivity
+
+---
+
+## Scenario 7 — Dashboard Data Collection Failure
+
+### Symptoms
+
+Widgets stop updating.
+
+Examples:
+
+- Weather
+- Last.fm
+- Pokémon
+
+### Verification
+
+Inspect logs:
+
+```bash
+tail -f /var/log/olympus_fetch.log
+```
+
+Verify scheduled jobs:
+
+```bash
+crontab -l
+```
+
+### Recovery
+
+Run a manual update:
+
+```bash
+./olympus_update.sh
+```
+
+Verify:
+
+- Fetch scripts completed
+- JSON generated successfully
+- API reflects new data
+
+---
+
+## Scenario 8 — Cron Lock Failure
+
+### Symptoms
+
+- Widgets stop updating
+- Jobs appear idle
+- No recent timestamps
+
+### Verification
+
+Check for stale lock files:
+
+```bash
+ls /tmp/*.lock
+```
+
+### Recovery
+
+If no job is running, remove stale locks:
+
+```bash
+rm /tmp/*.lock
+```
+
+Run a manual refresh afterward.
+
+---
+
+## Scenario 9 — Invalid JSON
+
+### Symptoms
+
+Homepage reports:
+
+- Invalid JSON
+- Widget rendering failures
+
+### Verification
+
+Validate generated files:
+
+```bash
+jq . *.json
+```
+
+### Recovery
+
+Ensure all fetch scripts generate JSON using `jq` instead of manual string concatenation.
+
+Re-run the affected fetch script.
+
+---
+
+## Scenario 10 — Kubernetes Cluster Failure
+
+### Symptoms
+
+- Pods stuck in `ContainerCreating`
+- Node reports `NotReady`
+- Deployments fail
+
+### Verification
+
+```bash
+kubectl get nodes
+kubectl get pods -A
+```
+
+### Recovery
+
+Verify cgroup v2:
+
+```bash
+cat /proc/cmdline
+```
+
+Expected:
+
+```text
+systemd.unified_cgroup_hierarchy=1
+```
+
+Restart K3s:
+
+```bash
+sudo systemctl restart k3s
+```
+
+Verify:
+
+```bash
+kubectl get nodes
+```
+
+Node should report:
+
+```text
+Ready
 ```
 
 ---
 
-# Complete Environment Recovery
+## Scenario 11 — kubectl TLS Failure
 
-## Cold-Start Restoration Sequence
+### Symptoms
 
-Execute recovery in this order:
+```text
+certificate signed by unknown authority
+```
 
-1. Verify Apollo is operational.
-2. Verify vmbr0 bridge status.
-3. Restore outbound NAT if required.
-4. Verify Tailscale connectivity.
-5. Start Athena.
-6. Start Hestia.
-7. Verify Homepage and Vaultwarden.
-8. Start telemetry services.
-9. Verify Prometheus targets.
-10. Verify Loki readiness.
-11. Verify Alloy forwarding.
-12. Verify Dashboard API operation.
-13. Verify dashboard synchronization.
-14. Verify Floci.
-15. Validate Terraform.
-16. Send Telegram test notification.
+or
+
+```text
+x509 certificate is valid for...
+```
+
+### Cause
+
+The kubeconfig references Athena's Tailscale IP instead of its LAN IP.
+
+### Recovery
+
+Update the kubeconfig server endpoint:
+
+```text
+https://10.10.10.10:6443
+```
+
+Retry:
+
+```bash
+kubectl get nodes
+```
 
 ---
 
-# Recovery Objectives
+## Scenario 12 — Observability Stack Failure
 
-| Objective                 | Target       |
-| ------------------------- | ------------ |
-| Apollo Recovery           | < 5 Minutes  |
-| Athena Recovery           | < 2 Minutes  |
-| Hestia Recovery           | < 2 Minutes  |
-| Docker Recovery           | < 1 Minute   |
-| Observability Recovery    | < 2 Minutes  |
-| Full Environment Recovery | < 10 Minutes |
+### Symptoms
+
+- Grafana unavailable
+- Dashboards empty
+- Metrics missing
+
+### Verification
+
+```bash
+docker ps
+```
+
+Check Prometheus:
+
+```bash
+curl http://10.10.10.10:9090/-/ready
+```
+
+Check Loki:
+
+```bash
+curl http://10.10.10.10:3100/ready
+```
+
+### Recovery
+
+Restart telemetry stack:
+
+```bash
+docker compose restart
+```
+
+Verify:
+
+- Grafana
+- Prometheus
+- Loki
+- Alloy
+
+---
+
+## Scenario 13 — Loki Not Ready
+
+### Symptoms
+
+No logs appear in Grafana.
+
+### Verification
+
+```bash
+docker logs loki
+```
+
+### Recovery
+
+Verify standalone configuration:
+
+```yaml
+replication_factor: 1
+
+kvstore:
+  store: inmemory
+```
+
+Restart Loki:
+
+```bash
+docker restart loki
+```
+
+---
+
+## Scenario 14 — Missing Container Logs
+
+### Symptoms
+
+Metrics available but no logs visible.
+
+### Verification
+
+```bash
+docker logs alloy
+```
+
+### Recovery
+
+Restart Alloy:
+
+```bash
+docker restart alloy
+```
+
+Verify log ingestion in Grafana Explore.
+
+---
+
+## Scenario 15 — Floci Failure
+
+### Symptoms
+
+Terraform cannot communicate with AWS emulator.
+
+### Verification
+
+```bash
+curl http://10.10.10.10:4566
+```
+
+### Recovery
+
+Restart Floci:
+
+```bash
+docker restart floci
+```
+
+Verify endpoint responsiveness before retrying Terraform.
+
+---
+
+## Scenario 16 — Terraform Failure
+
+### Verification
+
+```bash
+terraform validate
+terraform plan
+```
+
+### Recovery
+
+Verify Floci is operational.
+
+If state becomes inconsistent:
+
+```bash
+terraform destroy
+terraform apply
+```
+
+Confirm resources:
+
+- tf-homelab-storage-bucket
+- tf-homelab-metadata
+
+---
+
+## Scenario 17 — Vaultwarden Returns "400 Bad Request"
+
+### Symptoms
+
+Homepage works but Vaultwarden displays:
+
+```text
+400 Bad Request
+```
+
+### Cause
+
+Client is using HTTP instead of HTTPS.
+
+### Recovery
+
+Access Vaultwarden using:
+
+```text
+https://Apollo:8080
+```
+
+No infrastructure changes are required if Homepage remains accessible.
+
+
+# Recovery Validation
+
+Perform the following validation checks before declaring the environment operational.
+
+---
+
+## Infrastructure
+
+### Apollo
+
+Verify:
+
+```bash
+ping 10.10.10.1
+```
+
+Expected:
+
+```text
+Successful response
+```
+
+---
+
+### Virtual Workloads
+
+Verify:
+
+```bash
+qm status 100
+pct status 101
+```
+
+Expected:
+
+```text
+status: running
+```
+
+---
+
+### Tailscale
+
+```bash
+tailscale status
+```
+
+Expected:
+
+- Apollo connected
+- Athena connected
+
+---
+
+### NAT Gateway
+
+```bash
+curl -I https://google.com
+```
+
+Expected:
+
+```text
+HTTP/2 200
+```
+
+---
+
+## Kubernetes
+
+Verify cluster health.
+
+```bash
+kubectl get nodes
+```
+
+Expected:
+
+```text
+STATUS: Ready
+```
+
+Verify workloads.
+
+```bash
+kubectl get pods -A
+```
+
+Expected:
+
+All pods should report:
+
+```text
+Running
+```
+
+---
+
+## Dashboard API
+
+Verify API availability.
+
+```bash
+curl http://10.10.10.10:8000/olympus
+```
+
+Expected:
+
+Valid JSON response.
+
+---
+
+## Homepage
+
+Verify:
+
+- Homepage loads successfully
+- Widgets display current data
+- Service links function correctly
+
+---
+
+## Vaultwarden
+
+Verify:
+
+```text
+https://Apollo:8080
+```
+
+Expected:
+
+Vaultwarden login page loads over HTTPS.
+
+---
+
+## Prometheus
+
+```bash
+curl http://10.10.10.10:9090/-/ready
+```
+
+Expected:
+
+```text
+Prometheus is Ready
+```
+
+---
+
+## Loki
+
+```bash
+curl http://10.10.10.10:3100/ready
+```
+
+Expected:
+
+```text
+HTTP/1.1 200 OK
+```
+
+---
+
+## Grafana
+
+Verify:
+
+- Dashboards load
+- Prometheus datasource healthy
+- Loki datasource healthy
+
+---
+
+## Grafana Alloy
+
+```bash
+docker logs alloy
+```
+
+Expected:
+
+Container discovery and log forwarding are functioning normally.
+
+---
+
+## Floci
+
+Verify:
+
+```bash
+curl http://10.10.10.10:4566
+```
+
+Then confirm Terraform connectivity.
+
+```bash
+terraform plan
+```
+
+Expected:
+
+Successful execution without connectivity errors.
+
+---
+
+# Recovery Validation Checklist
+
+## Infrastructure
+
+- [ ] Apollo operational
+- [ ] vmbr0 operational
+- [ ] IP forwarding enabled
+- [ ] NAT rules present
+- [ ] Internet connectivity restored
+- [ ] Tailscale connected
+
+---
+
+## Compute
+
+- [ ] Athena running
+- [ ] Hestia running
+- [ ] Docker operational
+- [ ] Containers healthy
+
+---
+
+## Kubernetes
+
+- [ ] Node Ready
+- [ ] System pods healthy
+- [ ] Dashboard API reachable
+
+---
+
+## Observability
+
+- [ ] Grafana operational
+- [ ] Prometheus collecting metrics
+- [ ] Loki ingesting logs
+- [ ] Alloy forwarding logs
+- [ ] Dashboards loading
+
+---
+
+## Applications
+
+- [ ] Homepage accessible
+- [ ] Dashboard widgets updating
+- [ ] Vaultwarden accessible via HTTPS
+
+---
+
+## Development
+
+- [ ] Floci operational
+- [ ] Terraform validated
 
 ---
 
 # Recovery Design Principles
 
-* Proxmox guest autostart enabled
-* Docker restart policies configured
-* Tailscale remote administration
-* Git-backed configuration management
-* Terraform-managed infrastructure
-* Documented and tested recovery procedures
-* Restore dependencies before applications
+The Olympus HomeLab follows several principles to minimize downtime and ensure predictable recovery.
+
+## Dependency-Aware Recovery
+
+Restore foundational infrastructure before dependent services.
+
+Order of recovery:
+
+1. Apollo
+2. Networking
+3. Athena
+4. Platform Services
+5. Hestia
+6. Validation
 
 ---
 
-# Health Verification Checklist
+## Persistent Configuration
 
-## Infrastructure
+Critical configuration must survive host reboots.
 
-* [ ] Apollo reachable
-* [ ] vmbr0 operational
-* [ ] NAT functioning
-* [ ] Tailscale healthy
+Examples include:
 
-## Applications
-
-* [ ] Homepage accessible
-* [ ] Vaultwarden accessible
-
-## Observability
-
-* [ ] Grafana accessible
-* [ ] Prometheus healthy
-* [ ] Loki `/ready` returns 200 OK
-* [ ] Logs visible in Grafana Explore
-* [ ] Telegram alerts operational
-
-## Development Services
-
-* [ ] Floci responding
-* [ ] Terraform operational
-
-## Dashboard Services
-
-* [ ] Olympus Dashboard API responding
-* [ ] Personal widgets updating
-* [ ] Synchronization jobs functioning
+- VM/LXC autostart
+- NAT rules
+- Docker restart policies
+- Tailscale configuration
 
 ---
 
-# Conclusion
+## Secure Remote Administration
 
-The Olympus HomeLab is designed to recover from common infrastructure failures through virtualization, containerization, observability, secure remote administration, and well-defined operational procedures.
+All administrative access is performed through Tailscale and SSH.
 
-**Current Recovery Status:** Operational
+No routine recovery procedures require exposing management services directly to the Internet.
 
-**Recovery Procedures:** Documented and Tested
+---
 
-**Overall Environment State:** Stable Operational Environment
+## Infrastructure as Code
+
+Infrastructure changes should be reproducible.
+
+Before modifying infrastructure:
+
+```bash
+terraform validate
+terraform plan
+```
+
+Terraform remains the authoritative source for Floci-managed resources.
+
+---
+
+## Safe Automation
+
+Dashboard automation should always use:
+
+- `jq` for JSON generation
+- `flock` for concurrency control
+
+These safeguards prevent malformed data and overlapping scheduled jobs.
+
+---
+
+## Continuous Validation
+
+Recovery is considered complete only after:
+
+- Services are reachable
+- Metrics are available
+- Logs are collected
+- Dashboard widgets update
+- Kubernetes reports healthy nodes
+
+---
+
+# Related Documentation
+
+For additional operational guidance, refer to:
+
+- `architecture.md` — System architecture and service layout
+- `network.md` — Network topology and NAT configuration
+- `inventory.md` — Infrastructure inventory
+- `runbook.md` — Routine operational procedures
+- `health-checks.md` — Daily and periodic validation tasks
+- `troubleshooting.md` — Incident history and root cause analysis
+- `validation-report.md` — Infrastructure validation records
+- `changelog.md` — Infrastructure change history
+
+---
+
+# Current Recovery Status
+
+| Component | Status |
+|----------|--------|
+| Apollo | ✅ Operational |
+| Networking | ✅ Operational |
+| Athena | ✅ Operational |
+| K3s Cluster | ✅ Operational |
+| Dashboard API | ✅ Operational |
+| Hestia | ✅ Operational |
+| Homepage | ✅ Operational |
+| Vaultwarden | ✅ Operational |
+| Grafana | ✅ Operational |
+| Prometheus | ✅ Operational |
+| Loki | ✅ Operational |
+| Grafana Alloy | ✅ Operational |
+| Floci | ✅ Operational |
+| Terraform | ✅ Operational |
+
+---
+
+# Recovery Objectives Summary
+
+| Objective | Target |
+|-----------|--------|
+| Apollo Recovery | < 5 Minutes |
+| Athena Recovery | < 3 Minutes |
+| Hestia Recovery | < 2 Minutes |
+| Observability Recovery | < 2 Minutes |
+| Development Services | < 1 Minute |
+| Complete Environment Recovery | < 10 Minutes |
+
+---
+
+# Document Status
+
+**Environment State:** Stable Operational Environment
+
+**Recovery Procedures:** Documented and Validated
+
+**Last Reviewed:** July 2026
+
+This runbook reflects the current Olympus HomeLab architecture, including the Dashboard V2 backend, K3s cluster, centralized observability stack, and production-inspired recovery workflows.

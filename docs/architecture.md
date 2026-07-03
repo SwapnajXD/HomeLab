@@ -2,34 +2,33 @@
 
 ## Overview
 
-The Olympus HomeLab is a production-inspired infrastructure platform designed to simulate real-world DevOps, Site Reliability Engineering (SRE), and cloud-native operational practices within a self-hosted environment.
+Olympus HomeLab is a production-inspired infrastructure platform built to simulate real-world DevOps, Site Reliability Engineering (SRE), and cloud-native operations within a self-hosted environment.
 
-The platform serves as a practical environment for developing skills in:
+It serves as a practical environment for learning and validating:
 
-* Infrastructure Engineering
-* DevOps
-* Site Reliability Engineering (SRE)
-* Linux Administration
-* Observability
-* Infrastructure as Code (IaC)
-* Incident Response
-* Disaster Recovery
-* Systems Design
+- Infrastructure Engineering
+- DevOps & SRE
+- Linux Administration
+- Infrastructure as Code (Terraform)
+- Kubernetes
+- Observability
+- Incident Response
+- Disaster Recovery
+- Systems Design
 
 ---
 
-## Architectural Principles
+# Architecture Principles
 
-The architecture is guided by the following principles:
+The platform is designed around several core principles:
 
-* Private-by-default networking
-* Service isolation
-* Remote-first administration
-* Centralized observability
-* Reproducible infrastructure
-* Lightweight workload placement
-* Operational resilience
-* Incremental evolution through experimentation
+- **Private-by-default networking** with controlled ingress
+- **Service isolation** between platform and application workloads
+- **Remote-first administration** using Tailscale and SSH
+- **Centralized observability**
+- **Infrastructure as Code**
+- **Operational resilience**
+- **Incremental evolution through experimentation**
 
 ---
 
@@ -49,8 +48,9 @@ Apollo (Proxmox VE)
     │   ├── Prometheus
     │   ├── Loki
     │   ├── Grafana Alloy
-    │   ├── Portainer
+    │   ├── K3s
     │   ├── Olympus Dashboard API
+    │   ├── Portainer
     │   └── Floci
     │
     └── Hestia (Alpine LXC)
@@ -60,123 +60,136 @@ Apollo (Proxmox VE)
 
 ---
 
-# Physical Infrastructure
+# Infrastructure
 
 ## Apollo
 
-**Primary Infrastructure Host**
+**Role:** Hypervisor & Network Gateway
 
-Apollo serves as the compute foundation of the homelab.
-
-### Platform
-
-* Proxmox VE (Type-1 Hypervisor)
+Apollo is the bare-metal Proxmox VE host that provides the compute foundation for the homelab.
 
 ### Responsibilities
 
-* Virtual Machine Hosting
-* LXC Hosting
-* Storage Management
-* Virtual Networking
-* Hardware Abstraction
+- Virtual machine and LXC hosting
+- Storage management
+- Virtual networking
+- Hardware abstraction
+- Persistent NAT gateway
+- Port forwarding for internal services
 
-### Design Rationale
-
-Separating workloads from the hypervisor improves portability, backup flexibility, and operational safety.
-
----
-
-## Artemis
-
-**Management Workstation**
-
-Artemis functions as the operational control point for the environment.
-
-### Platform
-
-* Arch Linux
-
-### Responsibilities
-
-* Infrastructure Administration
-* SSH Management
-* Git Operations
-* Terraform Development
-* Documentation
-* Remote Access
-
-### Design Rationale
-
-Keeping management tooling external to the infrastructure ensures administrative access remains available during partial service failures.
-
----
-
-# Virtualized Workload Segregation
-
-To mirror production deployment patterns, workloads are separated into platform services and user-facing applications.
+Apollo uses `iptables` to provide outbound internet access for internal workloads and selectively forwards traffic to trusted internal services.
 
 ---
 
 ## Athena (Ubuntu VM)
 
-### Role
+**Role:** Operations, Observability & Kubernetes Platform
 
-Operations, Observability, and Local Development Platform.
+Athena acts as the operational core of the homelab.
 
 ### Hosted Services
 
-| Service               | Purpose                      |
-| --------------------- | ---------------------------- |
-| Grafana               | Dashboards and Visualization |
-| Prometheus            | Metrics Collection           |
-| Loki                  | Log Aggregation              |
-| Grafana Alloy         | Log Collection               |
-| Node Exporter         | Host Metrics                 |
-| Proxmox Exporter      | Proxmox Metrics              |
-| Portainer             | Container Management         |
-| Olympus Dashboard API | Homepage Data Services       |
-| Floci                 | AWS Service Emulation        |
+| Service | Purpose |
+|----------|---------|
+| Grafana | Dashboards & Visualization |
+| Prometheus | Metrics Collection |
+| Loki | Centralized Logging |
+| Grafana Alloy | Log Collection |
+| Node Exporter | Host Metrics |
+| Proxmox Exporter | Hypervisor Metrics |
+| Portainer | Container Management |
+| K3s | Kubernetes Lab |
+| Olympus Dashboard API | Dashboard Backend |
+| Floci | AWS Service Emulation |
 
-### Design Rationale
+### Responsibilities
 
-Athena was deployed as a full virtual machine because observability and development workloads require:
+- Centralized observability
+- Kubernetes experimentation
+- Dashboard data aggregation
+- Container management
+- Infrastructure monitoring
 
-* Greater resource flexibility
-* Broad software compatibility
-* Independent lifecycle management
-* Isolation from the hypervisor
+The K3s cluster operates as a single-node Kubernetes environment with cgroup v2 enabled for stable operation.
 
 ---
 
-## Hestia (CT 101)
+## Hestia (Alpine LXC)
 
-### Role
+**Role:** Application Frontend
 
-Self-Hosted Application Platform.
+Hestia hosts lightweight user-facing services.
 
 ### Hosted Services
 
-| Service     | Purpose                  |
-| ----------- | ------------------------ |
-| Homepage    | Infrastructure Dashboard |
-| Vaultwarden | Password Management      |
+| Service | Purpose |
+|----------|---------|
+| Homepage | Infrastructure Dashboard |
+| Vaultwarden | Password Manager |
 
-### Design Rationale
+The container is intentionally lightweight, providing:
 
-Hestia uses an unprivileged Alpine Linux LXC to provide:
+- Fast startup
+- Low resource usage
+- Strong workload isolation
 
-* Minimal overhead
-* Rapid startup times
-* Efficient resource utilization
-* Strong workload isolation
+Following the Dashboard V2 redesign, Hestia no longer performs backend data collection and instead consumes the centralized Dashboard API hosted on Athena.
 
-This placement is well suited to lightweight, continuously running services.
+---
+
+## Artemis
+
+**Role:** Management Workstation
+
+Artemis is the external administration workstation used to manage the entire environment.
+
+### Responsibilities
+
+- SSH administration
+- Git operations
+- Terraform development
+- Kubernetes management
+- Documentation
+- Remote infrastructure access
+
+Keeping management tooling outside the infrastructure ensures administration remains possible during partial service failures.
+
+---
+
+# Dashboard Architecture
+
+The dashboard follows a decoupled API-driven architecture.
+
+```text
+External APIs
+      │
+      ▼
+Collection Scripts
+      │
+      ▼
+Olympus Dashboard API (Athena)
+      │
+      ▼
+Homepage (Hestia)
+```
+
+### Workflow
+
+1. Automated Python and Shell scripts collect external data.
+2. The Dashboard API aggregates all data into a unified JSON response.
+3. Homepage consumes the API to render widgets.
+
+### Benefits
+
+- Separation of frontend and backend
+- Faster dashboard loading
+- Easier maintenance
+- Extensible widget development
+- Single source of truth for dashboard data
 
 ---
 
 # Observability Architecture
-
-The observability stack provides unified visibility across the environment.
 
 ## Metrics Pipeline
 
@@ -195,37 +208,32 @@ Proxmox Exporter
 Prometheus
 ```
 
-### Capabilities
+### Features
 
-* Host Monitoring
-* VM Monitoring
-* Capacity Planning
-* Resource Utilization Tracking
-* Infrastructure Visibility
+- Host monitoring
+- VM monitoring
+- Capacity planning
+- Resource utilization
+- Infrastructure dashboards
 
 ---
 
 ## Logging Pipeline
 
 ```text
-Docker Containers
-        │
-        ▼
+Containers
+      │
+      ▼
 Grafana Alloy
-        │
-        ▼
+      │
+      ▼
 Loki
-        │
-        ▼
+      │
+      ▼
 Grafana
 ```
 
-### Capabilities
-
-* Centralized Logging
-* Historical Log Search
-* Container Log Aggregation
-* Troubleshooting Support
+Provides centralized log aggregation, historical search, and troubleshooting.
 
 ---
 
@@ -233,94 +241,44 @@ Grafana
 
 ```text
 Prometheus
-        │
-        ▼
+      │
+      ▼
 Grafana Alerting
-        │
-        ▼
+      │
+      ▼
 Telegram
 ```
 
-### Alert Coverage
+Alerts cover:
 
-* Host Availability
-* Service Availability
-* CPU Utilization
-* Memory Utilization
-* Disk Capacity
-* Infrastructure Health
+- Host availability
+- Service availability
+- CPU utilization
+- Memory utilization
+- Disk capacity
+- Infrastructure health
 
 ---
 
-# Infrastructure as Code Architecture
+# Infrastructure as Code
 
-Infrastructure provisioning and experimentation are managed through Terraform.
-
-## Active Cloud Emulation
+Infrastructure provisioning and cloud experimentation are managed using Terraform.
 
 ```text
 Terraform
-        │
-        ▼
+      │
+      ▼
 Floci
-        │
-        ├── S3
-        └── DynamoDB
+      ├── S3
+      └── DynamoDB
 ```
-
-### Managed Resources
-
-* `tf-homelab-storage-bucket`
-* `tf-homelab-metadata`
 
 ### Benefits
 
-* Reproducible Deployments
-* Safe Experimentation
-* Zero Cloud Cost
-* Local Validation of AWS Workflows
-
----
-
-## Architectural Evolution
-
-Floci replaced LocalStack as the active AWS emulation platform due to its significantly lower startup time and resource consumption.
-
-LocalStack is retained as a historical reference and compatibility artifact documenting the platform's evolution.
-
----
-
-# Dashboard Data Architecture
-
-Custom Homepage widgets rely on a decoupled synchronization pipeline.
-
-```text
-Hestia
-    │
-    ├── Collect External Data
-    │
-    ▼
-Generate JSON Assets
-    │
-    ▼
-Secure SCP Synchronization
-    │
-    ▼
-Athena
-    │
-    ▼
-Olympus Dashboard API
-    │
-    ▼
-Homepage Widgets
-```
-
-### Design Goals
-
-* Decouple data collection from presentation
-* Minimize external dependencies in the frontend
-* Preserve dashboard responsiveness
-* Support extensible widget development
+- Reproducible deployments
+- Local AWS workflow validation
+- Zero cloud cost experimentation
+- Safe infrastructure testing
 
 ---
 
@@ -328,76 +286,69 @@ Homepage Widgets
 
 The homelab follows a defense-in-depth approach.
 
-## Security Principles
+## Principles
 
-* Private-by-default networking
-* No intentional public exposure
-* Tailscale-only remote administration
-* Service isolation
-* Internal service communication
-* Least-exposure design
+- Private-by-default networking
+- No unnecessary public exposure
+- Tailscale-only remote administration
+- Service isolation
+- Least-privilege communication
 
 ---
 
-## Remote Access Model
+## Remote Access
 
 ```text
 Artemis
-    │
-    ▼
-Tailscale Network
-    │
-    ▼
+      │
+      ▼
+Tailscale
+      │
+      ▼
 Apollo
-    │
-    ├── Athena
-    │
-    └── Hestia (Indirect Access)
+      │
+      ├── Athena
+      └── Hestia
 ```
 
-### Security Decisions
+Administrative access is performed entirely through Tailscale and SSH.
 
-* No public SSH access
-* No router port forwarding
-* Device-authenticated administration
-* Encrypted WireGuard transport
-* Hestia excluded from the Tailscale mesh to reduce exposure of sensitive services
+Apollo provides internal routing using persistent NAT and selectively forwards only required services to the internal network.
 
 ---
 
 # Operational Status
 
-| Component         | Status      |
-| ----------------- | ----------- |
-| Apollo            | Healthy     |
-| Artemis           | Healthy     |
-| Athena            | Healthy     |
-| Hestia            | Healthy     |
-| Grafana           | Healthy     |
-| Prometheus        | Healthy     |
-| Loki              | Healthy     |
-| Grafana Alloy     | Healthy     |
-| Node Exporter     | Healthy     |
-| Proxmox Exporter  | Healthy     |
-| Floci             | Healthy     |
-| Metrics Pipeline  | Operational |
-| Logging Pipeline  | Operational |
-| Alerting Pipeline | Operational |
+| Component | Status |
+|----------|--------|
+| Apollo | Healthy |
+| Athena | Healthy |
+| Hestia | Healthy |
+| Artemis | Healthy |
+| Grafana | Operational |
+| Prometheus | Operational |
+| Loki | Operational |
+| Grafana Alloy | Operational |
+| K3s | Operational |
+| Homepage | Operational |
+| Vaultwarden | Operational |
+| Dashboard API | Operational |
 
 ---
 
-# Current Architecture State
+# Current State
 
 **Phase:** Stable Operational Environment
 
 The Olympus HomeLab currently provides:
 
-* Centralized observability
-* Secure remote administration
-* Self-hosted application services
-* Local AWS workflow experimentation
-* Automated dashboard integrations
-* Infrastructure as Code validation
-* Operational resilience through documented processes
+- Secure private infrastructure
+- Centralized observability
+- Kubernetes experimentation
+- Infrastructure as Code workflows
+- Self-hosted applications
+- Automated dashboard integrations
+- Remote-first administration
+- Production-inspired operational practices
 
-The architecture continues to evolve incrementally through experimentation while preserving production-inspired design principles.
+The platform continues to evolve incrementally while maintaining a stable, production-inspired architecture.
