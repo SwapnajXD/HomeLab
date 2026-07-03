@@ -1,116 +1,330 @@
-# HomeLab
+# Olympus HomeLab
 
-![Platform](https://img.shields.io/badge/platform-Proxmox-blue)
-![OS](https://img.shields.io/badge/os-Ubuntu-orange)
+![Platform](https://img.shields.io/badge/platform-Proxmox%20VE-blue)
+![OS](https://img.shields.io/badge/os-Ubuntu%20%7C%20Alpine-orange)
 ![Containers](https://img.shields.io/badge/containers-Docker-blue)
-![IaC](https://img.shields.io/badge/IaC-Terraform-purple)
+![Orchestration](https://img.shields.io/badge/orchestration-K3s-326CE5)
+![IaC](https://img.shields.io/badge/IaC-Terraform-7B42BC)
 ![Monitoring](https://img.shields.io/badge/monitoring-Grafana%20%7C%20Prometheus-green)
-![Logging](https://img.shields.io/badge/logging-Loki-yellow)
-![Alerting](https://img.shields.io/badge/alerting-Telegram-success)
-![VPN](https://img.shields.io/badge/network-Tailscale-blue)
+![Logging](https://img.shields.io/badge/logging-Loki%20%7C%20Grafana%20Alloy-yellow)
+![Remote](https://img.shields.io/badge/remote-Tailscale-blue)
+![Status](https://img.shields.io/badge/status-Fully%20Validated-brightgreen)
 
-A self-hosted homelab built on Proxmox VE for learning infrastructure engineering, observability, networking, automation, Infrastructure as Code, and disaster recovery practices.
-The environment is fully manageable remotely through Tailscale and is designed to remain operational without physical access.
+A production-inspired self-hosted HomeLab built on **Proxmox VE** for learning modern infrastructure engineering, Site Reliability Engineering (SRE), Kubernetes, observability, Infrastructure as Code, automation, and disaster recovery.
 
----
-
-## Infrastructure Overview
-* **Apollo:** Proxmox VE Hypervisor
-* **Athena:** Ubuntu VM (Monitoring, Automation, IaC)
-* **Hestia:** LXC Container (Core Applications)
-* **Artemis:** Arch Linux Management Workstation
+The environment is designed around a layered architecture where infrastructure, operations, and frontend services are separated into dedicated nodes. It is fully manageable through **Tailscale** and documented with production-style operational procedures.
 
 ---
 
-## Key Achievements
-* Built a multi-node Proxmox homelab
-* Implemented secure remote management through Tailscale
-* Centralized monitoring using Prometheus and Grafana
-* Centralized log aggregation using Loki and Grafana Alloy
-* Implemented Telegram-based infrastructure alerting
-* Automated cloud resource provisioning using Terraform
-* Validated infrastructure through reboot and disaster recovery testing
-* Maintained complete infrastructure documentation
-* Implemented Infrastructure as Code workflows using LocalStack and Terraform
-* Performed troubleshooting and root cause analysis on production-style incidents
+# Architecture
+
+```
+                    Artemis
+           (Management Workstation)
+                    │
+             Tailscale Mesh
+                    │
+                Apollo
+          Proxmox VE Hypervisor
+                    │
+      ┌─────────────┴─────────────┐
+      │                           │
+ VM 100: Athena             CT 101: Hestia
+ Ubuntu Operations VM      Alpine Frontend LXC
+      │                           │
+ Docker + K3s                Docker Compose
+      │                           │
+ Grafana                    Homepage
+ Prometheus                 Vaultwarden
+ Loki
+ Grafana Alloy
+ Dashboard API
+ Portainer
+ Floci
+```
 
 ---
 
-## Technology Stack
-### Infrastructure
-* Proxmox VE | Ubuntu Server | Linux Containers (LXC) | Docker | Docker Compose
-### Networking
-* Tailscale | Linux Bridges | Proxmox Virtual Networking
-### Monitoring, Logging & Alerting
-* Grafana | Prometheus | Loki | Grafana Alloy | Node Exporter | Proxmox Exporter | Telegram Alerting
-### Automation & IaC
-* Terraform | LocalStack | AWS CLI | Bash
+# Infrastructure Overview
+
+## Apollo
+
+**Role:** Proxmox VE Hypervisor
+
+Responsibilities:
+
+- Virtualization
+- Storage Management
+- Virtual Networking
+- Persistent NAT Gateway
+- Port Forwarding
 
 ---
+
+## Athena (VM 100)
+
+**Role:** Operations Platform
+
+Hosted Services:
+
+- Grafana
+- Prometheus
+- Loki
+- Grafana Alloy
+- Node Exporter
+- Proxmox Exporter
+- Olympus Dashboard API
+- Portainer
+- Floci
+- K3s Kubernetes Cluster
+
+---
+
+## Hestia (CT 101)
+
+**Role:** Frontend Platform
+
+Hosted Services:
+
+- Homepage Dashboard
+- Vaultwarden
+
+---
+
+## Artemis
+
+**Role:** Management Workstation
+
+Used for:
+
+- SSH Administration
+- kubectl Management
+- Terraform
+- Git Operations
+- Documentation
+
+---
+
+# Features
+
+- Proxmox-based virtualized infrastructure
+- Docker Compose service orchestration
+- Single-node K3s Kubernetes cluster
+- Secure remote administration with Tailscale
+- Centralized metrics using Prometheus
+- Centralized logging using Loki & Grafana Alloy
+- Grafana dashboards and alerting
+- Telegram alert notifications
+- Infrastructure as Code with Terraform
+- Local AWS emulation using Floci
+- Custom FastAPI Dashboard Backend
+- Automated dashboard data pipelines
+- Disaster Recovery Runbook
+- Operational Runbook
+- Infrastructure Validation Reports
+- Health Verification Procedures
+- Production-style documentation
+
+---
+
+# Technology Stack
+
+## Infrastructure
+
+- Proxmox VE
+- Ubuntu Server
+- Alpine Linux
+- Docker
+- Docker Compose
+- LXC
+
+## Kubernetes
+
+- K3s
+- kubectl
+- Portainer
+
+## Networking
+
+- Tailscale
+- Linux Bridge (`vmbr0`)
+- iptables NAT
+- DNAT Port Forwarding
+
+## Observability
+
+- Grafana
+- Prometheus
+- Loki
+- Grafana Alloy
+- Node Exporter
+- Proxmox Exporter
+
+## Automation
+
+- Bash
+- Cron
+- flock
+- jq
 
 ## Infrastructure as Code
-Terraform is used with LocalStack to simulate AWS services locally.
-Current resources include:
-* `tf-homelab-storage-bucket`
-* `tf-homelab-metadata`
 
-Benefits:
-* Repeatable deployments
-* Safe experimentation
-* No cloud costs
-* Infrastructure testing workflows
+- Terraform
+- Floci
+- AWS CLI
+
+## Dashboard
+
+- FastAPI
+- Homepage
 
 ---
 
-## Documentation Map
+# Dashboard V2
+
+The dashboard follows a backend-first architecture.
+
+```
+External APIs
+       │
+       ▼
+Fetch Scripts
+       │
+       ▼
+flock Lock Protection
+       │
+       ▼
+JSON Generation (jq)
+       │
+       ▼
+Olympus Dashboard API
+       │
+       ▼
+Homepage
+```
+
+Athena serves as the single source of truth for all dashboard data, while Hestia acts as a lightweight frontend.
+
+---
+
+# Documentation
+
 | Document | Description |
-| ------ | ------ |
-| [Architecture](docs/architecture.md) | Infrastructure architecture |
-| [Network](docs/network.md) | Network topology and routing |
-| [Security](docs/security.md) | Security posture and access controls |
-| [Inventory](docs/inventory.md) | Infrastructure inventory |
-| [Runbook](docs/runbook.md) | Operational procedures |
-| [Troubleshooting](docs/troubleshooting.md) | Issues encountered and resolutions |
-| [Disaster Recovery](docs/disaster-recovery.md) | Recovery procedures |
-| [Validation Report](docs/validation-report.md) | Validation and testing results |
-| [Changelog](docs/changelog.md) | Infrastructure changes over time |
-| [Project Timeline](docs/project-timeline.md) | Project milestones and history |
-| [Roadmap](HOMELAB_ROADMAP.md) | Lean Engineering Homelab Roadmap |
+|----------|-------------|
+| `architecture.md` | Infrastructure architecture |
+| `network.md` | Network topology and routing |
+| `inventory.md` | Infrastructure inventory |
+| `runbook.md` | Operational procedures |
+| `health-checks.md` | Health verification guide |
+| `troubleshooting.md` | Common issues and resolutions |
+| `disaster-recovery.md` | Recovery procedures |
+| `validation-report.md` | Infrastructure validation |
+| `project-timeline.md` | Project lifecycle |
+| `changelog.md` | Infrastructure changes |
 
 ---
 
-## Screenshots
+# Infrastructure Validation
 
-### Homepage Dashboard
-![Homepage Dashboard](screenshots/homepage-dashboard.png)
+The environment has been validated across:
 
-### Grafana Dashboard
-![Grafana Dashboard](screenshots/grafana-dashboard.png)
+- Infrastructure
+- Networking
+- Kubernetes
+- Monitoring
+- Logging
+- Automation
+- Disaster Recovery
+- Infrastructure as Code
 
-### Prometheus Targets
-![Prometheus Targets](screenshots/prometheus-targets.png)
+**Operational Status:** ✅ Fully Validated
 
-### Loki Logs
-![Loki Logs](screenshots/loki-logs.png)
+---
 
-### Portainer
+# Screenshots
+
+## Homepage
+
+![Homepage](screenshots/homepage-dashboard.png)
+
+## Grafana
+
+![Grafana](screenshots/grafana-dashboard.png)
+
+## Prometheus
+
+![Prometheus](screenshots/prometheus-targets.png)
+
+## Loki
+
+![Loki](screenshots/loki-logs.png)
+
+## Portainer
+
 ![Portainer](screenshots/portainer.png)
 
-### Proxmox Summary
-![Proxmox Summary](screenshots/proxmox-summary.png)
+## Proxmox
+
+![Proxmox](screenshots/proxmox-summary.png)
 
 ---
 
-## Future Roadmap & Plans
-The following initiatives are planned for the next phase of the homelab's evolution:
-* **CI/CD & GitOps:** Transitioning the repository into a fully automated GitOps deployment structure.
-* **Backup & Restore Automation:** Scripting automated, version-controlled backups for all container volumes and configurations.
-* **ESP32 Telemetry Integration:** Integrating external IoT and hardware sensors into the Prometheus metrics pipeline.
-* **Advanced Monitoring Upgrades:** Adding network latency tracking, uptime monitoring, and SRE-grade Grafana dashboards.
-* **Security Enhancements:** Implementing Tailscale ACLs, network device tagging, and secure authentication layers for Prometheus and Loki.
-* **Architecture Flow Diagrams:** Generating dedicated Mermaid.js flow diagrams for metrics, logging, alerting, and recovery.
+# Future Roadmap
+
+- GitOps with Argo CD or Flux
+- Automated Proxmox backup validation
+- Traefik Ingress for K3s
+- Persistent Volumes in Kubernetes
+- ESP32 telemetry integration
+- Advanced Grafana dashboards
+- Tailscale ACLs
+- Automated infrastructure testing
+- CI/CD for documentation
+- Expanded Kubernetes workloads
 
 ---
 
-## License
-MIT License
+# Repository Structure
+
+```text
+.
+├── docs/
+│   ├── architecture.md
+│   ├── network.md
+│   ├── inventory.md
+│   ├── runbook.md
+│   ├── health-checks.md
+│   ├── troubleshooting.md
+│   ├── disaster-recovery.md
+│   ├── validation-report.md
+│   ├── project-timeline.md
+│   └── changelog.md
+├── screenshots/
+├── docker-compose/
+├── terraform/
+└── README.md
+```
+
+---
+
+# Goals
+
+This project is built to gain practical experience with:
+
+- Linux System Administration
+- Virtualization
+- Kubernetes
+- Docker
+- Infrastructure as Code
+- Networking
+- Site Reliability Engineering
+- Observability
+- Incident Response
+- Disaster Recovery
+- Production-style Documentation
+
+---
+
+# License
+
+This project is licensed under the MIT License.
