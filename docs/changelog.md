@@ -8,9 +8,42 @@ It captures **what changed, why it changed, and the impact of those changes**, p
 
 ---
 
-# Phase 9 — Kubernetes & Dashboard V2 (June 2026)
+# Phase 10 — Log Aggregation Hardening (2026-07-05)
 
-A major architectural milestone introducing Kubernetes and a centralized dashboard backend.
+Extended the observability stack with centralized logging on top of the existing Prometheus/Grafana metrics stack.
+
+## Added
+
+- Loki 3.0 (filesystem storage, TSDB index, single-binary mode).
+- Grafana Alloy as the log collector, replacing Promtail across the fleet.
+- Loki datasource wired into Grafana, with working Explore queries (`{host="athena"}`).
+
+## Known Issue (open)
+
+Only the `grafana` and `loki` containers are currently being ingested; `prometheus`, `cadvisor`, `node-exporter`, `proxmox-exporter`, `portainer`, and `floci_aws` logs are not yet appearing. Root cause suspected to be an incomplete `discovery.docker`/`loki.source.docker` configuration in Alloy rather than a Loki or Grafana problem. See `postmortems.md` (2026-07-05) for full investigation notes.
+
+---
+
+# Phase 9.5 — Network Bring-up & Port Forwarding (2026-06-30)
+
+Configured Apollo (Proxmox host) to provide outbound internet access to the isolated `10.10.10.0/24` VM network and to forward external connections to Hestia.
+
+## Added
+
+- Outbound NAT (`MASQUERADE`) from `10.10.10.0/24` through Apollo's Wi-Fi uplink.
+- DNAT port forwarding: Apollo `:3000` → Hestia Homepage, Apollo `:8080` → Hestia Vaultwarden.
+
+## Fixed
+
+Diagnosed a Vaultwarden "unreachable" report that was actually an application-layer protocol mismatch — Vaultwarden serves HTTPS internally (`ROCKET_TLS`), and the client was connecting over plain HTTP. No networking change was required; connecting via `https://` resolved it. Full walkthrough in `postmortems.md` (2026-06-30).
+
+---
+
+# Phase 9 — Kubernetes Lab & Dashboard Build/Rollback (2026-06-11 → 2026-06-27)
+
+Full dated build log, every incident encountered, and every fix applied for this phase — including the K3s cluster stand-up, the Athena network outage, the media-pipeline cron/JSON bugs, and the custom Homepage widget being built and later torn out in favor of a more maintainable integration — now lives in **`postmortems.md`**. Summary below.
+
+A major architectural milestone introducing Kubernetes, and a dashboard backend that was ultimately decommissioned (see Phase 11).
 
 ## Added
 
@@ -21,7 +54,7 @@ A major architectural milestone introducing Kubernetes and a centralized dashboa
 - Configured secure remote administration from Artemis using `kubectl`.
 - Integrated Portainer for graphical Kubernetes management.
 
-### Olympus Dashboard V2
+### Olympus Dashboard V2 *(later fully removed — see Phase 11)*
 
 The dashboard architecture was redesigned around a centralized backend.
 
@@ -32,7 +65,7 @@ Changes included:
 - Established Athena as the single source of truth.
 - Decoupled backend processing from frontend presentation.
 
-### Dashboard Improvements
+### Dashboard Improvements *(later fully removed — see Phase 11)*
 
 - LastFM album artwork support
 - Pokémon species descriptions
@@ -228,6 +261,28 @@ This established the foundation for all future infrastructure development.
 
 ---
 
+# Phase 11 — Dashboard API Decommission (2026-07-17)
+
+Following on from the widget rollback in Phase 9, the entire Dashboard API concept was removed for good.
+
+## Removed
+
+- FastAPI Dashboard API container and image on Athena.
+- All fetch scripts (LastFM, weather, prices, Pokémon, library, MyAnimeList, media/wallpaper) and their cron jobs.
+- Any remaining custom Homepage integration code.
+
+## Result
+
+- Hestia now runs **Homepage in its stock, default configuration** — service links only, no custom widget, no backend dependency.
+- Athena no longer runs any dashboard-related container, script, or scheduled job.
+- Removes the small amount of ongoing maintenance risk the API represented, in exchange for a simpler, more reliable frontend.
+
+## Rationale
+
+Consistent with the lesson already learned in Phase 9: Homepage works best as a dashboard, not an application platform, and a backend is only worth keeping if something is still consuming it. See `postmortems.md` and `architecture.md` for the full history and current state.
+
+---
+
 # Operational Milestones
 
 | Milestone | Status |
@@ -236,11 +291,11 @@ This established the foundation for all future infrastructure development.
 | Secure Remote Administration | Complete |
 | Core Services | Complete |
 | Observability Stack | Complete |
-| Centralized Logging | Complete |
+| Centralized Logging | Complete (partial log discovery — open) |
 | Infrastructure as Code | Complete |
 | Floci Migration | Complete |
 | Kubernetes Deployment | Complete |
-| Dashboard V2 | Complete |
+| Dashboard API | Decommissioned |
 | Documentation Standardization | Complete |
 
 ---
@@ -257,8 +312,7 @@ This established the foundation for all future infrastructure development.
 - Centralized observability
 - Infrastructure as Code
 - Secure remote administration
-- Self-hosted applications
-- Dashboard API
+- Self-hosted applications (Homepage, Vaultwarden — stock configuration)
 - Local AWS emulation
 - Disaster recovery procedures
 - Production-inspired documentation
@@ -269,6 +323,7 @@ This established the foundation for all future infrastructure development.
 
 Planned areas of exploration include:
 
+- Fixing Grafana Alloy's Docker log discovery gap
 - Automated backup validation
 - Enhanced Grafana dashboards
 - CI/CD experimentation
@@ -282,8 +337,14 @@ Planned areas of exploration include:
 
 # Current Status
 
-**Last Updated:** June 2026
+**Last Updated:** 2026-07-17
 
 **Environment:** Stable Operational Environment
 
 The Olympus HomeLab has evolved from a simple virtualization host into a production-inspired infrastructure platform featuring Kubernetes, centralized observability, Infrastructure as Code, secure remote administration, and comprehensive operational documentation.
+
+## Known Open Items (as of 2026-07-17)
+
+- Loki/Alloy centralized logging is live but only ingesting 2 of 9 Docker containers on Athena; Docker log discovery in Alloy still needs to be fixed (see `postmortems.md`, `troubleshooting.md`).
+- MyAnimeList (MAL) dashboard integration is moot — the dashboard itself has been removed (kept here only as historical context).
+- Reading/library tracking automation is likewise moot following the dashboard removal.

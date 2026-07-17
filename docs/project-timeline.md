@@ -4,7 +4,7 @@
 
 This document provides a chronological record of the Olympus HomeLab's evolution from a basic virtualization platform into a production-inspired infrastructure focused on Site Reliability Engineering (SRE), observability, automation, and cloud-native technologies.
 
-Each phase documents the major architectural decisions, deployments, incident-driven improvements, and operational milestones that shaped the environment.
+Each phase documents the major architectural decisions, deployments, incident-driven improvements, and operational milestones that shaped the environment. For the full dated, incident-by-incident write-up (what broke, root cause, and fix) behind Phases 9 and 10, see `postmortems.md`.
 
 ---
 
@@ -338,3 +338,59 @@ Created:
 ## Outcome
 
 The HomeLab matured into a fully documented and maintainable engineering platform suitable for long-term operation and portfolio presentation.
+
+---
+
+# Phase 9 — Kubernetes Lab & Dashboard V2
+
+**Period:** 2026-06-11 → 2026-06-27
+
+## Objectives
+
+- Stand up a K3s cluster on Athena, manageable remotely from Artemis.
+- Rebuild the Olympus dashboard around a centralized FastAPI backend instead of frontend-local scripts.
+
+## Milestones
+
+- **2026-06-17:** Decision made to move all dashboard data collection to Athena; Hestia becomes presentation-only.
+- **2026-06-21:** K3s stood up on Athena (cgroup v2 enabled, remote `kubectl` access from Artemis over the LAN IP, Portainer Agent integrated).
+- **2026-06-21 → 06-22:** Athena briefly dropped off the Tailnet due to a transient upstream network interruption; fully recovered with no configuration changes (full postmortem in `postmortems.md`).
+- **2026-06-21:** Olympus V2 backend build — wallpaper engine, LastFM integration, cron automation, MAL widget attempt.
+- **2026-06-18 → 06-27:** Full command-center build on top of Homepage; the custom `custom.js`/`custom.css` widget was ultimately judged too fragile (broke on mobile, tightly coupled to Homepage internals) and was torn out in favor of the more maintainable API-driven integration reflected in `architecture.md` today.
+
+## Outcome
+
+A working K3s lab with remote management, and a Dashboard API backend on Athena that survived this round of the widget rewrite/rollback cycle — though it was later removed entirely (see Phase 11). Every incident, root cause, and fix from this phase is logged in detail in **`postmortems.md`**.
+
+---
+
+# Phase 10 — Network Bring-up & Observability Hardening
+
+**Period:** 2026-06-26 → 2026-07-05
+
+## Milestones
+
+- **2026-06-26:** LastFM/media-pipeline cron overlap and GitHub API rate-limit crash resolved with `flock` locking, `jq` response validation, and wallpaper fallback logic.
+- **2026-06-30:** Apollo configured for outbound NAT and DNAT port forwarding to Hestia (Homepage, Vaultwarden); a "Vaultwarden unreachable" report was traced to an HTTP-vs-HTTPS protocol mismatch, not a networking fault.
+- **2026-07-05:** Loki + Grafana Alloy deployed for centralized logging alongside the existing Prometheus/Grafana metrics stack; end-to-end log pipeline confirmed working, but Docker container discovery in Alloy is only picking up 2 of 9 running containers — open investigation.
+
+## Outcome
+
+The network layer is fully routable and forwarded, and centralized logging exists end-to-end, though full Docker log discovery remains the top open item heading into the next phase. Full incident detail in `postmortems.md`.
+
+---
+
+# Phase 11 — Dashboard API Decommission
+
+**Date:** 2026-07-17
+
+## What happened
+
+The entire Olympus Dashboard API concept — the FastAPI backend on Athena, its fetch scripts, and their cron jobs — was removed. Hestia's Homepage instance now runs in its stock, default configuration with no custom widget and no backend dependency.
+
+## Outcome
+
+This closes out the dashboard experiment that ran through Phases 9 and part of the widget rollback: the frontend widget was retired first (2026-06-27), and the backend it had been decoupled from was retired afterward. The homelab's frontend is now intentionally minimal — see `architecture.md` for the current state and `changelog.md` (Phase 11) / `postmortems.md` for the full rationale.
+
+---
+

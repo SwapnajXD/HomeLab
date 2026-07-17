@@ -19,12 +19,11 @@ The verification process follows a bottom-up approach, validating networking and
 | Athena | Ubuntu Operations VM |
 | Hestia | Alpine Linux Application Container |
 | K3s | Kubernetes Control Plane |
-| Olympus API | Dashboard Backend |
 | Grafana | Visualization |
 | Prometheus | Metrics Collection |
 | Loki | Log Aggregation |
 | Grafana Alloy | Log Collection |
-| Homepage | Dashboard Frontend |
+| Homepage | Infrastructure Dashboard (stock frontend) |
 | Vaultwarden | Password Manager |
 | Floci | Local AWS Emulator |
 
@@ -226,7 +225,6 @@ Expected services:
 - prometheus
 - loki
 - grafana-alloy
-- dashboard-api
 - portainer
 - floci_aws
 
@@ -424,27 +422,9 @@ Open **Grafana Explore** and query:
 
 ---
 
-# Layer 5 — Dashboard & Application Health
+# Layer 5 — Application Health
 
-## Verify Olympus Dashboard API
-
-Execute:
-
-```bash
-curl http://10.10.10.10:8000/olympus | jq .
-```
-
-### Expected Result
-
-A valid JSON response containing:
-
-- LastFM
-- Weather
-- Pokémon
-- Investments
-- System information
-
----
+> Note: this layer previously included checks for a custom "Olympus" Dashboard API and its cron-based sync. That component has been fully decommissioned (see `architecture.md`, `postmortems.md`) — Homepage now runs stock, with no backend API or scheduled data pipeline to verify.
 
 ## Verify Homepage
 
@@ -457,9 +437,8 @@ http://<apollo-ip>:3000
 ### Expected Result
 
 - Homepage loads successfully
-- Widgets display live data
-- Hero panel displays correctly
-- No broken images
+- Service links resolve correctly
+- No broken images or console errors
 
 ---
 
@@ -478,32 +457,6 @@ https://<apollo-ip>:8080
 - HTTPS certificate accepted
 
 > **Note:** Vaultwarden is configured for **HTTPS only**. Accessing it over HTTP will result in a protocol mismatch.
-
----
-
-## Verify Dashboard Synchronization
-
-On Athena:
-
-```bash
-ls /tmp/*.lock
-```
-
-### Expected Result
-
-No stale lock files remain after scheduled jobs.
-
-Verify cron execution:
-
-```bash
-grep CRON /var/log/syslog
-```
-
-Expected:
-
-- Scheduled jobs execute normally.
-- No overlapping executions.
-- `flock` prevents concurrent runs.
 
 ---
 
@@ -628,13 +581,9 @@ instead of the Tailscale IP.
 
 ## Applications
 
-- [ ] Olympus Dashboard API returns valid JSON.
 - [ ] Homepage loads successfully.
-- [ ] Homepage widgets display live data.
-- [ ] Hero panel displays correctly.
+- [ ] Homepage service links resolve correctly.
 - [ ] Vaultwarden is accessible over HTTPS.
-- [ ] No stale cron lock files exist.
-- [ ] Dashboard synchronization is functioning.
 
 ---
 
@@ -657,9 +606,8 @@ instead of the Tailscale IP.
 | Containerization | PASS | Docker workloads healthy |
 | Kubernetes | PASS | K3s cluster healthy |
 | Monitoring | PASS | Prometheus targets UP |
-| Logging | PASS | Loki and Grafana Alloy operational |
-| Dashboard API | PASS | API responding with valid JSON |
-| Homepage | PASS | Frontend accessible |
+| Logging | PARTIAL | Loki/Alloy operational, container discovery incomplete (see `troubleshooting.md`) |
+| Homepage | PASS | Stock frontend accessible |
 | Vaultwarden | PASS | HTTPS functioning correctly |
 | Infrastructure as Code | PASS | Terraform validated |
 | Local Cloud | PASS | Floci operational |
@@ -674,7 +622,6 @@ instead of the Tailscale IP.
 | Infrastructure Health | Daily |
 | Docker Containers | Daily |
 | K3s Cluster | Daily |
-| Dashboard API | Daily |
 | Homepage & Vaultwarden | Daily |
 | Prometheus Targets | Daily |
 | Loki & Alloy | Daily |
@@ -691,10 +638,10 @@ instead of the Tailscale IP.
 |----------|--------|
 | Environment State | **Stable Operational Environment** |
 | Platform Maturity | **Production-Inspired HomeLab** |
-| Last Full Validation | **June 2026** |
+| Last Full Validation | **July 2026** |
 | Kubernetes Status | **Operational** |
-| Dashboard V2 Status | **Operational** |
-| Observability Status | **Healthy** |
+| Homepage | **Operational (stock configuration)** |
+| Observability Status | **Healthy (logging gap open — see `troubleshooting.md`)** |
 | Documentation Coverage | **Complete** |
 | Operational Readiness | **FULLY VALIDATED** |
 
@@ -702,9 +649,9 @@ instead of the Tailscale IP.
 
 # Conclusion
 
-The Olympus HomeLab has been validated across every operational layer, including infrastructure, networking, containerization, Kubernetes, observability, automation, and application services.
+The Olympus HomeLab has been validated across every operational layer, including infrastructure, networking, containerization, Kubernetes, observability, and application services.
 
-Routine health verification, documented operational procedures, and continuous validation ensure that the platform remains reliable, maintainable, and resilient. Incident-driven improvements—including persistent NAT configuration, cgroup v2 migration, Dashboard V2 architecture, and standardized recovery procedures—have strengthened the environment and reduced operational risk.
+Routine health verification, documented operational procedures, and continuous validation ensure that the platform remains reliable, maintainable, and resilient. Incident-driven improvements — including persistent NAT configuration, cgroup v2 migration, the decommissioning of the fragile custom dashboard integration in favor of a stock Homepage, and standardized recovery procedures — have strengthened the environment and reduced operational risk.
 
 By combining proactive monitoring, centralized logging, Infrastructure as Code, secure remote administration, and comprehensive documentation, the HomeLab closely reflects production-inspired operational practices while serving as a platform for ongoing learning and experimentation.
 

@@ -18,10 +18,11 @@ It records significant incidents, root cause analyses (RCA), verified resolution
 | K3s Pods Stuck in `ContainerCreating` | High | Resolved |
 | Remote kubectl TLS Failure | Medium | Resolved |
 | Namespace Visibility Confusion | Low | Resolved |
-| Dashboard JSON Corruption | Medium | Resolved |
-| Wallpaper 404 Errors | Low | Resolved |
-| Cron Job Overlap | Low | Resolved |
+| Dashboard JSON Corruption *(archived — component removed)* | Medium | Resolved |
+| Wallpaper 404 Errors *(archived — component removed)* | Low | Resolved |
+| Cron Job Overlap *(archived — component removed)* | Low | Resolved |
 | Vaultwarden HTTPS Mismatch | Low | Resolved |
+| Grafana Alloy Incomplete Docker Log Discovery | Medium | **Open** |
 
 ---
 
@@ -233,7 +234,9 @@ Use dedicated namespaces consistently during development.
 
 ---
 
-# Dashboard Incidents
+# Dashboard Incidents (Archived — Component Removed)
+
+> The Homepage/Dashboard API integration described in this section was **fully decommissioned** (see `architecture.md`, `postmortems.md`). These entries are kept for historical/portfolio value — the fixes below no longer apply to anything currently running, since the components themselves are gone.
 
 ## JSON Corruption
 
@@ -301,6 +304,36 @@ High-frequency automation should always include concurrency control.
 
 ---
 
+# Current Open Incidents
+
+## Grafana Alloy — Incomplete Docker Log Discovery
+
+**Status:** Open (since 2026-07-05)
+
+### Symptoms
+
+Only the `grafana` and `loki` containers appear in Loki (`/label/container/values`). `prometheus`, `cadvisor`, `node-exporter`, `proxmox-exporter`, `portainer`, and `floci_aws` logs are never ingested, despite all of them running on the same Docker host.
+
+### Investigation So Far
+
+- Confirmed the Docker socket (`/var/run/docker.sock`) is mounted into the Alloy container with correct permissions (`srw-rw----`).
+- `ss -lx | grep docker` inside the Alloy container returned nothing, suggesting Alloy isn't actually talking to the Docker daemon despite the mount.
+- Attempts to inspect Alloy's live `discovery.docker` / `loki.source.docker` configuration were inconclusive — output was too large to work through in one session.
+
+### Suspected Root Cause (unconfirmed)
+
+Either the `discovery.docker` component isn't finding all containers, `loki.source.docker` is only subscribed to two of them, or Alloy cannot fully reach the Docker daemon.
+
+### Next Steps
+
+1. Dump and review Alloy's live `discovery.docker` and `loki.source.docker` component config.
+2. Test Docker API connectivity from inside the Alloy container directly (`curl --unix-socket /var/run/docker.sock http://localhost/containers/json`).
+3. Review Alloy's own logs for Docker-related discovery errors.
+
+Full write-up: `postmortems.md` (2026-07-05).
+
+---
+
 # Operational Lessons
 
 ## Persistence Matters
@@ -356,5 +389,6 @@ Recovery procedures should be validated through controlled reboot and failover t
 | Recovery Procedures | Verified |
 | Operational Documentation | Current |
 | Infrastructure Stability | Stable |
+| Open Incidents | 1 (Grafana Alloy Docker log discovery) |
 
 **Environment State:** Stable Operational Environment

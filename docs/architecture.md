@@ -28,35 +28,39 @@ The platform is designed around several core principles:
 - **Centralized observability**
 - **Infrastructure as Code**
 - **Operational resilience**
-- **Incremental evolution through experimentation**
+- **Incremental evolution through experimentation** — including reversing decisions (see `postmortems.md`) when a component turns out not to be worth its complexity
 
 ---
 
 # High-Level Architecture
 
-```text
-Internet
-    │
-    ▼
-Airtel Fiber Router
-    │
-    ▼
-Apollo (Proxmox VE)
-    │
-    ├── Athena (Ubuntu VM)
-    │   ├── Grafana
-    │   ├── Prometheus
-    │   ├── Loki
-    │   ├── Grafana Alloy
-    │   ├── K3s
-    │   ├── Olympus Dashboard API
-    │   ├── Portainer
-    │   └── Floci
-    │
-    └── Hestia (Alpine LXC)
-        ├── Homepage
-        └── Vaultwarden
+```mermaid
+flowchart TB
+    INET([Internet]) --> ROUTER[Airtel Fiber Router]
+    ROUTER --> APOLLO[Apollo — Proxmox VE Host]
+
+    subgraph ATHENA["Athena — Ubuntu VM"]
+        GRAFANA[Grafana]
+        PROM[Prometheus]
+        LOKI[Loki]
+        ALLOY[Grafana Alloy]
+        K3S[K3s — Kubernetes Lab]
+        PORTAINER[Portainer]
+        FLOCI[Floci — AWS Emulation]
+    end
+
+    subgraph HESTIA["Hestia — Alpine LXC"]
+        HOMEPAGE[Homepage]
+        VAULT[Vaultwarden]
+    end
+
+    APOLLO --> ATHENA
+    APOLLO --> HESTIA
+
+    ARTEMIS[Artemis — Management Workstation] -.Tailscale.-> APOLLO
 ```
+
+> Rendered natively on GitHub. Source also kept as a standalone file at `architecture-diagram.mmd` for editing in the [Mermaid Live Editor](https://mermaid.live).
 
 ---
 
@@ -77,7 +81,7 @@ Apollo is the bare-metal Proxmox VE host that provides the compute foundation fo
 - Persistent NAT gateway
 - Port forwarding for internal services
 
-Apollo uses `iptables` to provide outbound internet access for internal workloads and selectively forwards traffic to trusted internal services.
+Apollo uses `iptables` to provide outbound internet access for internal workloads and selectively forwards traffic to trusted internal services. See `network.md` for the full NAT/DNAT rule set.
 
 ---
 
@@ -99,18 +103,18 @@ Athena acts as the operational core of the homelab.
 | Proxmox Exporter | Hypervisor Metrics |
 | Portainer | Container Management |
 | K3s | Kubernetes Lab |
-| Olympus Dashboard API | Dashboard Backend |
 | Floci | AWS Service Emulation |
 
 ### Responsibilities
 
 - Centralized observability
 - Kubernetes experimentation
-- Dashboard data aggregation
 - Container management
 - Infrastructure monitoring
 
 The K3s cluster operates as a single-node Kubernetes environment with cgroup v2 enabled for stable operation.
+
+> **Note:** Athena previously also hosted a custom FastAPI "Dashboard API" that aggregated LastFM, weather, Pokémon, and similar personal-data feeds for a custom Homepage widget. That entire concept — the API, its fetch scripts, and the associated cron jobs — was removed. See "Decommissioned: Olympus Dashboard API" below and `postmortems.md` for the full history.
 
 ---
 
@@ -133,7 +137,7 @@ The container is intentionally lightweight, providing:
 - Low resource usage
 - Strong workload isolation
 
-Following the Dashboard V2 redesign, Hestia no longer performs backend data collection and instead consumes the centralized Dashboard API hosted on Athena.
+Homepage runs in its **stock, unmodified configuration** — a simple service-link dashboard with no custom JavaScript/CSS and no external API dependency. This is a deliberate simplification after the custom "Olympus" widget (and later, the Dashboard API backing it) proved too fragile and high-maintenance relative to the value it added. See `postmortems.md` for that decision.
 
 ---
 
@@ -156,36 +160,15 @@ Keeping management tooling outside the infrastructure ensures administration rem
 
 ---
 
-# Dashboard Architecture
+# Decommissioned: Olympus Dashboard API
 
-The dashboard follows a decoupled API-driven architecture.
+For a period, Homepage was extended into a custom "Olympus Command Center" backed by a FastAPI aggregation service on Athena (LastFM, weather, Pokémon, investments, MyAnimeList, dynamic wallpapers). It has been **fully removed**:
 
-```text
-External APIs
-      │
-      ▼
-Collection Scripts
-      │
-      ▼
-Olympus Dashboard API (Athena)
-      │
-      ▼
-Homepage (Hestia)
-```
+- No Dashboard API container, fetch scripts, or cron jobs remain on Athena.
+- No custom `custom.js` / `custom.css` remain on Hestia.
+- Homepage runs its default configuration only.
 
-### Workflow
-
-1. Automated Python and Shell scripts collect external data.
-2. The Dashboard API aggregates all data into a unified JSON response.
-3. Homepage consumes the API to render widgets.
-
-### Benefits
-
-- Separation of frontend and backend
-- Faster dashboard loading
-- Easier maintenance
-- Extensible widget development
-- Single source of truth for dashboard data
+This is intentionally documented here rather than deleted from history, because the reasoning behind removing it — tight coupling to Homepage internals, cross-device timing bugs, and maintenance cost outweighing the payoff — is itself a useful engineering lesson. Full build-and-removal narrative: `postmortems.md`.
 
 ---
 
@@ -193,19 +176,11 @@ Homepage (Hestia)
 
 ## Metrics Pipeline
 
-```text
-Node Exporter
-        │
-        ▼
-Prometheus
-        │
-        ▼
-Grafana
-
-Proxmox Exporter
-        │
-        ▼
-Prometheus
+```mermaid
+flowchart LR
+    NE[Node Exporter] --> PROM[Prometheus]
+    PE[Proxmox Exporter] --> PROM
+    PROM --> GRAF[Grafana]
 ```
 
 ### Features
@@ -220,33 +195,25 @@ Prometheus
 
 ## Logging Pipeline
 
-```text
-Containers
-      │
-      ▼
-Grafana Alloy
-      │
-      ▼
-Loki
-      │
-      ▼
-Grafana
+```mermaid
+flowchart LR
+    C[Docker Containers] --> ALLOY[Grafana Alloy]
+    ALLOY --> LOKI[Loki]
+    LOKI --> GRAF[Grafana Explore]
 ```
 
 Provides centralized log aggregation, historical search, and troubleshooting.
+
+> **Known gap:** Docker container discovery in Alloy is currently incomplete — only 2 of 9 running containers are being ingested. Tracked in `postmortems.md` (2026-07-05) and `troubleshooting.md`.
 
 ---
 
 ## Alerting Pipeline
 
-```text
-Prometheus
-      │
-      ▼
-Grafana Alerting
-      │
-      ▼
-Telegram
+```mermaid
+flowchart LR
+    PROM[Prometheus] --> ALERT[Grafana Alerting]
+    ALERT --> TG[Telegram]
 ```
 
 Alerts cover:
@@ -264,13 +231,11 @@ Alerts cover:
 
 Infrastructure provisioning and cloud experimentation are managed using Terraform.
 
-```text
-Terraform
-      │
-      ▼
-Floci
-      ├── S3
-      └── DynamoDB
+```mermaid
+flowchart LR
+    TF[Terraform] --> FLOCI[Floci]
+    FLOCI --> S3[S3]
+    FLOCI --> DDB[DynamoDB]
 ```
 
 ### Benefits
@@ -298,17 +263,11 @@ The homelab follows a defense-in-depth approach.
 
 ## Remote Access
 
-```text
-Artemis
-      │
-      ▼
-Tailscale
-      │
-      ▼
-Apollo
-      │
-      ├── Athena
-      └── Hestia
+```mermaid
+flowchart LR
+    ARTEMIS[Artemis] -->|Tailscale| APOLLO[Apollo]
+    APOLLO --> ATHENA[Athena]
+    APOLLO --> HESTIA[Hestia]
 ```
 
 Administrative access is performed entirely through Tailscale and SSH.
@@ -327,12 +286,12 @@ Apollo provides internal routing using persistent NAT and selectively forwards o
 | Artemis | Healthy |
 | Grafana | Operational |
 | Prometheus | Operational |
-| Loki | Operational |
-| Grafana Alloy | Operational |
+| Loki | Operational (partial log discovery — see `troubleshooting.md`) |
+| Grafana Alloy | Operational (partial log discovery — see `troubleshooting.md`) |
 | K3s | Operational |
-| Homepage | Operational |
+| Homepage | Operational (stock configuration) |
 | Vaultwarden | Operational |
-| Dashboard API | Operational |
+| Dashboard API | Decommissioned — removed |
 
 ---
 
@@ -343,12 +302,11 @@ Apollo provides internal routing using persistent NAT and selectively forwards o
 The Olympus HomeLab currently provides:
 
 - Secure private infrastructure
-- Centralized observability
+- Centralized observability (metrics + logs, logs partially complete)
 - Kubernetes experimentation
 - Infrastructure as Code workflows
-- Self-hosted applications
-- Automated dashboard integrations
+- Self-hosted applications (Homepage, Vaultwarden)
 - Remote-first administration
 - Production-inspired operational practices
 
-The platform continues to evolve incrementally while maintaining a stable, production-inspired architecture.
+The platform continues to evolve incrementally while maintaining a stable, production-inspired architecture. The most recent major change was simplifying the frontend back down to a stock Homepage instance after retiring the custom dashboard integration.

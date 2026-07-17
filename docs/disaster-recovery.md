@@ -15,7 +15,7 @@ Recovery follows a **dependency-aware** model, ensuring foundational infrastruct
 | Priority | Components | Target RTO |
 |----------|------------|------------|
 | Priority 1 | Apollo, vmbr0, NAT Gateway, Tailscale | < 5 Minutes |
-| Priority 2 | Athena, Dashboard API, K3s Cluster | < 3 Minutes |
+| Priority 2 | Athena, K3s Cluster | < 3 Minutes |
 | Priority 3 | Hestia, Homepage, Vaultwarden | < 2 Minutes |
 | Priority 4 | Observability Stack (Grafana, Prometheus, Loki, Alloy) | < 2 Minutes |
 | Priority 5 | Floci & Terraform Services | < 1 Minute |
@@ -55,7 +55,6 @@ Ubuntu Server VM
 - Node Exporter
 - Proxmox Exporter
 - Portainer
-- Olympus Dashboard API
 - K3s Cluster
 - Floci
 
@@ -99,7 +98,6 @@ Tailscale Connectivity
         │
         ▼
 Athena
-    ├── Dashboard API
     ├── K3s
     ├── Grafana
     ├── Prometheus
@@ -319,7 +317,6 @@ Expected services include:
 - loki
 - alloy
 - portainer
-- dashboard-api
 - floci
 
 ---
@@ -374,12 +371,6 @@ Homepage
 http://Apollo:3000
 ```
 
-Dashboard API
-
-```text
-http://Athena:8000/olympus
-```
-
 Vaultwarden
 
 ```text
@@ -413,7 +404,6 @@ Confirm all telemetry containers are healthy.
 
 Verify:
 
-- Dashboard widgets update
 - Metrics available
 - Logs available
 - Kubernetes Ready
@@ -486,8 +476,6 @@ Verify inbound forwarding for:
 
 - Grafana unavailable
 - Prometheus unavailable
-- Dashboard widgets stale
-- Dashboard API unavailable
 - `kubectl` fails
 - Portainer unavailable
 
@@ -523,7 +511,6 @@ Expected containers:
 - prometheus
 - loki
 - alloy
-- dashboard-api
 - portainer
 - floci
 
@@ -602,7 +589,6 @@ If only Athena is disconnected, verify internet connectivity before troubleshoot
 
 - Athena cannot access the Internet
 - Package updates fail
-- Dashboard API data becomes stale
 - External APIs unreachable
 
 ### Verification
@@ -626,138 +612,7 @@ Restore if required.
 
 ---
 
-## Scenario 6 — Dashboard API Failure
-
-### Symptoms
-
-- Homepage widgets unavailable
-- Dashboard displays stale data
-- API endpoints fail
-
-### Verification
-
-```bash
-docker ps | grep dashboard-api
-```
-
-Test API:
-
-```bash
-curl http://10.10.10.10:8000/olympus
-```
-
-### Recovery
-
-Restart the service:
-
-```bash
-docker restart dashboard-api
-```
-
-If data remains stale:
-
-- Check fetch script logs
-- Verify cron execution
-- Verify outbound Internet connectivity
-
----
-
-## Scenario 7 — Dashboard Data Collection Failure
-
-### Symptoms
-
-Widgets stop updating.
-
-Examples:
-
-- Weather
-- Last.fm
-- Pokémon
-
-### Verification
-
-Inspect logs:
-
-```bash
-tail -f /var/log/olympus_fetch.log
-```
-
-Verify scheduled jobs:
-
-```bash
-crontab -l
-```
-
-### Recovery
-
-Run a manual update:
-
-```bash
-./olympus_update.sh
-```
-
-Verify:
-
-- Fetch scripts completed
-- JSON generated successfully
-- API reflects new data
-
----
-
-## Scenario 8 — Cron Lock Failure
-
-### Symptoms
-
-- Widgets stop updating
-- Jobs appear idle
-- No recent timestamps
-
-### Verification
-
-Check for stale lock files:
-
-```bash
-ls /tmp/*.lock
-```
-
-### Recovery
-
-If no job is running, remove stale locks:
-
-```bash
-rm /tmp/*.lock
-```
-
-Run a manual refresh afterward.
-
----
-
-## Scenario 9 — Invalid JSON
-
-### Symptoms
-
-Homepage reports:
-
-- Invalid JSON
-- Widget rendering failures
-
-### Verification
-
-Validate generated files:
-
-```bash
-jq . *.json
-```
-
-### Recovery
-
-Ensure all fetch scripts generate JSON using `jq` instead of manual string concatenation.
-
-Re-run the affected fetch script.
-
----
-
-## Scenario 10 — Kubernetes Cluster Failure
+## Scenario 6 — Kubernetes Cluster Failure
 
 ### Symptoms
 
@@ -806,7 +661,7 @@ Ready
 
 ---
 
-## Scenario 11 — kubectl TLS Failure
+## Scenario 7 — kubectl TLS Failure
 
 ### Symptoms
 
@@ -840,7 +695,7 @@ kubectl get nodes
 
 ---
 
-## Scenario 12 — Observability Stack Failure
+## Scenario 8 — Observability Stack Failure
 
 ### Symptoms
 
@@ -883,7 +738,7 @@ Verify:
 
 ---
 
-## Scenario 13 — Loki Not Ready
+## Scenario 9 — Loki Not Ready
 
 ### Symptoms
 
@@ -914,16 +769,22 @@ docker restart loki
 
 ---
 
-## Scenario 14 — Missing Container Logs
+## Scenario 10 — Missing Container Logs
 
 ### Symptoms
 
-Metrics available but no logs visible.
+Metrics available but no logs visible for a given container.
 
 ### Verification
 
 ```bash
 docker logs alloy
+```
+
+Check which containers Loki is actually receiving logs for:
+
+```bash
+curl -s http://10.10.10.10:3100/loki/api/v1/label/container/values
 ```
 
 ### Recovery
@@ -936,9 +797,11 @@ docker restart alloy
 
 Verify log ingestion in Grafana Explore.
 
+> **Known open issue:** as of 2026-07-05, Loki only ever shows logs for the `grafana` and `loki` containers — every other container on Athena (`prometheus`, `cadvisor`, `node-exporter`, `proxmox-exporter`, `portainer`, `floci_aws`) is missing, and a container restart alone does not fix it. This is a Docker-discovery configuration issue inside Alloy, not a Loki or Grafana fault. See `troubleshooting.md` and `postmortems.md` (2026-07-05) for the investigation and next steps.
+
 ---
 
-## Scenario 15 — Floci Failure
+## Scenario 11 — Floci Failure
 
 ### Symptoms
 
@@ -962,7 +825,7 @@ Verify endpoint responsiveness before retrying Terraform.
 
 ---
 
-## Scenario 16 — Terraform Failure
+## Scenario 12 — Terraform Failure
 
 ### Verification
 
@@ -989,7 +852,7 @@ Confirm resources:
 
 ---
 
-## Scenario 17 — Vaultwarden Returns "400 Bad Request"
+## Scenario 13 — Vaultwarden Returns "400 Bad Request"
 
 ### Symptoms
 
@@ -1112,26 +975,11 @@ Running
 
 ---
 
-## Dashboard API
-
-Verify API availability.
-
-```bash
-curl http://10.10.10.10:8000/olympus
-```
-
-Expected:
-
-Valid JSON response.
-
----
-
 ## Homepage
 
 Verify:
 
 - Homepage loads successfully
-- Widgets display current data
 - Service links function correctly
 
 ---
@@ -1246,7 +1094,6 @@ Successful execution without connectivity errors.
 
 - [ ] Node Ready
 - [ ] System pods healthy
-- [ ] Dashboard API reachable
 
 ---
 
@@ -1263,7 +1110,6 @@ Successful execution without connectivity errors.
 ## Applications
 
 - [ ] Homepage accessible
-- [ ] Dashboard widgets updating
 - [ ] Vaultwarden accessible via HTTPS
 
 ---
@@ -1332,12 +1178,12 @@ Terraform remains the authoritative source for Floci-managed resources.
 
 ## Safe Automation
 
-Dashboard automation should always use:
+Any future scripted automation on the platform (backups, exporters, custom tooling) should always use:
 
-- `jq` for JSON generation
-- `flock` for concurrency control
+- `jq` for JSON generation, never hand-built string concatenation
+- `flock` for concurrency control on anything cron-scheduled
 
-These safeguards prevent malformed data and overlapping scheduled jobs.
+These are the two safeguards that repeatedly prevented malformed data and overlapping jobs during the (now-decommissioned) dashboard automation era — see `postmortems.md` — and remain good defaults for anything built going forward.
 
 ---
 
@@ -1348,7 +1194,7 @@ Recovery is considered complete only after:
 - Services are reachable
 - Metrics are available
 - Logs are collected
-- Dashboard widgets update
+- Homepage loads
 - Kubernetes reports healthy nodes
 
 ---
@@ -1376,14 +1222,13 @@ For additional operational guidance, refer to:
 | Networking | ✅ Operational |
 | Athena | ✅ Operational |
 | K3s Cluster | ✅ Operational |
-| Dashboard API | ✅ Operational |
 | Hestia | ✅ Operational |
 | Homepage | ✅ Operational |
 | Vaultwarden | ✅ Operational |
 | Grafana | ✅ Operational |
 | Prometheus | ✅ Operational |
 | Loki | ✅ Operational |
-| Grafana Alloy | ✅ Operational |
+| Grafana Alloy | ⚠️ Operational — partial container log discovery (see `troubleshooting.md`) |
 | Floci | ✅ Operational |
 | Terraform | ✅ Operational |
 
@@ -1410,4 +1255,4 @@ For additional operational guidance, refer to:
 
 **Last Reviewed:** July 2026
 
-This runbook reflects the current Olympus HomeLab architecture, including the Dashboard V2 backend, K3s cluster, centralized observability stack, and production-inspired recovery workflows.
+This runbook reflects the current Olympus HomeLab architecture, including the K3s cluster, centralized observability stack, minimal stock Homepage frontend, and production-inspired recovery workflows.

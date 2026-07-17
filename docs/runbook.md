@@ -28,7 +28,7 @@ Perform these checks daily or after significant infrastructure changes.
 | Tailscale | `tailscale status` | Apollo and Athena connected |
 | Compute | `qm list` / `pct list` | Athena and Hestia running |
 | Internet Access | `curl -I https://google.com` (Athena) | HTTP 200/301 |
-| Dashboard | Open Homepage | Widgets update successfully |
+| Homepage | Open Homepage | Loads and service links resolve |
 | Kubernetes | `kubectl get nodes` | Athena reports **Ready** |
 
 ---
@@ -46,7 +46,6 @@ Verify critical services are running:
 - Node Exporter
 - Proxmox Exporter
 - Portainer
-- Dashboard API
 - Floci
 - K3s
 
@@ -123,54 +122,16 @@ kubectl get svc -n artemis-lab
 
 ---
 
-# Dashboard Operations
+# Homepage Operations
 
-The dashboard follows a centralized API architecture.
-
-```text
-External APIs
-        │
-        ▼
-Fetch Scripts
-        │
-        ▼
-Dashboard API
-        │
-        ▼
-Homepage
-```
-
-## Manual Refresh
-
-Run the update wrapper on Athena:
+Homepage runs in its **stock configuration** on Hestia — a static service-link dashboard with no custom widget, no backend API, and no fetch/cron pipeline to operate. There is nothing to refresh or troubleshoot beyond the container itself:
 
 ```bash
-./olympus_update.sh
+docker ps | grep homepage
+docker logs homepage
 ```
 
----
-
-## Troubleshooting
-
-Check Dashboard API:
-
-```bash
-docker ps | grep dashboard-api
-```
-
-Inspect logs:
-
-```bash
-tail -f /var/log/olympus_fetch.log
-```
-
-Validate JSON output:
-
-```bash
-jq .
-```
-
-All fetch scripts should use `flock` to prevent overlapping cron executions.
+The previous custom "Olympus" dashboard (FastAPI Dashboard API on Athena + `custom.js`/`custom.css` on Hestia + per-source cron jobs) was fully decommissioned. If any of `dashboard-api`, `olympus_update.sh`, or `/var/log/olympus_fetch.log` show up on a host, they're leftovers from before the removal and can be cleaned up — see `postmortems.md` for what was removed and why.
 
 ---
 
@@ -324,8 +285,7 @@ If the entire lab is powered down:
 
 - [ ] Homepage available
 - [ ] Vaultwarden available
-- [ ] Dashboard API responding
-- [ ] Dashboard widgets updating
+- [ ] Homepage loads and service links resolve
 
 ## Kubernetes
 

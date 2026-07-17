@@ -1,0 +1,23 @@
+flowchart TB
+    INET([Internet]) --> ROUTER[Airtel Fiber Router]
+    ROUTER --> APOLLO[Apollo — Proxmox VE Host]
+
+    subgraph ATHENA["Athena — Ubuntu VM"]
+        GRAFANA[Grafana]
+        PROM[Prometheus]
+        LOKI[Loki]
+        ALLOY[Grafana Alloy]
+        K3S[K3s — Kubernetes Lab]
+        PORTAINER[Portainer]
+        FLOCI[Floci — AWS Emulation]
+    end
+
+    subgraph HESTIA["Hestia — Alpine LXC"]
+        HOMEPAGE[Homepage]
+        VAULT[Vaultwarden]
+    end
+
+    APOLLO --> ATHENA
+    APOLLO --> HESTIA
+
+    ARTEMIS[Artemis — Management Workstation] -.Tailscale.-> APOLLO

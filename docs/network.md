@@ -21,34 +21,23 @@ All infrastructure services operate on an isolated internal network, with admini
 
 ## Physical Topology
 
-```text
-Internet
-    │
-    ▼
-Airtel Fiber Router
-    │
-    ▼
-Apollo (Proxmox VE)
-    │
-    ├── Athena (Ubuntu VM)
-    └── Hestia (Alpine LXC)
+```mermaid
+flowchart TB
+    INET([Internet]) --> ROUTER[Airtel Fiber Router]
+    ROUTER --> APOLLO[Apollo — Proxmox VE]
+    APOLLO --> ATHENA[Athena — Ubuntu VM]
+    APOLLO --> HESTIA[Hestia — Alpine LXC]
 ```
 
 ---
 
 ## Logical Topology
 
-```text
-Artemis (Admin Workstation)
-        │
-        ▼
-Tailscale Mesh
-        │
-        ▼
-Apollo (Gateway)
-        │
-        ├── Athena
-        └── Hestia (LAN Only)
+```mermaid
+flowchart TB
+    ARTEMIS[Artemis — Admin Workstation] -->|Tailscale Mesh| APOLLO[Apollo — Gateway]
+    APOLLO --> ATHENA[Athena]
+    APOLLO --> HESTIA["Hestia (LAN Only)"]
 ```
 
 ---
@@ -73,12 +62,11 @@ LAN: 10.10.10.10        LAN: 10.10.10.2
 TS : 100.117.35.70      TS: None
 
 Services:               Services:
-• Grafana               • Homepage
+• Grafana               • Homepage (stock)
 • Prometheus            • Vaultwarden
 • Loki
 • Grafana Alloy
 • K3s
-• Dashboard API
 • Portainer
 • Floci
 ```
@@ -244,22 +232,9 @@ Monitors infrastructure health and service availability.
 
 ---
 
-## Dashboard Data Flow
+## Homepage (Decommissioned Dashboard API)
 
-```text
-External APIs
-        │
-        ▼
-Collection Scripts
-        │
-        ▼
-Dashboard API (Athena)
-        │
-        ▼
-Homepage (Hestia)
-```
-
-The Dashboard API acts as the single source of truth, separating backend data collection from frontend presentation.
+Homepage previously consumed a custom Dashboard API on Athena (`10.10.10.10:8000`) that aggregated data from external services. That API, its fetch scripts, and their cron jobs have been fully removed — Homepage on Hestia now runs standalone in its stock configuration with no backend dependency. See `architecture.md` and `postmortems.md` for the removal history.
 
 ---
 
@@ -307,7 +282,7 @@ The network follows a defense-in-depth approach.
 | Port Forwarding | Operational |
 | Kubernetes Networking | Operational |
 | Metrics Pipeline | Operational |
-| Logging Pipeline | Operational |
+| Logging Pipeline | Operational (partial container discovery — see `troubleshooting.md`) |
 | Alerting Pipeline | Operational |
 
 ---

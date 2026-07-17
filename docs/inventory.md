@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document serves as the authoritative inventory of the Olympus HomeLab environment. It documents all physical hardware, virtual infrastructure, containerized services, Kubernetes workloads, networking components, automation pipelines, and operational assets.
+This document serves as the authoritative inventory of the Olympus HomeLab environment. It documents all physical hardware, virtual infrastructure, containerized services, Kubernetes workloads, networking components, and operational assets.
 
 The inventory acts as the single source of truth for infrastructure management, troubleshooting, capacity planning, and disaster recovery.
 
@@ -16,40 +16,38 @@ The inventory acts as the single source of truth for infrastructure management, 
 | Hypervisors | 1 | Operational |
 | Virtual Machines | 1 | Healthy |
 | LXC Containers | 1 | Healthy |
-| Docker Services | 12+ | Operational |
+| Docker Services | 9 | Operational |
 | Kubernetes Cluster | 1 | Healthy |
 | Kubernetes Pods | 5+ | Running |
-| Monitoring Components | 6 | Healthy |
+| Monitoring Components | 6 | Healthy (logging partially complete — see `troubleshooting.md`) |
 | Self-Hosted Applications | 2 | Operational |
-| Automation Pipelines | 6 | Operational |
 
 ---
 
 # Infrastructure Topology
 
-```text
-                    Artemis
-           (Management Workstation)
-                    │
-        ───────── Tailscale ─────────
-                    │
-                Apollo
-          (Proxmox VE Hypervisor)
-                    │
-      ┌─────────────┴─────────────┐
-      │                           │
- VM 100: Athena             CT 101: Hestia
- Ubuntu Operations VM      Alpine Application LXC
-      │                           │
- Docker + K3s                 Docker Compose
-      │                           │
-Dashboard API                Homepage
-Grafana                     Vaultwarden
-Prometheus
-Loki
-Grafana Alloy
-Portainer
-Floci
+```mermaid
+flowchart TB
+    ARTEMIS["Artemis<br/>(Management Workstation)"] -.Tailscale.-> APOLLO
+    APOLLO["Apollo<br/>(Proxmox VE Hypervisor)"]
+
+    subgraph VM100["VM 100: Athena — Ubuntu Operations VM"]
+        direction TB
+        A1["Docker + K3s"]
+        A2["Grafana / Prometheus"]
+        A3["Loki / Grafana Alloy"]
+        A4["Portainer / Floci"]
+    end
+
+    subgraph CT101["CT 101: Hestia — Alpine Application LXC"]
+        direction TB
+        H1["Docker Compose"]
+        H2["Homepage (stock)"]
+        H3["Vaultwarden"]
+    end
+
+    APOLLO --> VM100
+    APOLLO --> CT101
 ```
 
 ---
@@ -125,7 +123,6 @@ Floci
 - cgroup v2 Enabled
 - Docker Compose Runtime
 - Single-node K3s Cluster
-- Dashboard API Backend
 - Infrastructure Automation Host
 
 ### Hosted Services
@@ -139,7 +136,6 @@ Floci
 | Node Exporter | Internal | System Metrics |
 | Proxmox Exporter | Internal | Hypervisor Metrics |
 | Portainer | 9443 | Container Management |
-| Olympus Dashboard API | 8000 | Homepage Backend |
 | Floci | 4566 | AWS Emulation |
 | K3s Control Plane | 6443 | Kubernetes API |
 
@@ -161,7 +157,7 @@ Floci
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| Homepage | 3000 | Infrastructure Dashboard |
+| Homepage | 3000 | Infrastructure Dashboard (stock configuration, no custom widgets) |
 | Vaultwarden | 8080 | Password Management |
 
 ---
@@ -195,7 +191,7 @@ Remote administration is performed from Artemis using:
 kubectl
 ```
 
-The Kubernetes API is accessed through Athena's LAN IP to match certificate SANs.
+The Kubernetes API is accessed through Athena's LAN IP (`10.10.10.10`) to match the certificate SANs — the Tailscale IP is not covered by the K3s-issued certificate (see `postmortems.md`, 2026-06-21).
 
 ---
 
@@ -241,7 +237,7 @@ The Kubernetes API is accessed through Athena's LAN IP to match certificate SANs
 - Log Search
 - Historical Retention
 
-**Status:** Healthy
+**Status:** Healthy (ingestion incomplete — see below)
 
 ---
 
@@ -253,19 +249,14 @@ The Kubernetes API is accessed through Athena's LAN IP to match certificate SANs
 - Log Collection
 - Log Forwarding
 
-**Destination**
+**Pipeline**
 
-```
-Docker
-    ↓
-Grafana Alloy
-    ↓
-Loki
-    ↓
-Grafana
+```mermaid
+flowchart LR
+    D[Docker] --> A[Grafana Alloy] --> L[Loki] --> G[Grafana]
 ```
 
-**Status:** Healthy
+**Status:** Running, but only ingesting logs from 2 of 9 running containers (`grafana`, `loki`). `discovery.docker`/`loki.source.docker` targeting is the suspected cause and is not yet resolved — see `troubleshooting.md` and `postmortems.md` (2026-07-05).
 
 ---
 
@@ -310,9 +301,11 @@ Grafana
 
 ### Features
 
-- Service Dashboard
-- Dynamic Widgets
-- Olympus Dashboard API Integration
+- Stock service-link dashboard
+- No custom JavaScript/CSS
+- No external API dependency
+
+Homepage previously ran a heavily customized "Olympus" widget backed by a dedicated Dashboard API on Athena. Both were removed; see "Decommissioned Components" below.
 
 ---
 
@@ -329,23 +322,7 @@ Grafana
 - Persistent Storage
 - Password Management
 - Accessible only through Apollo port forwarding
-
----
-
-## Olympus Dashboard API
-
-| Property | Value |
-|----------|-------|
-| Host | Athena |
-| Port | 8000 |
-
-### Responsibilities
-
-- Data Aggregation
-- Widget Backend
-- JSON Generation
-- Homepage API
-- Single Source of Truth
+- Serves HTTPS internally on port 80 (`ROCKET_TLS`) — always connect with `https://`, not `http://` (see `troubleshooting.md`)
 
 ---
 
@@ -359,7 +336,7 @@ Grafana
 ### Responsibilities
 
 - Docker Management
-- Kubernetes Visibility
+- Kubernetes Visibility (via Portainer Agent in K3s)
 - Container Monitoring
 
 ---
@@ -378,39 +355,17 @@ Grafana
 
 **Purpose:** Local AWS emulation for Terraform development.
 
-# Automation Pipelines
+---
 
-Olympus Dashboard V2 centralizes data collection on Athena, where scheduled fetch scripts gather information from external APIs and expose it through the Dashboard API. Concurrency is controlled using `flock` to prevent overlapping executions.
+# Decommissioned Components
 
-| Pipeline | Frequency | Source | Output |
-|----------|-----------|--------|--------|
-| LastFM | Every 1 Minute | Last.fm API | Track, Artist, Album, Album Art |
-| Media Hero | Every 1 Minute | GitHub Wallpapers | Dashboard Hero Image |
-| Weather | Every 15 Minutes | wttr.in | Current Weather |
-| Investments | Every 30 Minutes | Financial APIs | GoldBeES & LiquidCase Prices |
-| Pokémon | Every 6 Hours | PokeAPI | Pokémon Data & Flavor Text |
-| Anime | Manual | MyAnimeList | User Statistics |
+| Component | Host | Removed | Reason |
+|-----------|------|---------|--------|
+| Olympus Dashboard API (FastAPI) | Athena | 2026-06/07 | Too much operational overhead for the value provided once the frontend widget was retired |
+| Custom `custom.js` / `custom.css` Homepage widget | Hestia | 2026-06-27 | Fragile, tightly coupled to Homepage internals, broke on mobile |
+| Fetch scripts + cron jobs (LastFM, weather, prices, Pokémon, media, anime) | Athena | 2026-06/07 | Only existed to feed the Dashboard API |
 
-### Pipeline Flow
-
-```text
-External APIs
-      │
-      ▼
-Fetch Scripts
-      │
-      ▼
-flock Lock Protection
-      │
-      ▼
-JSON Generation (jq)
-      │
-      ▼
-Olympus Dashboard API
-      │
-      ▼
-Homepage Dashboard
-```
+Full narrative in `postmortems.md`.
 
 ---
 
@@ -449,12 +404,9 @@ Homepage Dashboard
 
 Provides internet access for internal workloads.
 
-```text
-10.10.10.0/24
-        │
-MASQUERADE
-        │
-Internet
+```mermaid
+flowchart LR
+    LAN["10.10.10.0/24"] -->|MASQUERADE| INET[Internet]
 ```
 
 ---
@@ -496,15 +448,6 @@ Internet
 
 ---
 
-## Dashboard Security
-
-- Backend logic centralized on Athena
-- Homepage acts as a frontend only
-- JSON generated safely using `jq`
-- Cron jobs protected using `flock`
-
----
-
 # Recovery Readiness
 
 | Component | Status |
@@ -530,23 +473,21 @@ Internet
 | Kubernetes | Healthy |
 | Grafana | Healthy |
 | Prometheus | Healthy |
-| Loki | Healthy |
-| Grafana Alloy | Healthy |
+| Loki | Healthy (partial ingestion) |
+| Grafana Alloy | Running (partial discovery) |
 | Homepage | Healthy |
 | Vaultwarden | Healthy |
-| Dashboard API | Healthy |
 | Floci | Healthy |
-| Automation Pipelines | Healthy |
 | Network Routing | Operational |
-| Observability | Operational |
+| Observability | Operational (logging gap open) |
 
 ---
 
 # Summary
 
-The Olympus HomeLab consists of a production-inspired virtualized environment built around Proxmox VE, Docker, and K3s. Infrastructure responsibilities are distributed between Athena (operations, observability, and backend services) and Hestia (frontend applications), while Apollo provides virtualization, networking, and gateway services.
+The Olympus HomeLab consists of a production-inspired virtualized environment built around Proxmox VE, Docker, and K3s. Infrastructure responsibilities are distributed between Athena (operations, observability, and Kubernetes) and Hestia (a minimal, stock frontend), while Apollo provides virtualization, networking, and gateway services.
 
-The environment includes centralized monitoring, logging, Infrastructure as Code workflows, secure remote administration through Tailscale, automated dashboard data aggregation, and comprehensive operational documentation covering architecture, recovery, validation, troubleshooting, and health verification.
+The environment includes centralized monitoring, logging (with a known gap in Docker log discovery), Infrastructure as Code workflows, secure remote administration through Tailscale, and comprehensive operational documentation covering architecture, recovery, validation, troubleshooting, and health verification.
 
 **Overall Infrastructure Status:** Healthy and Operational
 

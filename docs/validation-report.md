@@ -8,6 +8,8 @@ Validation is performed after major infrastructure changes, maintenance windows,
 
 The current report reflects the infrastructure following the June 2026 Kubernetes deployment and Dashboard V2 architecture refactor.
 
+> **Archival note:** Tests 14, 15, and 30 below validated the Olympus Dashboard API, which was the custom FastAPI backend behind the Homepage widget at the time. That component has since been **fully decommissioned** — Homepage now runs in its stock configuration with no backend dependency (see `architecture.md`, `postmortems.md`). Those test results are kept for historical/audit purposes; they no longer describe anything currently running.
+
 ---
 
 # Environment Under Test
@@ -19,7 +21,7 @@ The current report reflects the infrastructure following the June 2026 Kubernete
 | Athena | Ubuntu Operations VM | PASS |
 | Hestia | Alpine Application LXC | PASS |
 | K3s Cluster | Kubernetes Control Plane | PASS |
-| Olympus Dashboard API | FastAPI Backend | PASS |
+| Olympus Dashboard API *(decommissioned since)* | FastAPI Backend | PASS at time of test |
 | Grafana | Visualization | PASS |
 | Prometheus | Metrics Collection | PASS |
 | Loki | Centralized Logging | PASS |
@@ -335,9 +337,11 @@ Learning workloads remain isolated from the `default` and `kube-system` namespac
 
 **PASS**
 
-# Dashboard & Automation Validation
+# Dashboard & Automation Validation *(Archived — Component Since Decommissioned)*
 
-## Test 14 — Olympus Dashboard API
+> Tests 14–17 validated the Olympus Dashboard API and its supporting automation, all of which have since been removed. Homepage now runs stock with no backend or cron pipeline. Kept for historical record only.
+
+## Test 14 — Olympus Dashboard API *(archived)*
 
 ### Objective
 
@@ -364,7 +368,7 @@ The API returns valid JSON containing:
 
 ---
 
-## Test 15 — Dashboard Endpoint Validation
+## Test 15 — Dashboard Endpoint Validation *(archived)*
 
 ### Procedure
 
@@ -384,7 +388,7 @@ Each endpoint returns valid JSON without errors.
 
 ---
 
-## Test 16 — Widget Synchronization
+## Test 16 — Widget Synchronization *(archived)*
 
 ### Objective
 
@@ -410,7 +414,7 @@ Widgets display current:
 
 ---
 
-## Test 17 — Cron & Concurrency Validation
+## Test 17 — Cron & Concurrency Validation *(archived)*
 
 ### Objective
 
@@ -698,7 +702,7 @@ kubectl get pods -A
 
 ---
 
-## Test 30 — Dashboard Recovery
+## Test 30 — Dashboard Recovery *(archived — see note above)*
 
 ### Objective
 
@@ -718,7 +722,7 @@ Verify Dashboard V2 resumes normal operation following service interruption.
 
 ### Result
 
-**PASS**
+**PASS** *(historical — this API no longer exists; recovering Homepage today is just `docker restart homepage`)*
 
 ---
 
@@ -778,6 +782,33 @@ Recovery objectives are achieved within documented RTO targets.
 
 ---
 
+## Test 33 — Homepage Stock Configuration (Current)
+
+### Objective
+
+Confirm Homepage on Hestia runs standalone in its stock configuration, with no dependency on the (now-removed) Dashboard API.
+
+### Procedure
+
+```bash
+docker inspect homepage --format '{{.State.Status}}'
+curl -I http://<apollo-ip>:3000
+```
+
+Confirm no `dashboard-api` container exists on Athena and no `custom.js`/`custom.css` files remain in Homepage's config volume on Hestia.
+
+### Expected Result
+
+- Homepage container is running.
+- Homepage loads with only stock service links, no custom widget.
+- No dashboard-api container, fetch scripts, or cron jobs present anywhere in the environment.
+
+### Result
+
+**PASS**
+
+---
+
 # Operational Readiness Matrix
 
 | Capability | Status | Verification |
@@ -787,11 +818,10 @@ Recovery objectives are achieved within documented RTO targets.
 | Network Routing | PASS | NAT & DNAT persistence verified |
 | Remote Administration | PASS | SSH, Tailscale & kubectl operational |
 | Kubernetes | PASS | Cluster Ready |
-| Dashboard API | PASS | FastAPI responding |
+| Homepage | PASS | Stock frontend accessible |
 | Monitoring | PASS | Prometheus targets healthy |
-| Logging | PASS | Loki ingestion verified |
+| Logging | PARTIAL | Loki ingestion verified for 2 of 9 containers — see `troubleshooting.md` |
 | Alerting | PASS | Grafana notifications operational |
-| Automation | PASS | Cron & `flock` validated |
 | Infrastructure as Code | PASS | Terraform & Floci operational |
 | Disaster Recovery | PASS | Recovery procedures validated |
 
@@ -799,9 +829,9 @@ Recovery objectives are achieved within documented RTO targets.
 
 # Validation Summary
 
-The Olympus HomeLab has been successfully validated across every operational layer, including compute infrastructure, networking, Kubernetes orchestration, observability, automation, Infrastructure as Code, and disaster recovery.
+The Olympus HomeLab has been successfully validated across every operational layer, including compute infrastructure, networking, Kubernetes orchestration, observability, Infrastructure as Code, and disaster recovery.
 
-The June 2026 platform upgrades—including the K3s deployment, Dashboard V2 refactor, and improved network persistence—have been verified to operate reliably under both normal and recovery conditions.
+The June–July 2026 platform changes — including the K3s deployment, the retirement of the custom Dashboard API in favor of a stock Homepage, and improved network persistence — have been verified to operate reliably under both normal and recovery conditions.
 
 The environment demonstrates production-inspired operational practices through:
 
@@ -809,10 +839,8 @@ The environment demonstrates production-inspired operational practices through:
 - Kubernetes-based workload orchestration
 - Persistent NAT and port forwarding
 - Centralized monitoring with Prometheus and Grafana
-- Centralized logging with Grafana Alloy and Loki
-- Dashboard V2 using a FastAPI backend
-- Automated synchronization with `cron` and `flock`
-- Safe JSON generation using `jq`
+- Centralized logging with Grafana Alloy and Loki (container discovery gap open)
+- A minimal, low-maintenance Homepage frontend
 - Infrastructure as Code with Terraform and Floci
 - Dependency-aware disaster recovery procedures
 - Comprehensive operational documentation
@@ -826,10 +854,9 @@ The environment demonstrates production-inspired operational practices through:
 | Infrastructure | PASS |
 | Networking | PASS |
 | Kubernetes | PASS |
-| Dashboard Services | PASS |
+| Applications (Homepage/Vaultwarden) | PASS |
 | Monitoring | PASS |
-| Logging | PASS |
-| Automation | PASS |
+| Logging | PARTIAL — see `troubleshooting.md` |
 | Infrastructure as Code | PASS |
 | Disaster Recovery | PASS |
 
@@ -841,7 +868,7 @@ The environment demonstrates production-inspired operational practices through:
 
 **FULLY VALIDATED**
 
-The Olympus HomeLab is operating as a stable, production-inspired SRE platform. All critical infrastructure components, networking, Kubernetes services, observability pipelines, automation workflows, and recovery procedures have been validated successfully and meet the documented operational requirements.
+The Olympus HomeLab is operating as a stable, production-inspired SRE platform. All critical infrastructure components, networking, Kubernetes services, observability pipelines, and recovery procedures have been validated successfully and meet the documented operational requirements, with one open item (Grafana Alloy Docker log discovery) tracked in `troubleshooting.md`.
 
 ---
 
