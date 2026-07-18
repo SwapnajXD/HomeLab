@@ -12,7 +12,7 @@
 
 A production-inspired self-hosted HomeLab built on **Proxmox VE** for learning modern infrastructure engineering, Site Reliability Engineering (SRE), Kubernetes, observability, Infrastructure as Code, automation, and disaster recovery.
 
-The environment is designed around a layered architecture where infrastructure, operations, and frontend services are separated into dedicated nodes. It is fully manageable through **Tailscale** and documented with production-style operational procedures.
+The environment is designed around a layered architecture where infrastructure, operations, and frontend services are separated into dedicated nodes. It is fully manageable through **Tailscale** and documented with production-style operational procedures — including the incidents encountered along the way and how they were resolved (see [`docs/postmortems.md`](docs/postmortems.md)).
 
 ---
 
@@ -31,17 +31,19 @@ The environment is designed around a layered architecture where infrastructure, 
       │                           │
  VM 100: Athena             CT 101: Hestia
  Ubuntu Operations VM      Alpine Frontend LXC
-      │                           │
- Docker + K3s                Docker Compose
-      │                           │
- Grafana                    Homepage
- Prometheus                 Vaultwarden
- Loki
+ (Tailscale-connected)     (isolated — reached
+      │                     via Apollo DNAT)
+ Docker + K3s                    │
+      │                    Docker Compose
+ Grafana                         │
+ Prometheus                 Homepage (stock)
+ Loki                       Vaultwarden
  Grafana Alloy
- Dashboard API
  Portainer
  Floci
 ```
+
+Full Mermaid diagrams (rendered natively on GitHub): [`architecture/architecture-diagram.mmd`](architecture/architecture-diagram.mmd) and the rest of the [`architecture/`](architecture/) directory.
 
 ---
 
@@ -63,7 +65,7 @@ Responsibilities:
 
 ## Athena (VM 100)
 
-**Role:** Operations Platform
+**Role:** Operations & Kubernetes Platform
 
 Hosted Services:
 
@@ -73,7 +75,6 @@ Hosted Services:
 - Grafana Alloy
 - Node Exporter
 - Proxmox Exporter
-- Olympus Dashboard API
 - Portainer
 - Floci
 - K3s Kubernetes Cluster
@@ -86,8 +87,10 @@ Hosted Services:
 
 Hosted Services:
 
-- Homepage Dashboard
+- Homepage — stock configuration, service links only
 - Vaultwarden
+
+> Hestia is intentionally excluded from the Tailscale mesh and reachable only through Apollo's port forwarding.
 
 ---
 
@@ -109,7 +112,7 @@ Used for:
 
 - Proxmox-based virtualized infrastructure
 - Docker Compose service orchestration
-- Single-node K3s Kubernetes cluster
+- Single-node K3s Kubernetes cluster, remotely managed via `kubectl`
 - Secure remote administration with Tailscale
 - Centralized metrics using Prometheus
 - Centralized logging using Loki & Grafana Alloy
@@ -117,12 +120,12 @@ Used for:
 - Telegram alert notifications
 - Infrastructure as Code with Terraform
 - Local AWS emulation using Floci
-- Custom FastAPI Dashboard Backend
-- Automated dashboard data pipelines
+- Minimal, low-maintenance Homepage frontend
 - Disaster Recovery Runbook
 - Operational Runbook
 - Infrastructure Validation Reports
 - Health Verification Procedures
+- Dated incident/postmortem log
 - Production-style documentation
 
 ---
@@ -173,37 +176,18 @@ Used for:
 - Floci
 - AWS CLI
 
-## Dashboard
+## Frontend
 
-- FastAPI
-- Homepage
+- Homepage (stock configuration)
+- Vaultwarden
 
 ---
 
-# Dashboard V2
+# A Note on the Dashboard
 
-The dashboard follows a backend-first architecture.
+Earlier in the project, Homepage was extended into a custom "Olympus" command-center widget, backed by a dedicated FastAPI aggregation service on Athena (LastFM, weather, Pokémon, investments, and more). It worked, but it turned out to be more maintenance than it was worth — tightly coupled to Homepage's internals, fragile across devices, and only earning its complexity while something was actively consuming it.
 
-```
-External APIs
-       │
-       ▼
-Fetch Scripts
-       │
-       ▼
-flock Lock Protection
-       │
-       ▼
-JSON Generation (jq)
-       │
-       ▼
-Olympus Dashboard API
-       │
-       ▼
-Homepage
-```
-
-Athena serves as the single source of truth for all dashboard data, while Hestia acts as a lightweight frontend.
+Both the widget and its backend API have been fully removed. Homepage now runs in its stock configuration. The full build-it, learn-from-it, remove-it story — including every incident and fix along the way — is documented in [`docs/postmortems.md`](docs/postmortems.md) and [`docs/changelog.md`](docs/changelog.md) (Phases 9 and 11). It's kept visible rather than deleted from history because "know when to cut scope" is as much a real engineering skill as building the thing in the first place.
 
 ---
 
@@ -219,8 +203,11 @@ Athena serves as the single source of truth for all dashboard data, while Hestia
 | `troubleshooting.md` | Common issues and resolutions |
 | `disaster-recovery.md` | Recovery procedures |
 | `validation-report.md` | Infrastructure validation |
+| `postmortems.md` | Dated incident log — what broke and how it was fixed |
 | `project-timeline.md` | Project lifecycle |
 | `changelog.md` | Infrastructure changes |
+
+All documentation lives in [`docs/`](docs/). Diagrams live in [`architecture/`](architecture/).
 
 ---
 
@@ -233,11 +220,12 @@ The environment has been validated across:
 - Kubernetes
 - Monitoring
 - Logging
-- Automation
 - Disaster Recovery
 - Infrastructure as Code
 
 **Operational Status:** ✅ Fully Validated
+
+**Known Open Issue:** Grafana Alloy is currently only discovering logs for 2 of 9 running containers on Athena — tracked in [`docs/troubleshooting.md`](docs/troubleshooting.md).
 
 ---
 
@@ -271,16 +259,20 @@ The environment has been validated across:
 
 # Future Roadmap
 
+- Fix Grafana Alloy's Docker log discovery gap
 - GitOps with Argo CD or Flux
 - Automated Proxmox backup validation
-- Traefik Ingress for K3s
 - Persistent Volumes in Kubernetes
+- Synthetic uptime monitoring (Uptime Kuma)
+- Internal reverse proxy / friendly domains (Caddy or Traefik)
 - ESP32 telemetry integration
 - Advanced Grafana dashboards
 - Tailscale ACLs
 - Automated infrastructure testing
 - CI/CD for documentation
 - Expanded Kubernetes workloads
+
+See [`HOMELAB_ROADMAP.md`](HOMELAB_ROADMAP.md) for the full roadmap with context and history.
 
 ---
 
@@ -297,11 +289,20 @@ The environment has been validated across:
 │   ├── troubleshooting.md
 │   ├── disaster-recovery.md
 │   ├── validation-report.md
+│   ├── postmortems.md
 │   ├── project-timeline.md
 │   └── changelog.md
+├── architecture/
+│   ├── README.md
+│   ├── architecture-diagram.mmd
+│   ├── metrics-flow.mmd
+│   ├── logging-flow.mmd
+│   ├── alerting-flow.mmd
+│   └── recovery-flow.mmd
 ├── screenshots/
 ├── docker-compose/
 ├── terraform/
+├── HOMELAB_ROADMAP.md
 └── README.md
 ```
 
