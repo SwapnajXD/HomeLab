@@ -10,7 +10,6 @@ graph TD
     %% Infrastructure
     Tailnet --> Apollo
     Tailnet --> Athena
-    Tailnet --> Hestia
 
     subgraph Apollo["Apollo - Proxmox VE Hypervisor"]
         direction TB
@@ -29,30 +28,38 @@ graph TD
                 ProxmoxExporter["Proxmox Exporter"]
             end
 
+            subgraph Kubernetes["Kubernetes Lab"]
+                K3s["K3s Control Plane + Node"]
+                Traefik["Traefik Ingress"]
+                PortainerAgent["Portainer Agent"]
+            end
+
             subgraph Development["Development Services"]
-                LocalStack["LocalStack"]
+                Floci["Floci (AWS Emulation)"]
                 Portainer["Portainer"]
             end
         end
 
-        subgraph Hestia["Hestia - LXC"]
+        subgraph Hestia["Hestia - LXC (Tailscale-isolated)"]
             direction TB
 
-            subgraph CoreServices["Core Services"]
-                Homepage["Homepage"]
+            subgraph CoreServices["Core Services - stock config"]
+                Homepage["Homepage (stock, no custom widget/API)"]
                 Vaultwarden["Vaultwarden"]
             end
         end
 
         Bridge --- Athena
-        Bridge --- Hestia
+        Bridge -->|DNAT / NAT| Hestia
     end
 
     classDef host fill:#0b5394,color:#ffffff,stroke:#ffffff,stroke-width:2px;
     classDef guest fill:#e69138,color:#ffffff,stroke:#ffffff,stroke-width:2px;
     classDef service fill:#3d85c6,color:#ffffff,stroke:#ffffff,stroke-width:1px;
+    classDef k8s fill:#326ce5,color:#ffffff,stroke:#ffffff,stroke-width:1px;
 
     class Apollo host;
     class Athena,Hestia guest;
-    class Grafana,Prometheus,Loki,Alloy,NodeExporter,ProxmoxExporter,LocalStack,Portainer,Homepage,Vaultwarden service;
+    class Grafana,Prometheus,Loki,Alloy,NodeExporter,ProxmoxExporter,Floci,Portainer,Homepage,Vaultwarden service;
+    class K3s,Traefik,PortainerAgent k8s;
 ```

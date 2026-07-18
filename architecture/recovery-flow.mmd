@@ -11,6 +11,7 @@ graph TD
     Hestia["Hestia Starts"]
 
     Telemetry["Telemetry Stack Recovery"]
+    K3s["K3s Cluster Ready"]
     Core["Core Services Recovery"]
 
     Tailscale["Tailscale Reconnects"]
@@ -25,9 +26,11 @@ graph TD
     Network -->|LXC Autostart| Hestia
 
     Athena -->|Docker Restart Policy| Telemetry
+    Athena -->|systemd| K3s
     Hestia -->|Docker Restart Policy| Core
 
     Telemetry --> Tailscale
+    K3s --> Tailscale
     Core --> Tailscale
 
     Tailscale --> Finish
