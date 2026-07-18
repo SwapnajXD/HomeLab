@@ -16,14 +16,14 @@ Each entry follows the same shape: **Date → What happened → What broke → R
 | 2026-06-17 | Decision: Athena becomes backend, Hestia becomes presentation-only | ✅ Adopted |
 | 2026-06-21 | K3s cluster stood up on Athena | ✅ Complete — still in use |
 | 2026-06-21 → 06-22 | Athena network/Tailscale outage | ✅ Resolved (transient, no config change) |
-| 2026-06-21 | Olympus V2 build (wallpaper engine, LastFM, cron automation, MAL) | ⚠️ Complete at the time — fully removed 2026-07-17 |
+| 2026-06-21 | Olympus V2 build (wallpaper engine, LastFM, cron automation, MAL) | ⚠️ Complete at the time — fully removed 2026-07-10 |
 | 2026-06-18 → 06-27 | Full Olympus Command Center build **and rollback** of the custom Homepage widget | ✅ Widget removed; backend kept (for now) |
-| 2026-06-26 | LastFM + media pipeline incident (cron overlap, jq crashes, GitHub rate limiting) | ✅ Resolved (moot since 2026-07-17 — pipeline removed) |
+| 2026-06-26 | LastFM + media pipeline incident (cron overlap, jq crashes, GitHub rate limiting) | ✅ Resolved (moot since 2026-07-10 — pipeline removed) |
 | 2026-06-30 | Apollo network bring-up: NAT, port forwarding, Vaultwarden TLS mismatch | ✅ Resolved |
 | 2026-07-05 | Loki + Grafana Alloy centralized logging | ⚠️ Partially working — Docker log discovery unresolved |
-| 2026-07-17 | Dashboard API fully decommissioned; Homepage reverted to stock config | ✅ Complete |
+| 2026-07-10 | Dashboard API fully decommissioned; Homepage reverted to stock config | ✅ Complete |
 
-**Note on the Dashboard's final status:** the raw notes originally contained two different endings for the Olympus Dashboard, since resolved. The custom Homepage widget (`custom.js`/`custom.css`) was torn out on 2026-06-27 for being too fragile and tightly coupled to Homepage's internals. The FastAPI backend behind it survived that round and stayed in use for a while — but as of **2026-07-17**, the entire Dashboard API concept (backend, fetch scripts, and cron jobs) has been removed as well. Hestia's Homepage now runs stock, with no custom widget and no backend dependency. K3s is unaffected and remains in active use. See the 2026-07-17 entry below and `changelog.md` (Phase 11) for details.
+**Note on the Dashboard's final status:** the raw notes originally contained two different endings for the Olympus Dashboard, since resolved. The custom Homepage widget (`custom.js`/`custom.css`) was torn out on 2026-06-27 for being too fragile and tightly coupled to Homepage's internals. The FastAPI backend behind it survived that round and stayed in use for a while — but as of **2026-07-10**, the entire Dashboard API concept (backend, fetch scripts, and cron jobs) has been removed as well. Hestia's Homepage now runs stock, with no custom widget and no backend dependency. K3s is unaffected and remains in active use. See the 2026-07-10 entry below and `changelog.md` (Phase 11) for details.
 
 ---
 
@@ -210,7 +210,7 @@ After the mobile-timing fix, the widget still accumulated hundreds of lines of D
 4. Sync live configs to Git *before* tearing anything down.
 5. Prefer the simplest solution that meets the actual need.
 
-**Reconciling with later docs (resolved 2026-07-17):** This cleanup removed the fragile *frontend widget*; the backend Dashboard API and K3s cluster were rebuilt/retained afterward through a more maintainable integration path (Phase 9 in `changelog.md`). That backend has since been removed too — the whole Dashboard API concept (FastAPI service, fetch scripts, cron jobs) was decommissioned on 2026-07-17, and Hestia now runs Homepage in its stock configuration with no backend dependency at all. See `changelog.md` (Phase 11) and `architecture.md` for the current state.
+**Reconciling with later docs (resolved 2026-07-10):** This cleanup removed the fragile *frontend widget*; the backend Dashboard API and K3s cluster were rebuilt/retained afterward through a more maintainable integration path (Phase 9 in `changelog.md`). That backend has since been removed too — the whole Dashboard API concept (FastAPI service, fetch scripts, cron jobs) was decommissioned on 2026-07-10, and Hestia now runs Homepage in its stock configuration with no backend dependency at all. See `changelog.md` (Phase 11) and `architecture.md` for the current state.
 
 ---
 
@@ -297,11 +297,11 @@ Metrics (Prometheus, Node Exporter, Proxmox Exporter, Grafana dashboards, alerti
 # Open Items Carried Forward
 
 - Loki/Alloy Docker log discovery — only 2 of 9 containers ingested; root cause unconfirmed.
-- ~~MAL (MyAnimeList) API integration~~ / ~~Library tracking automation~~ — both moot as of 2026-07-17: the Dashboard API that would have consumed them was fully decommissioned (see below).
+- ~~MAL (MyAnimeList) API integration~~ / ~~Library tracking automation~~ — both moot as of 2026-07-10: the Dashboard API that would have consumed them was fully decommissioned (see below).
 
 ---
 
-# 2026-07-17 — Dashboard API Fully Decommissioned
+# 2026-07-10 — Dashboard API Fully Decommissioned
 
 **What happened:** The entire Olympus Dashboard API concept was removed from the environment — the FastAPI backend on Athena, every fetch script (LastFM, weather, prices, Pokémon, library, MyAnimeList, media/wallpaper), and their cron jobs. Hestia's Homepage now runs standalone in its stock, default configuration.
 

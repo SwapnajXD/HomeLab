@@ -261,7 +261,7 @@ This established the foundation for all future infrastructure development.
 
 ---
 
-# Phase 11 — Dashboard API Decommission (2026-07-17)
+# Phase 11 — Dashboard API Decommission (2026-07-10)
 
 Following on from the widget rollback in Phase 9, the entire Dashboard API concept was removed for good.
 
@@ -337,13 +337,13 @@ Planned areas of exploration include:
 
 # Current Status
 
-**Last Updated:** 2026-07-17
+**Last Updated:** 2026-07-10
 
 **Environment:** Stable Operational Environment
 
 The Olympus HomeLab has evolved from a simple virtualization host into a production-inspired infrastructure platform featuring Kubernetes, centralized observability, Infrastructure as Code, secure remote administration, and comprehensive operational documentation.
 
-## Known Open Items (as of 2026-07-17)
+## Known Open Items (as of 2026-07-10)
 
 - Loki/Alloy centralized logging is live but only ingesting 2 of 9 Docker containers on Athena; Docker log discovery in Alloy still needs to be fixed (see `postmortems.md`, `troubleshooting.md`).
 - MyAnimeList (MAL) dashboard integration is moot — the dashboard itself has been removed (kept here only as historical context).
