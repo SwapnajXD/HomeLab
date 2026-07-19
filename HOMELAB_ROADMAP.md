@@ -323,7 +323,7 @@ Homepage now runs standalone, in its stock configuration, with no backend depend
 
 > **Update:** since this roadmap was first written, a single-node **K3s Kubernetes cluster** has been stood up on Athena and is in active use, remotely managed from Artemis via `kubectl` (see `docs/postmortems.md`, 2026-06-21, and `docs/inventory.md`). It isn't listed as an item below because it's already done — the items below are what's still ahead.
 >
-> **Also in progress right now (2026-07-18):** Apollo's NAT/firewall layer is mid-migration from `iptables` to `nftables`. Not originally on this roadmap either — surfaced organically while investigating a live NAT rule discrepancy during the infrastructure audit. See `docs/postmortems.md` for the live migration log.
+> **Also resolved on 2026-07-18, not originally on this roadmap either:** a real internet outage on Apollo (stale NAT interface rule after a Wi-Fi/USB-tethering switch) led to evaluating a migration from `iptables` to `nftables`. It was **explicitly declined** — Apollo runs `iptables-legacy`, independent from `nftables`, and Tailscale/Docker/K3s already manage their own `iptables` chains, so migrating would have meant conflicting rule sets rather than fixing the actual bug. A dedicated, idempotent firewall script with dynamic WAN detection (`apollo-firewall.sh` + a `systemd` unit) shipped instead. See `docs/postmortems.md` for the full incident and decision record.
 
 ## Reverse Proxy & Internal Routing
 
@@ -550,7 +550,7 @@ Stable Operational Environment
 | — | K3s Kubernetes Lab | ✅ Complete (built 2026-06-21, not originally in this roadmap; no Ingress deployed) |
 | — | Centralized Logging (Loki + Grafana Alloy) | ✅ Complete — full container discovery confirmed 2026-07-18 |
 | — | Live Infrastructure Audit | ✅ Complete (2026-07-18) — see `docs/postmortems.md` |
-| — | `iptables` → `nftables` Migration | 🚧 In progress |
+| — | `iptables` → `nftables` Migration | ✅ Resolved — evaluated and explicitly declined; dynamic firewall script shipped instead |
 | 9 | Reverse Proxy, Uptime, GitOps, IoT | 📋 Planned |
 | 10 | Suggested: Config Mgmt, Secrets, K8s Maturity, CI/CD Depth, Backup Automation, SLOs, Real-Cloud Practice, Hardware Utilization, FinOps | 💡 Suggested — not yet started |
 
@@ -558,7 +558,7 @@ Stable Operational Environment
 
 # Project Status
 
-**Current Phase:** Post-audit reconciliation — documentation now matches live infrastructure; active work is the `nftables` migration, with Phase 9/10 items next up.
+**Current Phase:** Post-audit reconciliation — documentation now matches live infrastructure, including the resolved Apollo networking/firewall rework; Phase 9/10 items are next up.
 
 **Infrastructure State:** Stable Operational Environment
 
@@ -581,4 +581,4 @@ This roadmap was written early in the project and has been reviewed against the 
 - The `docker-compose/localstack/` folder referenced under Phase 6–7 was **not** actually renamed to `floci/` as this document previously claimed — a live audit found both folders still exist side by side, with LocalStack's data kept on disk but unused. Corrected in place above.
 - Everything else in Phase 9 (reverse proxy, Uptime Kuma, GitOps, IoT telemetry) still reflects genuine, unstarted future work and was left as-is.
 - Added Phase 10 as a set of new suggestions (config management, secrets, Kubernetes maturity, CI/CD depth, backup automation, SLOs, real-cloud practice, hardware utilization, lightweight FinOps) aimed specifically at rounding out the cloud/DevOps skill story for a resume-facing project. None of it is committed — it's there to pick from.
-- **2026-07-18 update:** a full live-infrastructure audit closed out the previously-open Grafana Alloy logging gap (now resolved, confirmed via direct Loki query), surfaced real hardware specs for Apollo (AMD Ryzen 7 3700X, 16GB RAM, an idle NVIDIA GTX 1660 Super), corrected the Hestia/Athena service inventories (both were running more than documented), and kicked off an `iptables` → `nftables` migration on Apollo that wasn't part of any prior roadmap phase. Full findings in `docs/postmortems.md`.
+- **2026-07-18 update:** a full live-infrastructure audit closed out the previously-open Grafana Alloy logging gap (now resolved, confirmed via direct Loki query), surfaced real hardware specs for Apollo (AMD Ryzen 7 3700X, 16GB RAM, an idle NVIDIA GTX 1660 Super), and corrected the Hestia/Athena service inventories (both were running more than documented). The audit also surfaced a real internet outage on Apollo (stale NAT interface rule), which led to evaluating — and explicitly declining — a migration from `iptables` to `nftables` in favor of a dedicated, idempotent firewall script with dynamic WAN detection. None of this was part of any prior roadmap phase. Full findings in `docs/postmortems.md`.

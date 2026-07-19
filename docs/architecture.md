@@ -90,7 +90,7 @@ AMD Ryzen 7 3700X (8 cores/16 threads), 16GB DDR4-3200, a 238.5GB NVMe drive hos
 - Persistent NAT gateway
 - Port forwarding for internal services
 
-Apollo currently uses `iptables` to provide outbound internet access for internal workloads and selectively forwards traffic to trusted internal services. **A migration to `nftables` is in progress** — see `network.md` and `postmortems.md` for the live migration log. The rule set documented in `network.md` reflects the current `iptables` configuration until that migration completes.
+Apollo uses `iptables` (legacy backend) to provide outbound internet access for internal workloads and selectively forwards traffic to trusted internal services. Firewall/NAT logic is managed by a dedicated, idempotent script (`/usr/local/sbin/apollo-firewall.sh`) with dynamic WAN interface detection, run via a `systemd` unit at boot — rather than hardcoded rules embedded in network config. A migration to `nftables` was evaluated and explicitly declined, since Apollo's `iptables-legacy` backend runs independently from `nftables`, and Tailscale/Docker/K3s already manage their own `iptables` chains. See `network.md` and `postmortems.md` (2026-07-18) for the full architecture and decision record.
 
 ---
 
@@ -331,4 +331,4 @@ The Olympus HomeLab currently provides:
 - Remote-first administration
 - Production-inspired operational practices
 
-The platform continues to evolve incrementally while maintaining a stable, production-inspired architecture. Recent changes include simplifying the frontend back down to stock Homepage plus a lightweight theme after retiring the custom dashboard integration, and an in-progress migration of Apollo's NAT/firewall layer from `iptables` to `nftables`.
+The platform continues to evolve incrementally while maintaining a stable, production-inspired architecture. Recent changes include simplifying the frontend back down to stock Homepage plus a lightweight theme after retiring the custom dashboard integration, and reworking Apollo's NAT/firewall layer into a dedicated, idempotent script with dynamic WAN detection (after root-causing a real outage to a hardcoded interface name and evaluating — then declining — a migration to `nftables`).

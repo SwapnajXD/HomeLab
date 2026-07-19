@@ -23,9 +23,10 @@ It records significant incidents, root cause analyses (RCA), verified resolution
 | Cron Job Overlap *(archived — component removed)* | Low | Resolved |
 | Vaultwarden HTTPS Mismatch | Low | Resolved |
 | Grafana Alloy Incomplete Docker Log Discovery | Medium | **Resolved** (confirmed 2026-07-18) |
+| Apollo Internet Outage (stale NAT interface) | High | **Resolved** (2026-07-18) |
+| `nftables` Migration Question | Medium | **Resolved** — declined, stayed on `iptables` (2026-07-18) |
 | Orphaned `core-services` Compose Project | Low | **Open** |
 | `k3s.yaml` Permissions Reset on Restart | Low | **Open** (known, workaround exists) |
-| Port 3000 Return-Path NAT Rule Missing | Low | **Open** (not currently impacting service) |
 | Docker DNS Resolver Errors (`127.0.0.53`) | Low | **Open** (informational, not investigated) |
 
 ---
@@ -330,6 +331,61 @@ Full write-up: `postmortems.md` (2026-07-05, resolution noted 2026-07-18).
 
 ---
 
+# Resolved: Apollo Internet Outage — Stale NAT Interface Rule
+
+**Status:** Resolved (2026-07-18)
+
+### Symptoms
+
+Athena could reach Apollo and the rest of the LAN (`ping 10.10.10.1` succeeded) but could not reach the internet (`ping 8.8.8.8` failed). DNS was not the issue; the default route was correctly configured.
+
+### Root Cause
+
+Apollo's outbound MASQUERADE rule was bound to `enx4a7f6c52f9f5` (a USB Ethernet adapter used during an earlier tethering session). After switching back to Wi-Fi (`wlx002e2df0393b`), the rule was never updated — so outbound packets were never actually NAT'd.
+
+### Also Observed: SSH Access Broke
+
+While testing NAT changes, SSH to Athena also stopped working. This was **not** a separate SSH issue — it was a side effect of NAT being in a broken state during active troubleshooting. It resolved on its own once NAT was fixed, with zero SSH-side changes.
+
+### Fix
+
+Re-added the MASQUERADE rule against the correct interface, then replaced the entire hardcoded-interface approach with a dynamic one — see "Resolved: nftables Migration Question" below.
+
+### Lesson
+
+A correct default route does not guarantee internet access — NAT must be bound to the interface that's actually carrying traffic, and that binding needs to survive uplink changes (Wi-Fi ↔ Ethernet ↔ USB tethering).
+
+Full write-up: `postmortems.md` (2026-07-18).
+
+---
+
+# Resolved: `nftables` Migration Question
+
+**Status:** Resolved — decision made, not migrating (2026-07-18)
+
+### The Question
+
+Since Proxmox 9 ships with `nftables`, should Apollo's firewall be migrated off `iptables`?
+
+### Investigation
+
+A test migration was attempted (`/etc/nftables.conf` written, loaded, tested against the working `iptables` setup). This surfaced that Apollo's `iptables` binary reports `iptables v1.8.11 (legacy)` — the **legacy** backend, which maintains a completely independent rule set from `nftables`. The whole time `nftables` rules were being tested, the actually-working NAT was still coming from `iptables`.
+
+### Decision
+
+**Stay on `iptables`.** Migrating would mean either running two disconnected firewalls simultaneously, or also migrating Tailscale's, Docker's, and K3s's self-managed `iptables` chains — well outside the scope of the actual bug (one stale interface name).
+
+### What Shipped Instead
+
+- `/usr/local/sbin/apollo-firewall.sh` — idempotent script handling outbound NAT (dynamic WAN detection), port forwarding, and hairpin NAT.
+- `apollo-firewall.service` — `systemd` unit, runs once at boot after networking.
+- `/etc/network/interfaces` cleaned up to only configure networking, no embedded firewall logic.
+- Explicitly leaves Tailscale, Docker, and K3s/Flannel's own `iptables` rules untouched.
+
+Full write-up: `postmortems.md` (2026-07-18).
+
+---
+
 # Current Open Incidents
 
 ## Orphaned `core-services` Compose Project
@@ -371,22 +427,6 @@ Use `sudo kubectl` on Athena, or reapply `chmod 644 /etc/rancher/k3s/k3s.yaml` a
 Automate the permission fix via a systemd drop-in or a small post-start script, rather than reapplying manually.
 
 ---
-
-## Port 3000 Return-Path NAT Rule Missing
-
-**Status:** Open (not currently impacting service)
-
-### Symptoms
-
-`/etc/network/interfaces` defines an explicit return-path `MASQUERADE` rule for both port 3000 (Homepage) and port 8080 (Vaultwarden), but live audits of the NAT table have only ever shown the port 8080 rule actually applied.
-
-### Impact
-
-None observed — Homepage works normally, most likely because the general `10.10.10.0/24` MASQUERADE rule covers its return traffic anyway. Flagged for reconciliation rather than urgent action.
-
-### Next Steps
-
-Resolve as part of the `iptables` → `nftables` migration rather than patching the old rule set — see `postmortems.md`.
 
 ---
 
@@ -463,6 +503,6 @@ Recovery procedures should be validated through controlled reboot and failover t
 | Recovery Procedures | Verified |
 | Operational Documentation | Current |
 | Infrastructure Stability | Stable |
-| Open Incidents | 4 (all low severity — see "Current Open Incidents" above) |
+| Open Incidents | 3 (all low severity — see "Current Open Incidents" above) |
 
 **Environment State:** Stable Operational Environment

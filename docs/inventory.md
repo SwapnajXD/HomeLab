@@ -98,7 +98,7 @@ flowchart TB
 - DNAT Port Forwarding
 - Bridge Management (`vmbr0`)
 
-> **In progress:** Apollo's firewall/NAT layer is mid-migration from `iptables` to `nftables`. Current NAT rules are still `iptables`-based and documented in `network.md`; this section will be updated once the migration completes.
+> **Firewall architecture:** NAT/firewall logic is managed by a dedicated script (`/usr/local/sbin/apollo-firewall.sh`), run via a `systemd` unit at boot, with dynamic WAN interface detection rather than a hardcoded interface name. `nftables` was evaluated (Proxmox 9 ships with it) and explicitly declined — Apollo runs the `iptables-legacy` backend, fully independent from `nftables`, and Tailscale/Docker/K3s all already manage their own `iptables` chains. Full detail in `network.md` and `postmortems.md` (2026-07-18).
 
 ### Hosted Workloads
 
@@ -508,14 +508,14 @@ Full narrative in `postmortems.md`.
 
 ### Outbound NAT
 
-Provides internet access for internal workloads via MASQUERADE on the Wi-Fi uplink (`wlx002e2df0393b`).
+Provides internet access for internal workloads via MASQUERADE, with the outbound interface detected **dynamically** at boot (`ip route | awk '/^default/ {print $5; exit}'`) rather than hardcoded — this is the currently-Wi-Fi-bound interface (`wlx002e2df0393b`), but the script adapts automatically if the uplink ever changes to Ethernet or USB tethering.
 
 ```mermaid
 flowchart LR
-    LAN["10.10.10.0/24"] -->|MASQUERADE| INET[Internet]
+    LAN["10.10.10.0/24"] -->|MASQUERADE - dynamic WAN detection| INET[Internet]
 ```
 
-> **In progress:** this NAT layer is being migrated from `iptables` to `nftables`. See `network.md` and `postmortems.md` for the live migration log.
+Managed by `/usr/local/sbin/apollo-firewall.sh` + `apollo-firewall.service`. See `network.md` and `postmortems.md` (2026-07-18) for the full architecture and the incident that led to it.
 
 ---
 
@@ -573,7 +573,7 @@ flowchart LR
 | Disaster Recovery Runbook | Complete |
 | Health Verification Guide | Complete |
 | Infrastructure Validation | Complete |
-| NAT Persistence Documented | Yes (mid-migration to `nftables`) |
+| NAT Persistence Documented | Yes — via dedicated firewall script + `systemd` unit |
 | Operational Documentation | Complete |
 
 ---
@@ -595,7 +595,7 @@ flowchart LR
 | Vaultwarden | Healthy |
 | Portainer | Healthy (orphaned Compose project — see note) |
 | Floci | Healthy when started (on-demand) |
-| Network Routing | Operational (NAT migration to `nftables` in progress) |
+| Network Routing | Operational — dynamic firewall script in place |
 | Observability | Fully Operational |
 
 ---
@@ -604,7 +604,7 @@ flowchart LR
 
 The Olympus HomeLab consists of a production-inspired virtualized environment built around Proxmox VE, Docker, and K3s. Infrastructure responsibilities are distributed between Athena (operations, observability, and Kubernetes) and Hestia (a minimal, stock-plus-themed frontend, with its own local monitoring/agent footprint), while Apollo provides virtualization, networking, and gateway services on real hardware with meaningful headroom (16GB RAM, only 1 of 4 DIMM slots populated; an idle GPU available for future passthrough).
 
-The environment includes fully-working centralized monitoring and logging across both hosts, Infrastructure as Code workflows, secure remote administration through Tailscale, and comprehensive operational documentation covering architecture, recovery, validation, troubleshooting, and health verification. An in-progress `nftables` migration on Apollo is the current active infrastructure change.
+The environment includes fully-working centralized monitoring and logging across both hosts, Infrastructure as Code workflows, secure remote administration through Tailscale, and comprehensive operational documentation covering architecture, recovery, validation, troubleshooting, and health verification. The most recent infrastructure change was reworking Apollo's NAT/firewall layer into a dedicated, idempotent script with dynamic WAN detection, after root-causing a real outage to a hardcoded interface name — `nftables` was evaluated as part of that work and explicitly declined.
 
 **Overall Infrastructure Status:** Healthy and Operational
 

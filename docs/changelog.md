@@ -283,7 +283,7 @@ Consistent with the lesson already learned in Phase 9: Homepage works best as a 
 
 ---
 
-# Phase 12 — Live Infrastructure Audit & nftables Migration (2026-07-18)
+# Phase 12 — Live Infrastructure Audit & Firewall Rework (2026-07-18)
 
 ## Live Infrastructure Audit
 
@@ -298,9 +298,15 @@ A full audit was run directly against Apollo, Athena, and Hestia to catch drift 
 - Apollo's real hardware specs documented for the first time (AMD Ryzen 7 3700X, 16GB RAM, NVMe + SATA storage, an idle NVIDIA GTX 1660 Super).
 - An orphaned Portainer Compose project (`core-services`, no matching compose file on disk) identified as a minor open item.
 
-## nftables Migration (In Progress)
+## Networking & Firewall Rework
 
-Apollo's NAT/firewall layer is being migrated from `iptables` to `nftables`. While preparing for this, a stale/incorrect duplicate MASQUERADE rule (bound to the wrong network interface) was found and cleaned up in the live `iptables` table — unrelated to the migration itself, just surfaced while working in the same area. Migration is ongoing; `network.md` and `inventory.md` will be updated with the `nftables` rule set once complete.
+Athena briefly lost internet access after Apollo's outbound MASQUERADE rule was left bound to a stale, no-longer-active interface (from an earlier USB-tethering session) after switching back to Wi-Fi. Fixing that surfaced a bigger question — whether to migrate Apollo's firewall from `iptables` to `nftables`, since Proxmox 9 ships with `nftables` available.
+
+**`nftables` migration was evaluated and explicitly declined:** Apollo runs the `iptables-legacy` backend, which maintains a completely independent rule set from `nftables` — migrating would mean either running two disconnected firewalls simultaneously, or also migrating Tailscale, Docker, and K3s's self-managed `iptables` chains, well outside the scope of the actual bug.
+
+**What shipped instead:** firewall logic was extracted out of `/etc/network/interfaces` into a dedicated, idempotent script (`/usr/local/sbin/apollo-firewall.sh`) with its own `systemd` unit, run once at boot. The script detects the current WAN interface dynamically (`ip route | awk '/^default/ {print $5; exit}'`) instead of hardcoding it, and configures outbound NAT, Homepage/Vaultwarden port forwarding, and hairpin NAT — while explicitly leaving Tailscale, Docker, and K3s/Flannel's own rules untouched.
+
+Full write-up: `postmortems.md` (2026-07-18).
 
 ---
 
@@ -319,7 +325,7 @@ Apollo's NAT/firewall layer is being migrated from `iptables` to `nftables`. Whi
 | Dashboard API | Decommissioned from deployment — code retained |
 | Documentation Standardization | Complete |
 | Live Infrastructure Audit | Complete (2026-07-18) |
-| nftables Migration | In Progress |
+| Firewall Rework (dynamic WAN detection, dedicated script) | Complete |
 
 
 ---
@@ -369,7 +375,7 @@ The Olympus HomeLab has evolved from a simple virtualization host into a product
 
 ## Known Open Items (as of 2026-07-18)
 
-- Apollo's NAT/firewall layer migration from `iptables` to `nftables` is in progress.
+- ~~Apollo's NAT/firewall layer migration from `iptables` to `nftables`~~ — resolved: evaluated and explicitly declined in favor of staying on `iptables` with a new dynamic firewall script (`apollo-firewall.sh` + systemd unit).
 - Orphaned `core-services` Compose project (Portainer, Athena) — no matching compose file on disk, needs to be written and committed.
 - `k3s.yaml` permissions reset on every `k3s` service restart — workaround exists, not yet automated.
 - Port 3000 return-path NAT rule is defined in config but not applied live — low priority.

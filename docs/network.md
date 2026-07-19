@@ -72,7 +72,7 @@ Services:               Services:
 • Floci (on-demand)
 ```
 
-> **In progress:** Apollo's firewall/NAT layer is being migrated from `iptables` to `nftables`. Everything below reflects the current, still-`iptables`-based configuration.
+> **Firewall architecture note:** Apollo's NAT/firewall rules were previously embedded inline in `/etc/network/interfaces` with a hardcoded WAN interface name. As of 2026-07-18, this has been replaced with a dedicated, idempotent script (`/usr/local/sbin/apollo-firewall.sh`) run via `systemd` at boot, which detects the WAN interface dynamically rather than hardcoding it. `nftables` was evaluated as part of this rework and explicitly declined — see below and `postmortems.md`.
 
 ---
 
@@ -130,22 +130,41 @@ Hestia is intentionally excluded from the Tailscale network to reduce the attack
 
 # NAT & Traffic Routing
 
-Apollo functions as the network gateway for the homelab.
+Apollo functions as the network gateway for the homelab. As of 2026-07-18, all NAT/firewall logic is managed by a dedicated script rather than being embedded in network configuration files.
+
+## Firewall Architecture
+
+| Property | Value |
+|----------|-------|
+| Script | `/usr/local/sbin/apollo-firewall.sh` |
+| Managed by | `systemd` — `/etc/systemd/system/apollo-firewall.service` |
+| Trigger | Runs once at boot, after networking is up |
+| Enabled via | `systemctl enable apollo-firewall.service` |
+| Verified state | `Active: active (exited)` |
+| Idempotency | Checks for existing rules before adding them — safe to re-run manually at any time |
+
+The script is responsible for:
+
+- Outbound NAT (dynamic WAN detection)
+- Homepage and Vaultwarden port forwarding
+- Hairpin NAT (so LAN clients can reach forwarded services via Apollo's own address, not just external clients)
+
+It explicitly does **not** touch Tailscale's chains, Docker's rules, or K3s/Flannel's networking rules — those are left to their own tooling to avoid conflicts. `/etc/network/interfaces` now only configures networking; no firewall logic lives there anymore.
+
+## Why Not `nftables`?
+
+Proxmox 9 ships with `nftables`, and a migration was evaluated. It was declined once Apollo's `iptables` was confirmed to be running the **legacy** backend (`iptables v1.8.11 (legacy)`) — which maintains a completely independent rule set from `nftables`, not a shared one. Migrating would have meant either running two disconnected firewalls, or also migrating Tailscale's, Docker's, and K3s's self-managed `iptables` chains — well outside the scope of what was actually broken (a single stale interface name). Full reasoning: `postmortems.md` (2026-07-18).
 
 ## Outbound NAT
 
-Internal systems access the internet through a persistent MASQUERADE rule bound to Apollo's real uplink interface, confirmed live via `ip route`:
-
-```text
-default via 192.168.1.1 dev wlx002e2df0393b   ← actual internet uplink (Wi-Fi)
-10.10.10.0/24 dev vmbr0                        ← internal LAN
-```
+Internal systems access the internet through a MASQUERADE rule whose interface is determined **dynamically at boot**, rather than hardcoded:
 
 ```bash
-iptables -t nat -A POSTROUTING -s 10.10.10.0/24 -o wlx002e2df0393b -j MASQUERADE
+WAN_IF=$(ip route | awk '/^default/ {print $5; exit}')
+iptables -t nat -A POSTROUTING -s 10.10.10.0/24 -o "$WAN_IF" -j MASQUERADE
 ```
 
-> A second physical interface (`enx4a7f6c52f9f5`, USB Ethernet) briefly ended up in the live NAT table as well, from an earlier troubleshooting session — it was not the real uplink and has since been removed, leaving only the correct Wi-Fi-bound rule above. `ip route` is the fastest way to confirm which interface is actually carrying the default route if this is ever in question again.
+This directly fixes the root cause of a real outage: Apollo's uplink had previously changed from USB tethering (`enx4a7f6c52f9f5`) back to Wi-Fi (`wlx002e2df0393b`), but the old hardcoded MASQUERADE rule was never updated — so outbound traffic from Athena silently stopped being NAT'd. The script now adapts automatically across Wi-Fi, Ethernet, or USB tethering, instead of going stale the next time the connection type changes. Full incident writeup: `postmortems.md` (2026-07-18).
 
 This enables:
 
@@ -172,17 +191,18 @@ iptables -t nat -A PREROUTING -p tcp --dport 8080 -j DNAT --to-destination 10.10
 
 Vaultwarden requires HTTPS at the application layer and will reject plain HTTP connections.
 
-### Return-path NAT
+### Return-Path NAT & Hairpin NAT
 
-An explicit return-path MASQUERADE rule exists for Vaultwarden's port:
+`apollo-firewall.sh` configures return-path MASQUERADE for **both** forwarded ports symmetrically:
 
 ```bash
+iptables -t nat -A POSTROUTING -d 10.10.10.2 -p tcp --dport 3000 -j MASQUERADE
 iptables -t nat -A POSTROUTING -d 10.10.10.2 -p tcp --dport 8080 -j MASQUERADE
 ```
 
-> **Known asymmetry:** `/etc/network/interfaces` also defines an equivalent explicit return-path rule for port 3000 (Homepage), but it has not been present in the live NAT table during recent audits — Homepage still works, most likely because the general `10.10.10.0/24` MASQUERADE rule covers it anyway, but the explicit rule for port 3000 specifically isn't actually applied. Not currently causing a problem, but worth reconciling during the `nftables` migration rather than carrying the inconsistency forward.
+This resolves an asymmetry noted in an earlier audit, where port 8080's return-path rule was consistently present in the live NAT table but port 3000's wasn't. The script also configures **hairpin NAT**, so LAN clients can reach Homepage/Vaultwarden through Apollo's own address (not just external clients reaching in) — something the previous inline configuration didn't explicitly provide.
 
-Persistent `iptables` rules (defined in `/etc/network/interfaces`, applied via `post-up`/`post-down` hooks) ensure forwarding survives host reboots — this will be replaced by the `nftables` equivalent once the migration completes.
+All of this now survives host reboots via the `systemd` unit rather than `post-up`/`post-down` hooks in `/etc/network/interfaces`.
 
 ---
 
@@ -271,8 +291,9 @@ Routine network validation follows a fixed troubleshooting sequence.
 | 3 | `curl -I https://google.com` |
 | 4 | `tailscale status` |
 | 5 | Verify LAN connectivity between nodes |
+| 6 | If outbound internet fails specifically: confirm `apollo-firewall.service` is `active (exited)` and re-run `/usr/local/sbin/apollo-firewall.sh` manually if needed |
 
-This progression quickly isolates failures involving local networking, internet connectivity, DNS, Tailscale, or internal routing.
+This progression quickly isolates failures involving local networking, internet connectivity, DNS, Tailscale, internal routing, or a stale/misapplied firewall rule.
 
 ---
 
@@ -300,8 +321,9 @@ The network follows a defense-in-depth approach.
 | Internal Networking | Operational |
 | Tailscale Mesh | Operational |
 | Remote Administration | Operational |
-| Outbound NAT | Persistent |
-| Port Forwarding | Operational |
+| Apollo Firewall Script (`apollo-firewall.service`) | Operational — `active (exited)` |
+| Outbound NAT | Persistent — dynamic WAN detection |
+| Port Forwarding | Operational — symmetric return-path + hairpin NAT |
 | Kubernetes Networking | Operational |
 | Metrics Pipeline | Operational |
 | Logging Pipeline | Operational — full container discovery confirmed across both hosts |
@@ -313,4 +335,4 @@ The network follows a defense-in-depth approach.
 
 The Olympus HomeLab network provides a secure, resilient, and production-inspired foundation for infrastructure experimentation. Apollo acts as the central gateway, enforcing routing and network isolation, while Tailscale enables encrypted remote administration without exposing management interfaces to the public internet. The architecture supports observability, Kubernetes, and self-hosted applications while maintaining a minimal attack surface and operational simplicity.
 
-Apollo's NAT/firewall layer is currently mid-migration from `iptables` to `nftables` — this document will be updated to reflect the new rule set once that migration completes. See `postmortems.md` for the live migration log.
+Apollo's NAT/firewall layer was reworked on 2026-07-18 following a real outage root-caused to a stale, hardcoded interface reference. `nftables` was evaluated as a fix and explicitly declined — Apollo runs `iptables-legacy`, which is fully independent from `nftables`, and Tailscale/Docker/K3s all already manage their own `iptables` state. Instead, firewall logic now lives in a dedicated, idempotent script with dynamic WAN interface detection, managed by its own `systemd` unit. See `postmortems.md` for the full incident and decision record.

@@ -51,7 +51,7 @@ Hestia (LXC)
 * Persistent NAT gateway + DNAT port forwarding
 * Guest autostart policies
 
-> **In progress:** Apollo's firewall/NAT layer is being migrated from `iptables` to `nftables`. Diagrams and rule references below reflect the current `iptables` configuration until that completes — see `docs/network.md` and `docs/postmortems.md`.
+> **Firewall architecture:** NAT/firewall logic is managed by a dedicated, idempotent script (`/usr/local/sbin/apollo-firewall.sh` + `apollo-firewall.service`) with dynamic WAN interface detection, rather than hardcoded rules. A migration to `nftables` was evaluated and explicitly declined (Apollo runs `iptables-legacy`, independent from `nftables`; Tailscale/Docker/K3s already manage their own chains) — see `docs/network.md` and `docs/postmortems.md` (2026-07-18).
 
 ---
 
@@ -293,4 +293,4 @@ Keeping these diagrams current ensures that the visual documentation accurately 
 
 **Last Reviewed:** 2026-07-18
 
-**Recent Changes:** Live audit confirmed Hestia's and Athena's full real service inventories (previously undercounted); Docker log discovery gap in Grafana Alloy resolved; Traefik confirmed not deployed in K3s; Floci confirmed on-demand; real Apollo hardware specs documented; Apollo's NAT layer migration from `iptables` to `nftables` in progress; Dashboard API decommissioned from deployment with source code intentionally retained in the repository.
+**Recent Changes:** Live audit confirmed Hestia's and Athena's full real service inventories (previously undercounted); Docker log discovery gap in Grafana Alloy resolved; Traefik confirmed not deployed in K3s; Floci confirmed on-demand; real Apollo hardware specs documented; a real internet outage on Apollo was root-caused to a stale NAT interface rule and fixed with a dynamic firewall script (`nftables` migration evaluated and explicitly declined); Dashboard API decommissioned from deployment with source code intentionally retained in the repository.

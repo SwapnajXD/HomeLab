@@ -22,7 +22,7 @@ Each entry follows the same shape: **Date → What happened → What broke → R
 | 2026-06-30 | Apollo network bring-up: NAT, port forwarding, Vaultwarden TLS mismatch | ✅ Resolved |
 | 2026-07-05 | Loki + Grafana Alloy centralized logging | ⚠️ Partially working at the time — Docker log discovery gap, resolved by 2026-07-18 |
 | 2026-07-10 | Dashboard API decommissioned from deployment; Homepage reverted to stock+theme config | ✅ Complete — code retained in repo |
-| 2026-07-XX | Apollo NAT migration: `iptables` → `nftables` | 🚧 In progress |
+| 2026-07-18 | Apollo networking/firewall rework — root-caused interface bug, evaluated and declined `nftables`, shipped a dynamic firewall script | ✅ Complete |
 | 2026-07-18 | Live infrastructure audit — reconciled documentation against real running systems on all three hosts | ✅ Complete |
 
 **Note on the Dashboard's final status:** the raw notes originally contained two different endings for the Olympus Dashboard, since resolved. The custom Homepage widget's `custom.js` was emptied out on 2026-06-27 for being too fragile and tightly coupled to Homepage's internals (a separate, unrelated `custom.css` visual theme was later added/kept — purely cosmetic, no data logic). The FastAPI backend behind the original widget survived that round and stayed in use for a while — but as of **2026-07-10**, it was decommissioned from active deployment as well: the container was stopped and its fetch scripts/cron jobs were disabled. **The code itself was intentionally kept in the repository** (`docker-compose/dashboard-api/`, `scripts/fetch_*.sh`) rather than deleted — it's real, working engineering worth having visible, even though it's not part of the live deployment. Hestia's Homepage now runs stock (plus that unrelated theme), with no runtime backend dependency. K3s is unaffected and remains in active use. See the 2026-07-10 entry below and `changelog.md` (Phase 11) for details.
@@ -302,10 +302,10 @@ Metrics (Prometheus, Node Exporter, Proxmox Exporter, Grafana dashboards, alerti
 
 - ~~Loki/Alloy Docker log discovery~~ — **resolved**, confirmed via live audit 2026-07-18 (see below).
 - ~~MAL (MyAnimeList) API integration~~ / ~~Library tracking automation~~ — both moot as of 2026-07-10: the Dashboard API that would have consumed them was decommissioned from deployment (code retained — see below).
-- `nftables` migration on Apollo — in progress, not yet complete.
+- ~~`nftables` migration on Apollo~~ — **resolved**: evaluated, found Apollo runs `iptables-legacy` independently from `nftables`, and explicitly decided to stay on `iptables` rather than risk conflicting with Tailscale/Docker/K3s's self-managed rules. Replaced with a dynamic, idempotent firewall script instead (see 2026-07-18 entry below).
+- ~~Port 3000 return-path NAT rule defined in config but not present in the live table~~ — **resolved** as a side effect of the firewall rework; the new script configures hairpin NAT symmetrically for both forwarded ports.
 - Orphaned `core-services` Compose project (Portainer, on Athena) — needs a real compose file written and committed.
 - `k3s.yaml` permissions reset on every `k3s` restart — workaround exists (`sudo kubectl` or reapply `chmod`), not yet automated.
-- Port 3000 return-path NAT rule defined in config but not present in the live table — low priority, no observed impact.
 - Recurring `dockerd` DNS resolver errors on Athena (`127.0.0.53`) — informational, not yet investigated.
 
 ---
@@ -317,18 +317,6 @@ Metrics (Prometheus, Node Exporter, Proxmox Exporter, Grafana dashboards, alerti
 **Why:** Consistent with the lesson from the 2026-06-27 widget rollback — the frontend widget had already proven too fragile to justify its maintenance cost, and once it was gone, the backend serving it stopped earning its *deployment* keep either. Decommissioning it from active use eliminates the last piece of custom, higher-maintenance surface area actually running in the stack, while the code itself stays visible in the repo as a deliberate portfolio decision — a recruiter looking at the repository can see a real, working FastAPI service that was built, and the judgment call to retire it from production once it stopped earning its complexity.
 
 **Status:** Complete. This closes out the "reconcile the abandoned-vs-active dashboard" open item from the previous version of this document — the widget's logic is gone, the backend isn't deployed, and the code for both remains in the repo. Current architecture docs reflect this.
-
----
-
-# 2026-07-XX — Apollo NAT Migration: `iptables` → `nftables` (In Progress)
-
-**What's happening:** Apollo's firewall/NAT layer is being migrated from `iptables` to `nftables`. This is a live, in-progress change — not yet complete as of the most recent audit (2026-07-18).
-
-**Context uncovered during the migration:** while working through the live `iptables` rules to prepare for the migration, the outbound MASQUERADE rule was found duplicated/pointed at the wrong interface (`enx4a7f6c52f9f5`, a USB Ethernet adapter) instead of the actual internet uplink (`wlx002e2df0393b`, Wi-Fi, confirmed via `ip route`). This had accumulated from repeated rule reloads without a clean flush in between, rather than a real configuration error — it's been cleaned up and the correct rule restored, independent of the `nftables` work itself.
-
-Also surfaced: the return-path `MASQUERADE` rule for Homepage's port 3000 is defined in `/etc/network/interfaces` but has not actually been present in the live NAT table across recent audits — only Vaultwarden's port 8080 rule is. Not currently causing a problem (the general subnet MASQUERADE rule likely covers it), but flagged to be reconciled as part of the `nftables` rewrite rather than carried forward as-is.
-
-**Status:** In progress. `network.md`, `inventory.md`, and `disaster-recovery.md` will be updated with the new `nftables` rule set once the migration completes.
 
 ---
 
@@ -351,3 +339,74 @@ Also surfaced: the return-path `MASQUERADE` rule for Homepage's port 3000 is def
 **Why this mattered:** several of these gaps would have been immediately visible to anyone actually cloning the repo and poking around — an inventory doc that undercounts running services on the exact hosts it claims to document is a credibility problem for a project explicitly built to go on a resume.
 
 **Status:** Complete. `inventory.md`, `architecture.md`, `network.md`, `troubleshooting.md`, `disaster-recovery.md`, `health-checks.md`, and `validation-report.md` were all updated to reflect these findings.
+
+---
+
+# 2026-07-18 — Apollo Networking & Firewall Rework (Root-Caused, nftables Evaluated and Declined)
+
+**What happened:** Athena lost internet access — it could reach Apollo and the rest of the LAN (`ping 10.10.10.1` succeeded) but not the outside world (`ping 8.8.8.8` failed). DNS wasn't the issue and the default route was correct; the problem was packet forwarding/NAT.
+
+## Root Cause
+
+Apollo had previously been using **USB tethering** as its uplink, and the outbound MASQUERADE rule was bound to that interface (`enx4a7f6c52f9f5`). After switching back to Wi-Fi (`wlx002e2df0393b`), the MASQUERADE rule was never updated — it kept pointing at the old, no-longer-active interface, so outbound packets from Athena were never actually NAT'd. This confirms and closes out the interface-mismatch pattern flagged in earlier audits (2026-07-18 live audit, and the `enx.../wlx...` cleanup from the same day).
+
+**Fix:** re-added the MASQUERADE rule against the correct interface — internet access was restored immediately.
+
+```bash
+iptables -t nat -A POSTROUTING -s 10.10.10.0/24 -o wlx002e2df0393b -j MASQUERADE
+```
+
+## Red Herring: SSH Access Broke Too
+
+While testing NAT changes, SSH access to Athena also stopped working. This looked like a separate SSH problem — it wasn't. It was caused by the same broken/in-flux NAT rules from the troubleshooting process itself. Once NAT was cleaned up, SSH worked again with **no SSH-side configuration changes** at all. Worth remembering: a "service is unreachable" symptom during active firewall work is not automatically a service-layer problem.
+
+## nftables Migration: Evaluated, Then Declined
+
+Since Proxmox 9 ships with `nftables`, a migration was attempted: `/etc/nftables.conf` was created, rules were written, loaded, and tested against the working `iptables` configuration.
+
+**What killed the migration:** Apollo's `iptables` binary reported `iptables v1.8.11 (legacy)` — meaning it's running the **legacy** backend, not the `nft` backend. Legacy `iptables` and `nftables` rules on this system are **completely independent rule sets**, not two views of the same thing. The entire time the `nftables` rules were being tested, the actually-working NAT was still coming from the legacy `iptables` configuration — the `nftables` rules were inert.
+
+**Decision: stay on `iptables` (legacy).** Reasons:
+
+- Tailscale already manages its own `iptables` chains.
+- Docker creates its own `iptables` rules.
+- K3s (Flannel/CNI) creates additional `iptables`-based networking rules.
+- The existing `iptables` configuration, once the interface bug was fixed, was already working reliably.
+- Migrating would mean either running two independent, conflicting firewall backends simultaneously, or also migrating Tailscale/Docker/K3s's self-managed rules — well outside the scope of what was actually broken.
+
+The real bug was never `iptables` itself — it was one hardcoded, stale interface name.
+
+## New Firewall Architecture
+
+Rather than leaving firewall logic embedded in `/etc/network/interfaces` (where it had already caused problems), it was extracted into a dedicated, idempotent script:
+
+- **`/usr/local/sbin/apollo-firewall.sh`** — configures outbound NAT, Homepage/Vaultwarden port forwarding, and hairpin NAT (so LAN clients can reach forwarded services via Apollo's own address, not just external clients). Checks for existing rules before adding them, so it's safe to re-run.
+- **Dynamic WAN detection** — instead of hardcoding an interface name, the script determines the current uplink at runtime:
+
+  ```bash
+  WAN_IF=$(ip route | awk '/^default/ {print $5; exit}')
+  ```
+
+  This is the actual fix for the root cause: the script now adapts automatically whether the uplink is Wi-Fi, USB tethering, or Ethernet, instead of silently going stale the next time the connection type changes.
+- **`/etc/systemd/system/apollo-firewall.service`** — runs the script once at boot, after networking is up. Enabled via `systemctl enable apollo-firewall.service`; verified `Active: active (exited)`.
+- **`/etc/network/interfaces`** was cleaned up to only configure networking — no more `post-up`/`post-down` firewall rules embedded in it.
+
+**Explicitly left untouched:** Tailscale's chains, Docker's rules, K3s/Flannel's rules, and Proxmox's own networking — the script only manages Apollo's own outbound NAT, port forwarding, and hairpin NAT, to avoid conflicting with tooling that already manages its own `iptables` state.
+
+## Also Resolved As a Side Effect
+
+The port 3000 return-path NAT asymmetry flagged in the 2026-07-18 audit (Vaultwarden's port 8080 had an explicit return-path rule; Homepage's port 3000 didn't) is resolved by this rework — the new script configures hairpin NAT for both forwarded ports symmetrically, rather than relying on rules that had drifted apart over time.
+
+## Lessons Learned
+
+1. A correct default route does not guarantee internet access — NAT must also be bound to the correct outbound interface, and that binding needs to survive uplink changes.
+2. Hardcoded interface names in MASQUERADE rules are a real, recurring failure mode on a host that switches between Wi-Fi/Ethernet/USB — this happened more than once during this project.
+3. A "service unreachable" symptom appearing *during* active firewall changes should be suspected as a side effect of that work before being treated as an unrelated fault.
+4. Firewall logic doesn't belong inside `/etc/network/interfaces` — a dedicated, idempotent script with its own systemd unit is easier to reason about, test, and re-run safely.
+5. Evaluating a migration (`nftables`) and then explicitly declining it, for concrete reasons, is a legitimate engineering outcome — not every modernization is worth doing just because it's available, especially when three other systems (Tailscale, Docker, K3s) already have working state tied to the alternative.
+
+## Status
+
+**Complete.** Internet access, SSH, Homepage forwarding, and Vaultwarden forwarding are all confirmed working. This closes out the `iptables` → `nftables` migration item from the 2026-07-18 audit — the final decision was to **stay on `iptables`**, not migrate. `network.md`, `inventory.md`, `architecture.md`, and `disaster-recovery.md` have all been updated to describe the new firewall-script architecture in place of the old inline rules.
+
+---

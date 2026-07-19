@@ -836,11 +836,44 @@ Ran direct commands on all three hosts: `docker ps -a`, `kubectl get pods -A`, `
 - Tailscale mesh has 4 members, not 3 (a personal Android device, typically offline).
 - No `.env` files exist anywhere — all configuration is inline in Compose files.
 - An orphaned `core-services` Compose project (Portainer) exists with no matching compose file on disk.
-- Apollo's NAT configuration required cleanup (duplicate/incorrect interface rule) and is now mid-migration to `nftables`.
+- Apollo's NAT configuration had a real bug (stale interface reference after a WAN change) causing an actual internet outage; `nftables` was evaluated as a fix and explicitly declined once Apollo's `iptables-legacy` backend was found to be independent from it. Resolved with a dedicated, idempotent firewall script instead of a backend migration.
 
 ### Result
 
 **PASS** — documentation has been reconciled to match live state as of this audit. This is now the source-of-truth baseline for future validation passes.
+
+---
+
+## Test 35 — Apollo Networking & Firewall Rework (2026-07-18)
+
+### Objective
+
+Verify Athena's internet connectivity is restored and durable across WAN interface changes, and confirm the `nftables` migration decision is correctly reflected in the running configuration.
+
+### Procedure
+
+```bash
+ping -c3 8.8.8.8                                    # from Athena
+curl -I https://google.com                          # from Athena
+systemctl status apollo-firewall.service             # on Apollo
+iptables -t nat -L POSTROUTING -n -v                  # on Apollo
+ssh ubuntu@athena                                     # confirm unaffected
+curl -I http://10.10.10.2:3000                        # Homepage, from LAN (hairpin)
+curl -Ik https://10.10.10.2:8080                      # Vaultwarden, from LAN (hairpin)
+```
+
+### Expected Result
+
+- Athena has full internet access.
+- `apollo-firewall.service` reports `active (exited)`.
+- The live MASQUERADE rule is bound to the interface actually carrying the default route (confirmed via `ip route`), not a hardcoded/stale one.
+- SSH to Athena works normally.
+- Both Homepage and Vaultwarden are reachable via hairpin NAT from inside the LAN, not just from outside.
+- `nft list ruleset` is **not** the active firewall (confirms the decision to stay on `iptables` was actually implemented, not left half-migrated).
+
+### Result
+
+**PASS**
 
 ---
 

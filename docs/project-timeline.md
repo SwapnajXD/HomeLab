@@ -394,13 +394,13 @@ This closes out the dashboard experiment that ran through Phases 9 and part of t
 
 ---
 
-# Phase 12 — Live Infrastructure Audit & nftables Migration
+# Phase 12 — Live Infrastructure Audit & Firewall Rework
 
-**Date:** 2026-07-18 (audit); nftables migration ongoing
+**Date:** 2026-07-18
 
 ## What happened
 
-A full live audit was run against Apollo, Athena, and Hestia to reconcile documentation with actual running systems — real container inventories, K3s cluster state, Tailscale mesh membership, NAT rules, and hardware specs were all captured directly from the hosts rather than assumed from prior docs. Separately, Apollo's NAT/firewall layer began a migration from `iptables` to `nftables`.
+A full live audit was run against Apollo, Athena, and Hestia to reconcile documentation with actual running systems — real container inventories, K3s cluster state, Tailscale mesh membership, NAT rules, and hardware specs were all captured directly from the hosts rather than assumed from prior docs. The audit also surfaced an active bug (Athena losing internet access due to a stale NAT interface rule), which led to a full networking/firewall rework: `nftables` was evaluated as a fix and explicitly declined once Apollo's `iptables-legacy` backend was found to be running independently from it — Tailscale, Docker, and K3s all already manage their own `iptables` chains, and migrating would have meant either conflicting rule sets or a much larger migration than the actual bug warranted. A dedicated, idempotent firewall script with dynamic WAN detection was built instead.
 
 ## Key Findings
 
@@ -410,11 +410,12 @@ A full live audit was run against Apollo, Athena, and Hestia to reconcile docume
 - Floci runs on-demand, not continuously.
 - No `.env` files exist anywhere; all configuration is inline in Compose files.
 - Real hardware specs for Apollo captured for the first time.
-- A handful of small open items surfaced: an orphaned Portainer Compose project, a `k3s.yaml` permissions caveat, an asymmetric NAT return-path rule, and low-priority Docker DNS resolver noise.
+- Athena's internet outage was root-caused to a stale MASQUERADE rule bound to an old USB-tethering interface; the return-path NAT asymmetry flagged earlier in the audit was resolved as part of the same fix.
+- A handful of small open items remain: an orphaned Portainer Compose project, a `k3s.yaml` permissions caveat, and low-priority Docker DNS resolver noise.
 
 ## Outcome
 
-The full documentation set (`inventory.md`, `architecture.md`, `network.md`, `troubleshooting.md`, `disaster-recovery.md`, `health-checks.md`, `validation-report.md`) was updated to match live reality. Full findings in `postmortems.md` (2026-07-18). The `nftables` migration remains in progress and will get its own follow-up entry once complete.
+The full documentation set (`inventory.md`, `architecture.md`, `network.md`, `troubleshooting.md`, `disaster-recovery.md`, `health-checks.md`, `validation-report.md`) was updated to match live reality. Full findings in `postmortems.md` (2026-07-18). The networking/firewall rework is complete — Apollo now runs a dynamic firewall script instead of hardcoded `iptables` rules, and the `nftables` question is resolved (declined, staying on `iptables`).
 
 ---
 

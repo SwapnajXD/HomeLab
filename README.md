@@ -65,7 +65,7 @@ Responsibilities:
 - Persistent NAT Gateway
 - Port Forwarding
 
-> **In progress:** Apollo's NAT/firewall layer is being migrated from `iptables` to `nftables`.
+> Apollo's NAT/firewall layer runs as a dedicated, idempotent script (`apollo-firewall.sh` + a `systemd` unit) with dynamic WAN detection — a migration to `nftables` was evaluated and explicitly declined. See [`docs/postmortems.md`](docs/postmortems.md) (2026-07-18) for the full story.
 
 ---
 
@@ -236,7 +236,7 @@ The environment has been validated across:
 
 **Operational Status:** ✅ Fully Validated (last verified against live systems 2026-07-18)
 
-**Open Items:** a handful of small, low-severity items — an in-progress `iptables` → `nftables` migration on Apollo, an orphaned Portainer Compose project, and a couple of minor operational caveats — are tracked in [`docs/troubleshooting.md`](docs/troubleshooting.md).
+**Open Items:** a handful of small, low-severity items — an orphaned Portainer Compose project and a couple of minor operational caveats — are tracked in [`docs/troubleshooting.md`](docs/troubleshooting.md).
 
 ---
 
@@ -270,7 +270,6 @@ The environment has been validated across:
 
 # Future Roadmap
 
-- Complete the `iptables` → `nftables` migration on Apollo
 - Write a real compose file for the orphaned `core-services`/Portainer project
 - GitOps with Argo CD or Flux
 - Automated Proxmox backup validation

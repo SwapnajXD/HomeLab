@@ -215,21 +215,32 @@ Verify Floci resources before modifying state.
 
 # Networking Operations
 
-Apollo provides routing and NAT for the internal network.
+Apollo provides routing and NAT for the internal network via a dedicated firewall script (`/usr/local/sbin/apollo-firewall.sh`), managed by `apollo-firewall.service`, run once at boot.
 
 After every Apollo reboot verify:
 
+- `systemctl status apollo-firewall.service` reports `active (exited)`
 - IP forwarding enabled
-- NAT rules present
+- NAT rules present, bound to the actual current WAN interface (detected dynamically, not hardcoded)
 - Internet connectivity restored
-- Port forwarding operational
+- Port forwarding operational (both external and hairpin/LAN access)
+
+If NAT ever looks wrong, the script is safe to re-run manually — it checks for existing rules before adding them:
+
+```bash
+sudo /usr/local/sbin/apollo-firewall.sh
+```
 
 Useful commands:
 
 ```bash
 sysctl net.ipv4.ip_forward
+systemctl status apollo-firewall.service
 iptables -t nat -L -v -n
+ip route   # confirms which interface is the actual WAN uplink
 ```
+
+> Apollo runs `iptables` (legacy backend) intentionally — a migration to `nftables` was evaluated and declined since Tailscale, Docker, and K3s all manage their own independent `iptables` chains. See `network.md` and `postmortems.md` (2026-07-18).
 
 ---
 
