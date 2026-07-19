@@ -6,9 +6,9 @@ This document records the formal validation procedures performed against the Oly
 
 Validation is performed after major infrastructure changes, maintenance windows, recovery testing, and platform upgrades to verify operational stability, networking, observability, automation, Kubernetes functionality, and disaster recovery readiness.
 
-The current report reflects the infrastructure following the June 2026 Kubernetes deployment and Dashboard V2 architecture refactor.
+The current report reflects the infrastructure following the June 2026 Kubernetes deployment, the Dashboard API's decommission from active deployment (2026-07-10), and a full live-infrastructure audit (2026-07-18) that reconciled documentation against actual running systems.
 
-> **Archival note:** Tests 14, 15, and 30 below validated the Olympus Dashboard API, which was the custom FastAPI backend behind the Homepage widget at the time. That component has since been **fully decommissioned** — Homepage now runs in its stock configuration with no backend dependency (see `architecture.md`, `postmortems.md`). Those test results are kept for historical/audit purposes; they no longer describe anything currently running.
+> **Archival note:** Tests 14, 15, and 30 below validated the Olympus Dashboard API, which was the custom FastAPI backend behind the Homepage widget at the time. That component has since been **decommissioned from active deployment** — Homepage now runs in a stock-plus-theme configuration with no backend dependency (see `architecture.md`, `postmortems.md`). The Dashboard API's source code remains in the repository as a portfolio reference. Those test results are kept for historical/audit purposes; they no longer describe anything currently running.
 
 ---
 
@@ -21,16 +21,20 @@ The current report reflects the infrastructure following the June 2026 Kubernete
 | Athena | Ubuntu Operations VM | PASS |
 | Hestia | Alpine Application LXC | PASS |
 | K3s Cluster | Kubernetes Control Plane | PASS |
-| Olympus Dashboard API *(decommissioned since)* | FastAPI Backend | PASS at time of test |
+| Olympus Dashboard API *(decommissioned from deployment — code retained)* | FastAPI Backend | PASS at time of test |
 | Grafana | Visualization | PASS |
 | Prometheus | Metrics Collection | PASS |
 | Loki | Centralized Logging | PASS |
-| Grafana Alloy | Log Collection | PASS |
+| Grafana Alloy | Log Collection (Athena + Hestia) | PASS |
+| cAdvisor | Per-container metrics | PASS |
+| Glances | System monitor | PASS |
+| Node Exporter | Host metrics (Athena + Hestia) | PASS |
 | Portainer | Container Management | PASS |
-| Floci | AWS Emulator | PASS |
+| Portainer Agent | Remote container management (Hestia) | PASS |
+| Floci | AWS Emulator (on-demand) | PASS when started |
 | Homepage | Service Dashboard | PASS |
 | Vaultwarden | Password Manager | PASS |
-| Tailscale | Secure Remote Access | PASS |
+| Tailscale | Secure Remote Access (4 nodes) | PASS |
 
 ---
 
@@ -273,7 +277,7 @@ kubectl get pods -A
 
 ### Expected Result
 
-CoreDNS, Metrics Server, Traefik, Portainer Agent, and system workloads are all in the **Running** state.
+CoreDNS, Local Path Provisioner, Metrics Server, Portainer Agent, and system workloads are all in the **Running** state. No Ingress controller (Traefik) is deployed in this cluster.
 
 ### Result
 
@@ -339,7 +343,7 @@ Learning workloads remain isolated from the `default` and `kube-system` namespac
 
 # Dashboard & Automation Validation *(Archived — Component Since Decommissioned)*
 
-> Tests 14–17 validated the Olympus Dashboard API and its supporting automation, all of which have since been removed. Homepage now runs stock with no backend or cron pipeline. Kept for historical record only.
+> Tests 14–17 validated the Olympus Dashboard API and its supporting automation, which has since been decommissioned from active deployment (2026-07-10). The service's code is retained in the repository as a portfolio reference; Homepage now runs stock (plus a lightweight visual theme) with no backend or cron pipeline in production. Kept for historical record only.
 
 ## Test 14 — Olympus Dashboard API *(archived)*
 
@@ -786,26 +790,57 @@ Recovery objectives are achieved within documented RTO targets.
 
 ### Objective
 
-Confirm Homepage on Hestia runs standalone in its stock configuration, with no dependency on the (now-removed) Dashboard API.
+Confirm Homepage on Hestia runs standalone in its stock configuration (plus an intentional, lightweight visual theme), with no runtime dependency on the decommissioned Dashboard API.
 
 ### Procedure
 
 ```bash
 docker inspect homepage --format '{{.State.Status}}'
 curl -I http://<apollo-ip>:3000
+cat homepage-config/custom.js    # expected: empty
+cat homepage-config/custom.css   # expected: visual theme only, no data-fetching logic
 ```
 
-Confirm no `dashboard-api` container exists on Athena and no `custom.js`/`custom.css` files remain in Homepage's config volume on Hestia.
+Confirm no `dashboard-api` container is running on Athena.
 
 ### Expected Result
 
 - Homepage container is running.
-- Homepage loads with only stock service links, no custom widget.
-- No dashboard-api container, fetch scripts, or cron jobs present anywhere in the environment.
+- Homepage loads with stock service-discovery widgets plus visual theming — no custom data widget.
+- `custom.js` is empty; `custom.css` contains only styling rules.
+- No `dashboard-api` container currently running anywhere in the environment (its source code remains in the repository, intentionally, but is not deployed).
 
 ### Result
 
 **PASS**
+
+---
+
+## Test 34 — Live Infrastructure Audit (2026-07-18)
+
+### Objective
+
+Cross-check every claim in this documentation set against live system state across Apollo, Athena, and Hestia, rather than relying on prior documentation being accurate.
+
+### Procedure
+
+Ran direct commands on all three hosts: `docker ps -a`, `kubectl get pods -A`, `tailscale status`, `iptables -t nat -S`, `ip route`, `pvesm status`, `lscpu`/`free -h`/`lsblk`, `find / -iname ".env"`, and a live Loki label query.
+
+### Findings (see `postmortems.md` for the full write-up)
+
+- Hestia runs 3 additional services not previously documented (Alloy, Node Exporter, Portainer Agent).
+- Athena runs 2 additional services not previously documented (cAdvisor, Glances).
+- Traefik is not deployed in K3s, despite earlier documentation suggesting it was kept.
+- Floci is on-demand, not always-running.
+- The Grafana Alloy Docker log discovery gap (open since 2026-07-05) is resolved — full ingestion confirmed.
+- Tailscale mesh has 4 members, not 3 (a personal Android device, typically offline).
+- No `.env` files exist anywhere — all configuration is inline in Compose files.
+- An orphaned `core-services` Compose project (Portainer) exists with no matching compose file on disk.
+- Apollo's NAT configuration required cleanup (duplicate/incorrect interface rule) and is now mid-migration to `nftables`.
+
+### Result
+
+**PASS** — documentation has been reconciled to match live state as of this audit. This is now the source-of-truth baseline for future validation passes.
 
 ---
 
@@ -820,7 +855,7 @@ Confirm no `dashboard-api` container exists on Athena and no `custom.js`/`custom
 | Kubernetes | PASS | Cluster Ready |
 | Homepage | PASS | Stock frontend accessible |
 | Monitoring | PASS | Prometheus targets healthy |
-| Logging | PARTIAL | Loki ingestion verified for 2 of 9 containers — see `troubleshooting.md` |
+| Logging | PASS | Loki ingestion verified for all 12 running containers across both hosts (confirmed 2026-07-18) |
 | Alerting | PASS | Grafana notifications operational |
 | Infrastructure as Code | PASS | Terraform & Floci operational |
 | Disaster Recovery | PASS | Recovery procedures validated |
@@ -831,7 +866,7 @@ Confirm no `dashboard-api` container exists on Athena and no `custom.js`/`custom
 
 The Olympus HomeLab has been successfully validated across every operational layer, including compute infrastructure, networking, Kubernetes orchestration, observability, Infrastructure as Code, and disaster recovery.
 
-The June–July 2026 platform changes — including the K3s deployment, the retirement of the custom Dashboard API in favor of a stock Homepage, and improved network persistence — have been verified to operate reliably under both normal and recovery conditions.
+The June–July 2026 platform changes — including the K3s deployment, the retirement of the custom Dashboard API in favor of a stock Homepage (with its code retained in the repo), improved network persistence, and a full live-infrastructure reconciliation audit — have been verified to operate reliably under both normal and recovery conditions.
 
 The environment demonstrates production-inspired operational practices through:
 
@@ -856,7 +891,7 @@ The environment demonstrates production-inspired operational practices through:
 | Kubernetes | PASS |
 | Applications (Homepage/Vaultwarden) | PASS |
 | Monitoring | PASS |
-| Logging | PARTIAL — see `troubleshooting.md` |
+| Logging | PASS — full ingestion confirmed 2026-07-18 |
 | Infrastructure as Code | PASS |
 | Disaster Recovery | PASS |
 
@@ -879,5 +914,5 @@ The Olympus HomeLab is operating as a stable, production-inspired SRE platform. 
 | Document Status | Current |
 | Validation Status | PASS |
 | Operational Readiness | Fully Validated |
-| Last Validation | June 2026 |
+| Last Validation | 2026-07-18 |
 | Next Validation | Following major infrastructure changes or quarterly review |

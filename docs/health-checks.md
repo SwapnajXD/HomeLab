@@ -224,9 +224,13 @@ Expected services:
 - grafana
 - prometheus
 - loki
-- grafana-alloy
+- alloy
+- node-exporter
+- proxmox-exporter
+- cadvisor
+- glances
 - portainer
-- floci_aws
+- floci_aws *(only when started on-demand for AWS work — not expected by default)*
 
 ### Hestia
 
@@ -234,14 +238,19 @@ Expected services:
 
 - homepage
 - vaultwarden
+- alloy
+- node-exporter
+- portainer_agent
 
 ### Expected Result
 
-Every container reports:
+Every persistently-running container reports:
 
 ```text
 Up
 ```
+
+(`floci_aws` is expected **absent** unless actively in use — see `inventory.md`.)
 
 or
 
@@ -277,9 +286,12 @@ kubectl get pods -A
 Expected:
 
 - CoreDNS Running
+- Local Path Provisioner Running
 - Metrics Server Running
-- Traefik Running
+- Portainer Agent Running
 - User workloads Running
+
+> No Ingress controller (Traefik) is currently deployed in this cluster — its absence is expected, not a fault.
 
 ---
 
@@ -424,7 +436,7 @@ Open **Grafana Explore** and query:
 
 # Layer 5 — Application Health
 
-> Note: this layer previously included checks for a custom "Olympus" Dashboard API and its cron-based sync. That component has been fully decommissioned (see `architecture.md`, `postmortems.md`) — Homepage now runs stock, with no backend API or scheduled data pipeline to verify.
+> Note: this layer previously included checks for a custom "Olympus" Dashboard API and its cron-based sync. That component has been decommissioned from active deployment (see `architecture.md`, `postmortems.md`) — its code is retained in the repo as a portfolio reference. Homepage now runs stock plus a lightweight visual theme, with no backend API or scheduled data pipeline to verify.
 
 ## Verify Homepage
 
@@ -560,7 +572,7 @@ instead of the Tailscale IP.
 - [ ] K3s node reports **Ready**.
 - [ ] CoreDNS is running.
 - [ ] Metrics Server is running.
-- [ ] Traefik is running.
+- [ ] Portainer Agent is running.
 - [ ] User workloads are healthy.
 - [ ] cgroup v2 is enabled.
 - [ ] Athena Docker containers are healthy.
@@ -606,7 +618,7 @@ instead of the Tailscale IP.
 | Containerization | PASS | Docker workloads healthy |
 | Kubernetes | PASS | K3s cluster healthy |
 | Monitoring | PASS | Prometheus targets UP |
-| Logging | PARTIAL | Loki/Alloy operational, container discovery incomplete (see `troubleshooting.md`) |
+| Logging | PASS | Loki/Alloy operational, full container discovery confirmed across both hosts |
 | Homepage | PASS | Stock frontend accessible |
 | Vaultwarden | PASS | HTTPS functioning correctly |
 | Infrastructure as Code | PASS | Terraform validated |
@@ -638,10 +650,10 @@ instead of the Tailscale IP.
 |----------|--------|
 | Environment State | **Stable Operational Environment** |
 | Platform Maturity | **Production-Inspired HomeLab** |
-| Last Full Validation | **July 2026** |
+| Last Full Validation | **2026-07-18** |
 | Kubernetes Status | **Operational** |
 | Homepage | **Operational (stock configuration)** |
-| Observability Status | **Healthy (logging gap open — see `troubleshooting.md`)** |
+| Observability Status | **Healthy — fully operational** |
 | Documentation Coverage | **Complete** |
 | Operational Readiness | **FULLY VALIDATED** |
 

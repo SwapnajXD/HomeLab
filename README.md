@@ -22,10 +22,11 @@ The environment is designed around a layered architecture where infrastructure, 
                     Artemis
            (Management Workstation)
                     │
-             Tailscale Mesh
+             Tailscale Mesh (4 nodes)
                     │
                 Apollo
-          Proxmox VE Hypervisor
+        Proxmox VE 9.2.2 Hypervisor
+     (Ryzen 7 3700X · 16GB RAM)
                     │
       ┌─────────────┴─────────────┐
       │                           │
@@ -36,11 +37,12 @@ The environment is designed around a layered architecture where infrastructure, 
  Docker + K3s                    │
       │                    Docker Compose
  Grafana                         │
- Prometheus                 Homepage (stock)
+ Prometheus                 Homepage (stock + theme)
  Loki                       Vaultwarden
- Grafana Alloy
- Portainer
- Floci
+ Grafana Alloy              Grafana Alloy
+ cAdvisor / Glances         Node Exporter
+ Portainer                  Portainer Agent
+ Floci (on-demand)
 ```
 
 Full Mermaid diagrams (rendered natively on GitHub): [`architecture/architecture-diagram.mmd`](architecture/architecture-diagram.mmd) and the rest of the [`architecture/`](architecture/) directory.
@@ -51,7 +53,9 @@ Full Mermaid diagrams (rendered natively on GitHub): [`architecture/architecture
 
 ## Apollo
 
-**Role:** Proxmox VE Hypervisor
+**Role:** Proxmox VE 9.2.2 Hypervisor
+
+**Hardware:** AMD Ryzen 7 3700X (8c/16t), 16GB DDR4-3200, 238.5GB NVMe (LVM-thin pool) + 232.9GB SATA storage, idle NVIDIA GTX 1660 Super (no passthrough — a real future upgrade candidate).
 
 Responsibilities:
 
@@ -60,6 +64,8 @@ Responsibilities:
 - Virtual Networking
 - Persistent NAT Gateway
 - Port Forwarding
+
+> **In progress:** Apollo's NAT/firewall layer is being migrated from `iptables` to `nftables`.
 
 ---
 
@@ -75,9 +81,11 @@ Hosted Services:
 - Grafana Alloy
 - Node Exporter
 - Proxmox Exporter
+- cAdvisor
+- Glances
 - Portainer
-- Floci
-- K3s Kubernetes Cluster
+- Floci — **started on-demand**, not always running
+- K3s Kubernetes Cluster (no Ingress controller deployed)
 
 ---
 
@@ -87,8 +95,11 @@ Hosted Services:
 
 Hosted Services:
 
-- Homepage — stock configuration, service links only
+- Homepage — stock service-discovery widgets + a lightweight, purely visual `custom.css` theme
 - Vaultwarden
+- Grafana Alloy — per-host log collection
+- Node Exporter — per-host metrics
+- Portainer Agent — lets Athena's central Portainer manage Hestia remotely
 
 > Hestia is intentionally excluded from the Tailscale mesh and reachable only through Apollo's port forwarding.
 
@@ -187,7 +198,7 @@ Used for:
 
 Earlier in the project, Homepage was extended into a custom "Olympus" command-center widget, backed by a dedicated FastAPI aggregation service on Athena (LastFM, weather, Pokémon, investments, and more). It worked, but it turned out to be more maintenance than it was worth — tightly coupled to Homepage's internals, fragile across devices, and only earning its complexity while something was actively consuming it.
 
-Both the widget and its backend API have been fully removed. Homepage now runs in its stock configuration. The full build-it, learn-from-it, remove-it story — including every incident and fix along the way — is documented in [`docs/postmortems.md`](docs/postmortems.md) and [`docs/changelog.md`](docs/changelog.md) (Phases 9 and 11). It's kept visible rather than deleted from history because "know when to cut scope" is as much a real engineering skill as building the thing in the first place.
+Both the widget's logic and its backend API have been **decommissioned from active deployment** — Homepage now runs in a stock-plus-lightweight-theme configuration. The source code for both is **intentionally retained in the repository** (`docker-compose/dashboard-api/`, `scripts/fetch_*.sh`) rather than deleted — it's real, working engineering worth having visible, separate from the decision not to run it in production. The full build-it, learn-from-it, retire-it-from-deployment story — including every incident and fix along the way — is documented in [`docs/postmortems.md`](docs/postmortems.md) and [`docs/changelog.md`](docs/changelog.md) (Phases 9 and 11). It's kept visible rather than hidden because "know when to cut scope" is as much a real engineering skill as building the thing in the first place.
 
 ---
 
@@ -223,9 +234,9 @@ The environment has been validated across:
 - Disaster Recovery
 - Infrastructure as Code
 
-**Operational Status:** ✅ Fully Validated
+**Operational Status:** ✅ Fully Validated (last verified against live systems 2026-07-18)
 
-**Known Open Issue:** Grafana Alloy is currently only discovering logs for 2 of 9 running containers on Athena — tracked in [`docs/troubleshooting.md`](docs/troubleshooting.md).
+**Open Items:** a handful of small, low-severity items — an in-progress `iptables` → `nftables` migration on Apollo, an orphaned Portainer Compose project, and a couple of minor operational caveats — are tracked in [`docs/troubleshooting.md`](docs/troubleshooting.md).
 
 ---
 
@@ -259,7 +270,8 @@ The environment has been validated across:
 
 # Future Roadmap
 
-- Fix Grafana Alloy's Docker log discovery gap
+- Complete the `iptables` → `nftables` migration on Apollo
+- Write a real compose file for the orphaned `core-services`/Portainer project
 - GitOps with Argo CD or Flux
 - Automated Proxmox backup validation
 - Persistent Volumes in Kubernetes
@@ -271,6 +283,7 @@ The environment has been validated across:
 - Automated infrastructure testing
 - CI/CD for documentation
 - Expanded Kubernetes workloads
+- GPU passthrough for the idle NVIDIA GTX 1660 Super (transcoding or local ML experimentation)
 
 See [`HOMELAB_ROADMAP.md`](HOMELAB_ROADMAP.md) for the full roadmap with context and history.
 

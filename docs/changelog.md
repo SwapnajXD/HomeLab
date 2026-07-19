@@ -54,7 +54,7 @@ A major architectural milestone introducing Kubernetes, and a dashboard backend 
 - Configured secure remote administration from Artemis using `kubectl`.
 - Integrated Portainer for graphical Kubernetes management.
 
-### Olympus Dashboard V2 *(later fully removed — see Phase 11)*
+### Olympus Dashboard V2 *(later decommissioned from deployment — see Phase 11; code retained in repo)*
 
 The dashboard architecture was redesigned around a centralized backend.
 
@@ -65,7 +65,7 @@ Changes included:
 - Established Athena as the single source of truth.
 - Decoupled backend processing from frontend presentation.
 
-### Dashboard Improvements *(later fully removed — see Phase 11)*
+### Dashboard Improvements *(later decommissioned from deployment — see Phase 11; code retained in repo)*
 
 - LastFM album artwork support
 - Pokémon species descriptions
@@ -263,23 +263,44 @@ This established the foundation for all future infrastructure development.
 
 # Phase 11 — Dashboard API Decommission (2026-07-10)
 
-Following on from the widget rollback in Phase 9, the entire Dashboard API concept was removed for good.
+Following on from the widget rollback in Phase 9, the entire Dashboard API concept was decommissioned from active deployment.
 
-## Removed
+## Decommissioned from Deployment (code retained in repo)
 
-- FastAPI Dashboard API container and image on Athena.
-- All fetch scripts (LastFM, weather, prices, Pokémon, library, MyAnimeList, media/wallpaper) and their cron jobs.
-- Any remaining custom Homepage integration code.
+- FastAPI Dashboard API container and image on Athena — stopped, not deleted from the repository (`docker-compose/dashboard-api/`).
+- All fetch scripts (LastFM, weather, prices, Pokémon, library, MyAnimeList, media/wallpaper) and their cron jobs — disabled, scripts retained (`scripts/fetch_*.sh`).
+- Custom Homepage widget logic — `custom.js` emptied out.
 
 ## Result
 
-- Hestia now runs **Homepage in its stock, default configuration** — service links only, no custom widget, no backend dependency.
-- Athena no longer runs any dashboard-related container, script, or scheduled job.
-- Removes the small amount of ongoing maintenance risk the API represented, in exchange for a simpler, more reliable frontend.
+- Hestia now runs **Homepage in a stock-plus-lightweight-theme configuration** — native service-discovery widgets, a purely cosmetic `custom.css`, no data widget, no backend dependency.
+- Athena no longer runs any dashboard-related container or scheduled job.
+- Removes the small amount of ongoing maintenance/operational risk the API represented, in exchange for a simpler, more reliable frontend — while keeping the actual engineering work visible in the repository.
 
 ## Rationale
 
-Consistent with the lesson already learned in Phase 9: Homepage works best as a dashboard, not an application platform, and a backend is only worth keeping if something is still consuming it. See `postmortems.md` and `architecture.md` for the full history and current state.
+Consistent with the lesson already learned in Phase 9: Homepage works best as a dashboard, not an application platform, and a backend is only worth *deploying* if something is still consuming it. Keeping the code in the repo (rather than deleting it) was a deliberate choice — it's real, working software worth having visible, separate from the decision not to run it in production. See `postmortems.md` and `architecture.md` for the full history and current state.
+
+---
+
+# Phase 12 — Live Infrastructure Audit & nftables Migration (2026-07-18)
+
+## Live Infrastructure Audit
+
+A full audit was run directly against Apollo, Athena, and Hestia to catch drift between documentation and actual running systems. Findings and full detail in `postmortems.md` (2026-07-18); summary:
+
+- Hestia's and Athena's real container inventories were larger than documented (Hestia: + Alloy, Node Exporter, Portainer Agent; Athena: + cAdvisor, Glances).
+- The Grafana Alloy Docker log discovery gap (open since 2026-07-05) is **resolved** — confirmed via live Loki query, all containers on both hosts now ingesting.
+- Traefik confirmed **not** deployed in K3s, correcting earlier documentation.
+- Floci confirmed to be an on-demand service, not always-running.
+- Tailscale mesh confirmed to include a 4th device (personal Android phone, typically offline).
+- No `.env` files exist anywhere — all config is inline in Compose files.
+- Apollo's real hardware specs documented for the first time (AMD Ryzen 7 3700X, 16GB RAM, NVMe + SATA storage, an idle NVIDIA GTX 1660 Super).
+- An orphaned Portainer Compose project (`core-services`, no matching compose file on disk) identified as a minor open item.
+
+## nftables Migration (In Progress)
+
+Apollo's NAT/firewall layer is being migrated from `iptables` to `nftables`. While preparing for this, a stale/incorrect duplicate MASQUERADE rule (bound to the wrong network interface) was found and cleaned up in the live `iptables` table — unrelated to the migration itself, just surfaced while working in the same area. Migration is ongoing; `network.md` and `inventory.md` will be updated with the `nftables` rule set once complete.
 
 ---
 
@@ -291,12 +312,15 @@ Consistent with the lesson already learned in Phase 9: Homepage works best as a 
 | Secure Remote Administration | Complete |
 | Core Services | Complete |
 | Observability Stack | Complete |
-| Centralized Logging | Complete (partial log discovery — open) |
+| Centralized Logging | Complete — full container discovery confirmed |
 | Infrastructure as Code | Complete |
-| Floci Migration | Complete |
-| Kubernetes Deployment | Complete |
-| Dashboard API | Decommissioned |
+| Floci Migration | Complete (on-demand usage) |
+| Kubernetes Deployment | Complete (no Ingress controller deployed) |
+| Dashboard API | Decommissioned from deployment — code retained |
 | Documentation Standardization | Complete |
+| Live Infrastructure Audit | Complete (2026-07-18) |
+| nftables Migration | In Progress |
+
 
 ---
 
@@ -337,14 +361,17 @@ Planned areas of exploration include:
 
 # Current Status
 
-**Last Updated:** 2026-07-10
+**Last Updated:** 2026-07-18
 
 **Environment:** Stable Operational Environment
 
-The Olympus HomeLab has evolved from a simple virtualization host into a production-inspired infrastructure platform featuring Kubernetes, centralized observability, Infrastructure as Code, secure remote administration, and comprehensive operational documentation.
+The Olympus HomeLab has evolved from a simple virtualization host into a production-inspired infrastructure platform featuring Kubernetes, centralized observability, Infrastructure as Code, secure remote administration, and comprehensive operational documentation — reconciled against a live infrastructure audit as of 2026-07-18.
 
-## Known Open Items (as of 2026-07-10)
+## Known Open Items (as of 2026-07-18)
 
-- Loki/Alloy centralized logging is live but only ingesting 2 of 9 Docker containers on Athena; Docker log discovery in Alloy still needs to be fixed (see `postmortems.md`, `troubleshooting.md`).
-- MyAnimeList (MAL) dashboard integration is moot — the dashboard itself has been removed (kept here only as historical context).
-- Reading/library tracking automation is likewise moot following the dashboard removal.
+- Apollo's NAT/firewall layer migration from `iptables` to `nftables` is in progress.
+- Orphaned `core-services` Compose project (Portainer, Athena) — no matching compose file on disk, needs to be written and committed.
+- `k3s.yaml` permissions reset on every `k3s` service restart — workaround exists, not yet automated.
+- Port 3000 return-path NAT rule is defined in config but not applied live — low priority.
+- Recurring `dockerd` DNS resolver errors on Athena — informational, not yet investigated.
+- MyAnimeList (MAL) dashboard integration and reading/library tracking automation are both moot — the dashboard itself has been decommissioned from deployment (kept here only as historical context; code retained in repo).

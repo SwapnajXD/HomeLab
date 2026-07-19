@@ -14,16 +14,18 @@ Each entry follows the same shape: **Date → What happened → What broke → R
 |---|---|---|
 | 2026-06-11 → 06-22 | Olympus Dashboard: Hestia → Athena migration, FastAPI backend | ✅ Shipped (later reworked, see 06-18→27) |
 | 2026-06-17 | Decision: Athena becomes backend, Hestia becomes presentation-only | ✅ Adopted |
-| 2026-06-21 | K3s cluster stood up on Athena | ✅ Complete — still in use |
+| 2026-06-21 | K3s cluster stood up on Athena | ✅ Complete — still in use, no Traefik deployed |
 | 2026-06-21 → 06-22 | Athena network/Tailscale outage | ✅ Resolved (transient, no config change) |
-| 2026-06-21 | Olympus V2 build (wallpaper engine, LastFM, cron automation, MAL) | ⚠️ Complete at the time — fully removed 2026-07-10 |
-| 2026-06-18 → 06-27 | Full Olympus Command Center build **and rollback** of the custom Homepage widget | ✅ Widget removed; backend kept (for now) |
-| 2026-06-26 | LastFM + media pipeline incident (cron overlap, jq crashes, GitHub rate limiting) | ✅ Resolved (moot since 2026-07-10 — pipeline removed) |
+| 2026-06-21 | Olympus V2 build (wallpaper engine, LastFM, cron automation, MAL) | ⚠️ Complete at the time — decommissioned from deployment 2026-07-10, code retained in repo |
+| 2026-06-18 → 06-27 | Full Olympus Command Center build **and rollback** of the custom Homepage widget | ✅ Widget code emptied; backend kept running (for now) |
+| 2026-06-26 | LastFM + media pipeline incident (cron overlap, jq crashes, GitHub rate limiting) | ✅ Resolved (moot since 2026-07-10 — pipeline decommissioned from deployment) |
 | 2026-06-30 | Apollo network bring-up: NAT, port forwarding, Vaultwarden TLS mismatch | ✅ Resolved |
-| 2026-07-05 | Loki + Grafana Alloy centralized logging | ⚠️ Partially working — Docker log discovery unresolved |
-| 2026-07-10 | Dashboard API fully decommissioned; Homepage reverted to stock config | ✅ Complete |
+| 2026-07-05 | Loki + Grafana Alloy centralized logging | ⚠️ Partially working at the time — Docker log discovery gap, resolved by 2026-07-18 |
+| 2026-07-10 | Dashboard API decommissioned from deployment; Homepage reverted to stock+theme config | ✅ Complete — code retained in repo |
+| 2026-07-XX | Apollo NAT migration: `iptables` → `nftables` | 🚧 In progress |
+| 2026-07-18 | Live infrastructure audit — reconciled documentation against real running systems on all three hosts | ✅ Complete |
 
-**Note on the Dashboard's final status:** the raw notes originally contained two different endings for the Olympus Dashboard, since resolved. The custom Homepage widget (`custom.js`/`custom.css`) was torn out on 2026-06-27 for being too fragile and tightly coupled to Homepage's internals. The FastAPI backend behind it survived that round and stayed in use for a while — but as of **2026-07-10**, the entire Dashboard API concept (backend, fetch scripts, and cron jobs) has been removed as well. Hestia's Homepage now runs stock, with no custom widget and no backend dependency. K3s is unaffected and remains in active use. See the 2026-07-10 entry below and `changelog.md` (Phase 11) for details.
+**Note on the Dashboard's final status:** the raw notes originally contained two different endings for the Olympus Dashboard, since resolved. The custom Homepage widget's `custom.js` was emptied out on 2026-06-27 for being too fragile and tightly coupled to Homepage's internals (a separate, unrelated `custom.css` visual theme was later added/kept — purely cosmetic, no data logic). The FastAPI backend behind the original widget survived that round and stayed in use for a while — but as of **2026-07-10**, it was decommissioned from active deployment as well: the container was stopped and its fetch scripts/cron jobs were disabled. **The code itself was intentionally kept in the repository** (`docker-compose/dashboard-api/`, `scripts/fetch_*.sh`) rather than deleted — it's real, working engineering worth having visible, even though it's not part of the live deployment. Hestia's Homepage now runs stock (plus that unrelated theme), with no runtime backend dependency. K3s is unaffected and remains in active use. See the 2026-07-10 entry below and `changelog.md` (Phase 11) for details.
 
 ---
 
@@ -197,20 +199,20 @@ This is the fullest end-to-end narrative and it ends differently from the two th
 After the mobile-timing fix, the widget still accumulated hundreds of lines of DOM-manipulation JS with duplicated/conflicting CSS generations (old grid styles, old tile styles, new hero styles). The team judged this **too fragile and too tightly coupled to Homepage's internals** to maintain safely across Homepage updates. Decision: tear it out.
 
 **Cleanup performed (by 2026-06-27):**
-- Athena: removed `dashboard-api/`, `data/`, fetch scripts, and the associated cron jobs; stopped and deleted the Dashboard API container. Kept: Telemetry stack (Prometheus/Loki/Alloy), LocalStack, Floci.
-- Hestia: removed `custom.js`/`custom.css`; Homepage restored to stock configuration (Homepage, Vaultwarden, Portainer Agent only).
+- Athena: stopped and removed the Dashboard API container; disabled the fetch scripts and their cron jobs. (The `dashboard-api/` source directory itself was **not** deleted from the repo at this stage.) Kept: Telemetry stack (Prometheus/Loki/Alloy), LocalStack, Floci.
+- Hestia: emptied `custom.js`; Homepage restored to a stock-plus-minimal-theme configuration (Homepage, Vaultwarden, Portainer Agent, plus Alloy/Node Exporter for observability — see `inventory.md`).
 - Apollo: removed temporary transfer files and any staged widget files.
 - Everything was captured in Git before deletion, so the repository remains the canonical rollback point.
 
 ## Lessons learned
 
 1. Homepage is best treated as a dashboard, not an application framework — deep DOM/CSS hacking creates ongoing maintenance and cross-device risk.
-2. Only keep an aggregation backend around if it's still earning its complexity — the Dashboard API was solid engineering, but its value dropped once the widget consuming it was removed.
+2. Only keep an aggregation backend *deployed* if it's still earning its complexity — the Dashboard API was solid engineering, but its value as a *running service* dropped once the widget consuming it was gone. (The code itself was still worth keeping around — see the 2026-07-10 entry.)
 3. Test on multiple clients (desktop + mobile) early; timing bugs don't always show up on one device.
 4. Sync live configs to Git *before* tearing anything down.
 5. Prefer the simplest solution that meets the actual need.
 
-**Reconciling with later docs (resolved 2026-07-10):** This cleanup removed the fragile *frontend widget*; the backend Dashboard API and K3s cluster were rebuilt/retained afterward through a more maintainable integration path (Phase 9 in `changelog.md`). That backend has since been removed too — the whole Dashboard API concept (FastAPI service, fetch scripts, cron jobs) was decommissioned on 2026-07-10, and Hestia now runs Homepage in its stock configuration with no backend dependency at all. See `changelog.md` (Phase 11) and `architecture.md` for the current state.
+**Reconciling with later docs (resolved 2026-07-10):** This cleanup emptied out the fragile *frontend widget code*; the backend Dashboard API and K3s cluster were kept running afterward through a more maintainable integration path (Phase 9 in `changelog.md`). That backend has since been decommissioned from active deployment too — the whole Dashboard API concept (FastAPI service, fetch scripts, cron jobs) stopped running on 2026-07-10, and Hestia now runs Homepage in a stock-plus-theme configuration with no backend dependency at all. **The Dashboard API's source code remains in the repository** as a deliberate portfolio decision — see `changelog.md` (Phase 11) and `architecture.md` for the current state.
 
 ---
 
@@ -292,19 +294,60 @@ Logging pipeline is **functionally working but not production-complete**. High-p
 
 Metrics (Prometheus, Node Exporter, Proxmox Exporter, Grafana dashboards, alerting, Telegram notifications) were all confirmed still fully healthy throughout this work.
 
+> **Update (2026-07-18):** this gap is resolved. A live audit confirmed all 12 running containers across both Athena and Hestia are being ingested into Loki correctly. See the 2026-07-18 entry near the end of this document for the full audit findings.
+
 ---
 
 # Open Items Carried Forward
 
-- Loki/Alloy Docker log discovery — only 2 of 9 containers ingested; root cause unconfirmed.
-- ~~MAL (MyAnimeList) API integration~~ / ~~Library tracking automation~~ — both moot as of 2026-07-10: the Dashboard API that would have consumed them was fully decommissioned (see below).
+- ~~Loki/Alloy Docker log discovery~~ — **resolved**, confirmed via live audit 2026-07-18 (see below).
+- ~~MAL (MyAnimeList) API integration~~ / ~~Library tracking automation~~ — both moot as of 2026-07-10: the Dashboard API that would have consumed them was decommissioned from deployment (code retained — see below).
+- `nftables` migration on Apollo — in progress, not yet complete.
+- Orphaned `core-services` Compose project (Portainer, on Athena) — needs a real compose file written and committed.
+- `k3s.yaml` permissions reset on every `k3s` restart — workaround exists (`sudo kubectl` or reapply `chmod`), not yet automated.
+- Port 3000 return-path NAT rule defined in config but not present in the live table — low priority, no observed impact.
+- Recurring `dockerd` DNS resolver errors on Athena (`127.0.0.53`) — informational, not yet investigated.
 
 ---
 
 # 2026-07-10 — Dashboard API Fully Decommissioned
 
-**What happened:** The entire Olympus Dashboard API concept was removed from the environment — the FastAPI backend on Athena, every fetch script (LastFM, weather, prices, Pokémon, library, MyAnimeList, media/wallpaper), and their cron jobs. Hestia's Homepage now runs standalone in its stock, default configuration.
+**What happened:** The entire Olympus Dashboard API concept was decommissioned from active deployment — the FastAPI backend container on Athena was stopped, and every fetch script (LastFM, weather, prices, Pokémon, library, MyAnimeList, media/wallpaper) and its cron job was disabled. **None of the code was deleted** — `docker-compose/dashboard-api/` and the `scripts/fetch_*.sh` files remain in the repository, intentionally, as a portfolio artifact showing real working engineering, separate from what's actually deployed. Hestia's Homepage now runs standalone in a stock-plus-theme configuration.
 
-**Why:** Consistent with the lesson from the 2026-06-27 widget rollback — the frontend widget had already proven too fragile to justify its maintenance cost, and once it was gone, the backend serving it stopped earning its keep either. Removing it eliminates the last piece of custom, higher-maintenance surface area from the stack.
+**Why:** Consistent with the lesson from the 2026-06-27 widget rollback — the frontend widget had already proven too fragile to justify its maintenance cost, and once it was gone, the backend serving it stopped earning its *deployment* keep either. Decommissioning it from active use eliminates the last piece of custom, higher-maintenance surface area actually running in the stack, while the code itself stays visible in the repo as a deliberate portfolio decision — a recruiter looking at the repository can see a real, working FastAPI service that was built, and the judgment call to retire it from production once it stopped earning its complexity.
 
-**Status:** Complete. This closes out the "reconcile the abandoned-vs-active dashboard" open item from the previous version of this document — both the widget and its backend are now gone, and the current architecture docs reflect that.
+**Status:** Complete. This closes out the "reconcile the abandoned-vs-active dashboard" open item from the previous version of this document — the widget's logic is gone, the backend isn't deployed, and the code for both remains in the repo. Current architecture docs reflect this.
+
+---
+
+# 2026-07-XX — Apollo NAT Migration: `iptables` → `nftables` (In Progress)
+
+**What's happening:** Apollo's firewall/NAT layer is being migrated from `iptables` to `nftables`. This is a live, in-progress change — not yet complete as of the most recent audit (2026-07-18).
+
+**Context uncovered during the migration:** while working through the live `iptables` rules to prepare for the migration, the outbound MASQUERADE rule was found duplicated/pointed at the wrong interface (`enx4a7f6c52f9f5`, a USB Ethernet adapter) instead of the actual internet uplink (`wlx002e2df0393b`, Wi-Fi, confirmed via `ip route`). This had accumulated from repeated rule reloads without a clean flush in between, rather than a real configuration error — it's been cleaned up and the correct rule restored, independent of the `nftables` work itself.
+
+Also surfaced: the return-path `MASQUERADE` rule for Homepage's port 3000 is defined in `/etc/network/interfaces` but has not actually been present in the live NAT table across recent audits — only Vaultwarden's port 8080 rule is. Not currently causing a problem (the general subnet MASQUERADE rule likely covers it), but flagged to be reconciled as part of the `nftables` rewrite rather than carried forward as-is.
+
+**Status:** In progress. `network.md`, `inventory.md`, and `disaster-recovery.md` will be updated with the new `nftables` rule set once the migration completes.
+
+---
+
+# 2026-07-18 — Live Infrastructure Audit & Documentation Reconciliation
+
+**What happened:** A full audit was run directly against Apollo, Athena, and Hestia — `docker ps -a`, `kubectl get pods -A`, `tailscale status`, live NAT rules, hardware specs (`lscpu`, `free -h`, `lsblk`, `pvesm status`), and a check for `.env` files — specifically to catch drift between what the documentation claimed and what was actually running.
+
+**Findings:**
+
+- **Hestia runs more than previously documented.** Beyond Homepage and Vaultwarden, it also runs its own Grafana Alloy, Node Exporter, and Portainer Agent — a per-host exporter/agent pattern reporting up to the centralized stack on Athena. Confirmed via a Loki query that Hestia's logs are actually flowing into the central Loki correctly.
+- **Athena runs more than previously documented too.** cAdvisor (per-container metrics) and Glances (system monitor) were both running but not listed anywhere in prior docs.
+- **Traefik is not deployed.** Earlier documentation (2026-06-21 entry above) noted it was "kept — useful for learning Ingress." It isn't in the cluster now, whether removed later or never actually deployed as stated.
+- **Floci is on-demand, not always-running.** `docker ps -a` showed no active Floci container — only a leftover, exited EC2-emulation container from a previous session. This matches actual usage pattern (started only for AWS-emulation work) rather than a fault.
+- **The Grafana Alloy Docker log discovery gap (open since 2026-07-05) is resolved.** A live Loki query returned all 12 running containers across both hosts. The exact fix/timing wasn't captured — it was simply found resolved during this audit.
+- **Tailscale mesh has a 4th member** not previously documented: a personal Android device, typically offline, not part of routine infrastructure operations.
+- **No `.env` files exist anywhere** across all three hosts — confirmed all configuration is inline in Compose files, no secrets-externalization layer currently in place.
+- **An orphaned Compose project was found:** the central Portainer container reports project `core-services`, but no matching `docker-compose.yml` exists anywhere on Athena. Portainer itself is fine; recreating it from scratch currently has no compose file to work from.
+- **Real hardware specs captured for the first time:** Apollo is an AMD Ryzen 7 3700X (8c/16t) with 16GB DDR4-3200 (1 of 4 DIMM slots populated), a 238.5GB NVMe drive (Proxmox LVM-thin pool) plus a 232.9GB SATA drive (secondary storage pool), and an idle NVIDIA GTX 1660 Super with no passthrough configured — a legitimate future PCIe passthrough candidate (transcoding, local ML experimentation) sitting unused.
+
+**Why this mattered:** several of these gaps would have been immediately visible to anyone actually cloning the repo and poking around — an inventory doc that undercounts running services on the exact hosts it claims to document is a credibility problem for a project explicitly built to go on a resume.
+
+**Status:** Complete. `inventory.md`, `architecture.md`, `network.md`, `troubleshooting.md`, `disaster-recovery.md`, `health-checks.md`, and `validation-report.md` were all updated to reflect these findings.

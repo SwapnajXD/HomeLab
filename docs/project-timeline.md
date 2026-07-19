@@ -360,7 +360,7 @@ The HomeLab matured into a fully documented and maintainable engineering platfor
 
 ## Outcome
 
-A working K3s lab with remote management, and a Dashboard API backend on Athena that survived this round of the widget rewrite/rollback cycle — though it was later removed entirely (see Phase 11). Every incident, root cause, and fix from this phase is logged in detail in **`postmortems.md`**.
+A working K3s lab with remote management (no Ingress controller deployed, confirmed during the 2026-07-18 audit), and a Dashboard API backend on Athena that survived this round of the widget rewrite/rollback cycle — though it was later decommissioned from active deployment, with its code retained in the repo (see Phase 11). Every incident, root cause, and fix from this phase is logged in detail in **`postmortems.md`**.
 
 ---
 
@@ -372,11 +372,11 @@ A working K3s lab with remote management, and a Dashboard API backend on Athena 
 
 - **2026-06-26:** LastFM/media-pipeline cron overlap and GitHub API rate-limit crash resolved with `flock` locking, `jq` response validation, and wallpaper fallback logic.
 - **2026-06-30:** Apollo configured for outbound NAT and DNAT port forwarding to Hestia (Homepage, Vaultwarden); a "Vaultwarden unreachable" report was traced to an HTTP-vs-HTTPS protocol mismatch, not a networking fault.
-- **2026-07-05:** Loki + Grafana Alloy deployed for centralized logging alongside the existing Prometheus/Grafana metrics stack; end-to-end log pipeline confirmed working, but Docker container discovery in Alloy is only picking up 2 of 9 running containers — open investigation.
+- **2026-07-05:** Loki + Grafana Alloy deployed for centralized logging alongside the existing Prometheus/Grafana metrics stack; end-to-end log pipeline confirmed working, but Docker container discovery in Alloy was only picking up 2 of 9 running containers — open investigation at the time (resolved by 2026-07-18, see Phase 12).
 
 ## Outcome
 
-The network layer is fully routable and forwarded, and centralized logging exists end-to-end, though full Docker log discovery remains the top open item heading into the next phase. Full incident detail in `postmortems.md`.
+The network layer is fully routable and forwarded, and centralized logging exists end-to-end. Full incident detail in `postmortems.md`.
 
 ---
 
@@ -386,11 +386,35 @@ The network layer is fully routable and forwarded, and centralized logging exist
 
 ## What happened
 
-The entire Olympus Dashboard API concept — the FastAPI backend on Athena, its fetch scripts, and their cron jobs — was removed. Hestia's Homepage instance now runs in its stock, default configuration with no custom widget and no backend dependency.
+The entire Olympus Dashboard API concept — the FastAPI backend on Athena, its fetch scripts, and their cron jobs — was decommissioned from active deployment. Hestia's Homepage instance now runs in a stock-plus-lightweight-theme configuration with no custom data widget and no backend dependency. **The Dashboard API's source code was intentionally retained in the repository** rather than deleted, as a portfolio artifact.
 
 ## Outcome
 
-This closes out the dashboard experiment that ran through Phases 9 and part of the widget rollback: the frontend widget was retired first (2026-06-27), and the backend it had been decoupled from was retired afterward. The homelab's frontend is now intentionally minimal — see `architecture.md` for the current state and `changelog.md` (Phase 11) / `postmortems.md` for the full rationale.
+This closes out the dashboard experiment that ran through Phases 9 and part of the widget rollback: the frontend widget's logic was retired first (2026-06-27), and the backend it had been decoupled from was retired from deployment afterward. The homelab's frontend is now intentionally minimal in production, while the underlying engineering work remains visible in the repository. See `architecture.md` for the current state and `changelog.md` (Phase 11) / `postmortems.md` for the full rationale.
+
+---
+
+# Phase 12 — Live Infrastructure Audit & nftables Migration
+
+**Date:** 2026-07-18 (audit); nftables migration ongoing
+
+## What happened
+
+A full live audit was run against Apollo, Athena, and Hestia to reconcile documentation with actual running systems — real container inventories, K3s cluster state, Tailscale mesh membership, NAT rules, and hardware specs were all captured directly from the hosts rather than assumed from prior docs. Separately, Apollo's NAT/firewall layer began a migration from `iptables` to `nftables`.
+
+## Key Findings
+
+- Hestia and Athena both run more services than previously documented (Hestia: Alloy, Node Exporter, Portainer Agent; Athena: cAdvisor, Glances).
+- The Docker log discovery gap from Phase 10 is resolved — full ingestion confirmed across both hosts.
+- Traefik is not deployed in K3s, correcting earlier documentation.
+- Floci runs on-demand, not continuously.
+- No `.env` files exist anywhere; all configuration is inline in Compose files.
+- Real hardware specs for Apollo captured for the first time.
+- A handful of small open items surfaced: an orphaned Portainer Compose project, a `k3s.yaml` permissions caveat, an asymmetric NAT return-path rule, and low-priority Docker DNS resolver noise.
+
+## Outcome
+
+The full documentation set (`inventory.md`, `architecture.md`, `network.md`, `troubleshooting.md`, `disaster-recovery.md`, `health-checks.md`, `validation-report.md`) was updated to match live reality. Full findings in `postmortems.md` (2026-07-18). The `nftables` migration remains in progress and will get its own follow-up entry once complete.
 
 ---
 

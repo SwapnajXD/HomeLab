@@ -92,7 +92,7 @@ docker-compose/
 └── localstack/
 ```
 
-> *(This was later renamed `floci/` when LocalStack was replaced with Floci — see `docs/postmortems.md`, 2026-06-21.)*
+> *(Correction, 2026-07-18 live audit: this folder was not renamed — `docker-compose/localstack/` and `docker-compose/floci/` both exist side by side on Athena today. LocalStack's compose file and prior data are kept on disk for reference but are not in active use; Floci is the current AWS emulator, started on-demand rather than continuously. See `docs/postmortems.md`.)*
 
 Benefits:
 
@@ -236,7 +236,7 @@ Result:
 
 - Fully automated data distribution pipeline.
 
-> **Update:** this synchronization pipeline, along with the weather-widget fix above and the Olympus Dashboard API it fed, was fully decommissioned on 2026-07-10. See the note at the end of Phase 8 below.
+> **Update:** this synchronization pipeline, along with the weather-widget fix above and the Olympus Dashboard API it fed, was decommissioned from active deployment on 2026-07-10 — its code was intentionally kept in the repository rather than deleted. See the note at the end of Phase 8 below.
 
 ---
 
@@ -322,6 +322,8 @@ Homepage now runs standalone, in its stock configuration, with no backend depend
 # 🔮 Future Architecture Initiatives (Phase 9+)
 
 > **Update:** since this roadmap was first written, a single-node **K3s Kubernetes cluster** has been stood up on Athena and is in active use, remotely managed from Artemis via `kubectl` (see `docs/postmortems.md`, 2026-06-21, and `docs/inventory.md`). It isn't listed as an item below because it's already done — the items below are what's still ahead.
+>
+> **Also in progress right now (2026-07-18):** Apollo's NAT/firewall layer is mid-migration from `iptables` to `nftables`. Not originally on this roadmap either — surfaced organically while investigating a live NAT rule discrepancy during the infrastructure audit. See `docs/postmortems.md` for the live migration log.
 
 ## Reverse Proxy & Internal Routing
 
@@ -466,6 +468,7 @@ Currently `.env` files and manual credentials appear to be the norm (reasonable 
 K3s is running single-node; a few incremental steps would round this out nicely for interviews:
 
 - **Persistent Volumes** (already on the roadmap) — pair with a real stateful workload (e.g., move Vaultwarden or a small Postgres instance into K3s) rather than leaving it theoretical.
+- **Traefik (or another Ingress controller)** — a 2026-06-21 build session noted Traefik was "kept for learning Ingress," but a live audit (2026-07-18) confirmed it isn't actually deployed in the cluster. Worth either deploying it for real or updating the earlier note — right now the docs and the cluster disagree.
 - **cert-manager** — issue internal TLS certs automatically for K3s-hosted services; pairs well with the planned reverse proxy work.
 - **Helm** — package at least one workload as a chart instead of raw manifests; very commonly expected DevOps skill.
 - Optional: add a second, even low-power node (e.g., a Raspberry Pi) to go from single-node to a real multi-node cluster and practice scheduling/affinity.
@@ -491,7 +494,7 @@ The metrics/logging/alerting stack is solid; a few additions would make it feel 
 
 - **Uptime Kuma** (already planned) — pair it with alerting *cross-checks*: if Prometheus says a service is up but Uptime Kuma's external check disagrees, that's a more interesting signal than either alone.
 - **SLOs/error budgets** — even informally, define one or two (e.g., "Homepage should respond in <500ms, 99% of the time") and track it in Grafana. This is a very interview-friendly SRE concept to be able to speak to from a real project.
-- Finish the open **Grafana Alloy Docker log discovery** issue — it's already tracked, but worth calling out here too since a broken observability pipeline undercuts the "production-inspired" story for anyone reviewing the repo.
+- ~~Finish the open Grafana Alloy Docker log discovery issue~~ — **resolved**, confirmed via live audit 2026-07-18 (all 12 running containers across both hosts now ingesting correctly).
 
 ## Cloud Practice (actual cloud, not just Floci)
 
@@ -499,6 +502,13 @@ Floci is great for free local AWS-API practice, but pairing it with a small amou
 
 - Stand up one genuinely tiny always-free-tier resource (e.g., an AWS S3 bucket + IAM user via Terraform, or an Oracle Cloud free-tier VM) so at least one Terraform workflow targets real cloud, not just Floci.
 - Mirror one existing Terraform module to also support a real provider as an optional backend, documented as "local dev against Floci, deploy against real AWS."
+
+## Hardware Utilization (new — surfaced by the 2026-07-18 hardware audit)
+
+Apollo has real, currently-idle capacity worth putting to use:
+
+- **GPU passthrough** — the NVIDIA GTX 1660 Super is present but unused (`nouveau` driver, no passthrough configured). Passing it through to a guest would enable either Jellyfin/Plex hardware transcoding or a small local LLM/ML experimentation VM — both are legitimate, resume-relevant uses of hardware that's otherwise sitting idle.
+- **RAM headroom** — only 1 of 4 DIMM slots is populated (16GB installed). Worth keeping in mind before any capacity-constrained decision (e.g., adding a second K3s node) gets ruled out prematurely.
 
 ## Cost & FinOps Awareness (lightweight)
 
@@ -536,36 +546,39 @@ Stable Operational Environment
 |---------|------------|----------|
 | 1–5 | Foundation, Services, Observability | ✅ Complete |
 | 6–7 | Reliability Engineering & Refactoring | ✅ Complete |
-| 8 | Dashboard Enhancement & API Expansion | ⤴️ Superseded — pivoted to full removal (2026-07-10) instead |
-| — | K3s Kubernetes Lab | ✅ Complete (built 2026-06-21, not originally in this roadmap) |
-| — | Centralized Logging (Loki + Grafana Alloy) | ⚠️ Mostly complete — Docker log discovery gap open |
+| 8 | Dashboard Enhancement & API Expansion | ⤴️ Superseded — pivoted to decommission from deployment (2026-07-10) instead, code retained |
+| — | K3s Kubernetes Lab | ✅ Complete (built 2026-06-21, not originally in this roadmap; no Ingress deployed) |
+| — | Centralized Logging (Loki + Grafana Alloy) | ✅ Complete — full container discovery confirmed 2026-07-18 |
+| — | Live Infrastructure Audit | ✅ Complete (2026-07-18) — see `docs/postmortems.md` |
+| — | `iptables` → `nftables` Migration | 🚧 In progress |
 | 9 | Reverse Proxy, Uptime, GitOps, IoT | 📋 Planned |
-| 10 | Suggested: Config Mgmt, Secrets, K8s Maturity, CI/CD Depth, Backup Automation, SLOs, Real-Cloud Practice, FinOps | 💡 Suggested — not yet started |
+| 10 | Suggested: Config Mgmt, Secrets, K8s Maturity, CI/CD Depth, Backup Automation, SLOs, Real-Cloud Practice, Hardware Utilization, FinOps | 💡 Suggested — not yet started |
 
 ---
 
 # Project Status
 
-**Current Phase:** Post-dashboard simplification — platform is stable and minimal, next focus is closing the logging gap and starting on Phase 9 initiatives.
+**Current Phase:** Post-audit reconciliation — documentation now matches live infrastructure; active work is the `nftables` migration, with Phase 9/10 items next up.
 
 **Infrastructure State:** Stable Operational Environment
 
-**Operational Readiness:** Validated
+**Operational Readiness:** Validated (last confirmed against live systems 2026-07-18)
 
 **Documentation Coverage:** Comprehensive
 
-**Overall Status:** Production-inspired HomeLab actively evolving through iterative improvement, experimentation, and — just as importantly — deliberately removing things that stopped earning their complexity.
+**Overall Status:** Production-inspired HomeLab actively evolving through iterative improvement, experimentation, and — just as importantly — deliberately retiring things from production that stopped earning their complexity, while keeping the underlying engineering visible.
 
 ---
 
 # Roadmap Revision Notes
 
-**Last Reviewed:** 2026-07-18
+**Last Reviewed:** 2026-07-18 (live infrastructure audit)
 
-This roadmap was written early in the project and has been reviewed against the current state of the environment (`docs/architecture.md`, `docs/changelog.md`, `docs/postmortems.md`). Key drift found and corrected:
+This roadmap was written early in the project and has been reviewed against the current state of the environment (`docs/architecture.md`, `docs/changelog.md`, `docs/postmortems.md`) — most recently cross-checked against a live audit run directly on Apollo, Athena, and Hestia. Key drift found and corrected:
 
-- Phase 8 planned to *expand* the Olympus Dashboard API; the actual outcome was the opposite — the widget was rolled back (2026-06-27) and the API itself was later fully decommissioned (2026-07-10). Marked as superseded above rather than silently deleted, since the reasoning behind the reversal is useful history.
-- K3s Kubernetes wasn't in this roadmap at all when originally written but has since been built and is in active use — added above as a completed, unplanned addition.
-- The `docker-compose/localstack/` folder referenced under Phase 6–7 was later renamed `floci/` after LocalStack was replaced with Floci.
+- Phase 8 planned to *expand* the Olympus Dashboard API; the actual outcome was the opposite — the widget's logic was rolled back (2026-06-27) and the API itself was later decommissioned from active deployment (2026-07-10). **Its source code was intentionally kept in the repository**, not deleted. Marked as superseded above rather than silently deleted, since the reasoning behind the reversal is useful history.
+- K3s Kubernetes wasn't in this roadmap at all when originally written but has since been built and is in active use — added above as a completed, unplanned addition. A live audit also confirmed Traefik, despite being noted as "kept" in an earlier build log, isn't actually deployed.
+- The `docker-compose/localstack/` folder referenced under Phase 6–7 was **not** actually renamed to `floci/` as this document previously claimed — a live audit found both folders still exist side by side, with LocalStack's data kept on disk but unused. Corrected in place above.
 - Everything else in Phase 9 (reverse proxy, Uptime Kuma, GitOps, IoT telemetry) still reflects genuine, unstarted future work and was left as-is.
-- Added Phase 10 as a set of new suggestions (config management, secrets, Kubernetes maturity, CI/CD depth, backup automation, SLOs, real-cloud practice, lightweight FinOps) aimed specifically at rounding out the cloud/DevOps skill story for a resume-facing project. None of it is committed — it's there to pick from.
+- Added Phase 10 as a set of new suggestions (config management, secrets, Kubernetes maturity, CI/CD depth, backup automation, SLOs, real-cloud practice, hardware utilization, lightweight FinOps) aimed specifically at rounding out the cloud/DevOps skill story for a resume-facing project. None of it is committed — it's there to pick from.
+- **2026-07-18 update:** a full live-infrastructure audit closed out the previously-open Grafana Alloy logging gap (now resolved, confirmed via direct Loki query), surfaced real hardware specs for Apollo (AMD Ryzen 7 3700X, 16GB RAM, an idle NVIDIA GTX 1660 Super), corrected the Hestia/Athena service inventories (both were running more than documented), and kicked off an `iptables` → `nftables` migration on Apollo that wasn't part of any prior roadmap phase. Full findings in `docs/postmortems.md`.

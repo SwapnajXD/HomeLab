@@ -2,23 +2,30 @@ graph LR
 
     Apollo["Apollo - Proxmox Host"]
     Athena["Athena - Ubuntu VM"]
+    Hestia["Hestia - Alpine LXC"]
 
     PveExp["Proxmox Exporter"]
-    NodeExp["Node Exporter"]
+    NodeExpA["Node Exporter - Athena"]
+    NodeExpH["Node Exporter - Hestia"]
+    Cadvisor["cAdvisor"]
 
     Prometheus[(Prometheus)]
     Grafana["Grafana"]
 
     Apollo -->|Metrics| PveExp
-    Athena -->|Metrics| NodeExp
+    Athena -->|Metrics| NodeExpA
+    Athena -->|Per-container Metrics| Cadvisor
+    Hestia -->|Metrics| NodeExpH
 
     PveExp -->|Scraped Every 15s| Prometheus
-    NodeExp -->|Scraped Every 15s| Prometheus
+    NodeExpA -->|Scraped Every 15s| Prometheus
+    NodeExpH -->|Scraped Every 15s| Prometheus
+    Cadvisor -->|Scraped Every 15s| Prometheus
 
     Prometheus -->|Datasource Queries| Grafana
 
     classDef source fill:#6aa84f,color:#ffffff,stroke:#ffffff,stroke-width:2px;
     classDef storage fill:#e69138,color:#ffffff,stroke:#ffffff,stroke-width:2px;
 
-    class Apollo,Athena source;
+    class Apollo,Athena,Hestia source;
     class Prometheus storage;

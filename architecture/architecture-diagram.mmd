@@ -2,7 +2,7 @@ graph TD
 
     %% Remote Administration
     Artemis["Artemis<br/>Arch Linux Workstation"]
-    Tailnet(("Tailscale Mesh VPN"))
+    Tailnet(("Tailscale Mesh VPN<br/>4 nodes"))
 
     Artemis -->|Remote Administration| Tailnet
 
@@ -10,7 +10,7 @@ graph TD
     Tailnet --> Apollo
     Tailnet --> Athena
 
-    subgraph Apollo["Apollo - Proxmox VE Hypervisor"]
+    subgraph Apollo["Apollo - Proxmox VE 9.2.2 Hypervisor"]
         direction TB
 
         Bridge["vmbr0<br/>Virtual Bridge"]
@@ -25,32 +25,42 @@ graph TD
                 Alloy["Grafana Alloy"]
                 NodeExporter["Node Exporter"]
                 ProxmoxExporter["Proxmox Exporter"]
+                Cadvisor["cAdvisor"]
+                Glances["Glances"]
             end
 
-            subgraph Kubernetes["Kubernetes Lab"]
+            subgraph Kubernetes["Kubernetes Lab (no Ingress deployed)"]
                 K3s["K3s Control Plane + Node"]
-                Traefik["Traefik Ingress"]
-                PortainerAgent["Portainer Agent"]
+                K8sPortainerAgent["Portainer Agent (in-cluster)"]
             end
 
             subgraph Development["Development Services"]
-                Floci["Floci (AWS Emulation)"]
-                Portainer["Portainer"]
+                Floci["Floci (AWS Emulation - on-demand)"]
+                Portainer["Portainer (central)"]
             end
         end
 
         subgraph Hestia["Hestia - LXC (Tailscale-isolated)"]
             direction TB
 
-            subgraph CoreServices["Core Services - stock config"]
-                Homepage["Homepage (stock, no custom widget/API)"]
+            subgraph CoreServices["Core Services - stock config + visual theme"]
+                Homepage["Homepage (stock + custom.css theme)"]
                 Vaultwarden["Vaultwarden"]
+            end
+
+            subgraph HestiaObservability["Per-host Observability"]
+                HestiaAlloy["Grafana Alloy"]
+                HestiaNodeExporter["Node Exporter"]
+                HestiaPortainerAgent["Portainer Agent"]
             end
         end
 
         Bridge --- Athena
         Bridge -->|DNAT / NAT| Hestia
     end
+
+    HestiaAlloy -.forwards logs.-> Loki
+    HestiaPortainerAgent -.managed by.-> Portainer
 
     classDef host fill:#0b5394,color:#ffffff,stroke:#ffffff,stroke-width:2px;
     classDef guest fill:#e69138,color:#ffffff,stroke:#ffffff,stroke-width:2px;
@@ -59,5 +69,5 @@ graph TD
 
     class Apollo host;
     class Athena,Hestia guest;
-    class Grafana,Prometheus,Loki,Alloy,NodeExporter,ProxmoxExporter,Floci,Portainer,Homepage,Vaultwarden service;
-    class K3s,Traefik,PortainerAgent k8s;
+    class Grafana,Prometheus,Loki,Alloy,NodeExporter,ProxmoxExporter,Cadvisor,Glances,Floci,Portainer,Homepage,Vaultwarden,HestiaAlloy,HestiaNodeExporter service;
+    class K3s,K8sPortainerAgent,HestiaPortainerAgent k8s;

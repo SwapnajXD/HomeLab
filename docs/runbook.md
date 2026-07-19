@@ -42,11 +42,13 @@ Verify critical services are running:
 - Grafana
 - Prometheus
 - Loki
-- Grafana Alloy
-- Node Exporter
+- Grafana Alloy (Athena + Hestia)
+- Node Exporter (Athena + Hestia)
 - Proxmox Exporter
+- cAdvisor
+- Glances
 - Portainer
-- Floci
+- Floci (only if started on-demand for AWS work)
 - K3s
 
 Check:
@@ -74,13 +76,15 @@ docker ps
 
 # Kubernetes Operations
 
-Athena hosts a single-node K3s cluster used for experimentation.
+Athena hosts a single-node K3s cluster used for experimentation. No Ingress controller (Traefik) is currently deployed — NodePort services are used to expose test workloads.
 
 ## Administration
 
 Management is performed from Artemis using `kubectl`.
 
 Use Athena's LAN address (`10.10.10.10:6443`) in the kubeconfig to match the cluster certificate SANs.
+
+> **Local `kubectl` on Athena itself** requires `sudo` — K3s regenerates `/etc/rancher/k3s/k3s.yaml` with restrictive permissions on every service restart, so a one-time `chmod 644` doesn't stick. Remote `kubectl` from Artemis is unaffected.
 
 ## Namespace Policy
 
@@ -124,14 +128,14 @@ kubectl get svc -n artemis-lab
 
 # Homepage Operations
 
-Homepage runs in its **stock configuration** on Hestia — a static service-link dashboard with no custom widget, no backend API, and no fetch/cron pipeline to operate. There is nothing to refresh or troubleshoot beyond the container itself:
+Homepage runs in a **stock-plus-lightweight-theme configuration** on Hestia — native service-discovery widgets, a purely visual `custom.css` (rounded cards, hover animation, header subtitle — no data logic), and an empty `custom.js`. There is no backend API or fetch/cron pipeline to operate day-to-day:
 
 ```bash
 docker ps | grep homepage
 docker logs homepage
 ```
 
-The previous custom "Olympus" dashboard (FastAPI Dashboard API on Athena + `custom.js`/`custom.css` on Hestia + per-source cron jobs) was fully decommissioned. If any of `dashboard-api`, `olympus_update.sh`, or `/var/log/olympus_fetch.log` show up on a host, they're leftovers from before the removal and can be cleaned up — see `postmortems.md` for what was removed and why.
+The previous custom "Olympus" data widget (FastAPI Dashboard API on Athena + widget logic in `custom.js` on Hestia + per-source cron jobs) was decommissioned from active deployment on 2026-07-10. **This was a deliberate decision to keep the source code in the repository** — `docker-compose/dashboard-api/` and `scripts/fetch_*.sh` are intentionally retained as a portfolio artifact, not stray leftovers to clean up. If you ever want to actually remove them from the repo entirely, that's a separate, explicit decision — don't delete them by default just because they're not running. See `postmortems.md` for what was decommissioned and why.
 
 ---
 
@@ -345,6 +349,7 @@ iptables -t nat -L -v
 - inventory.md
 - troubleshooting.md
 - disaster-recovery.md
+- postmortems.md
 
 ---
 

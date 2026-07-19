@@ -316,8 +316,12 @@ Expected services include:
 - prometheus
 - loki
 - alloy
+- cadvisor
+- glances
+- node-exporter
+- proxmox-exporter
 - portainer
-- floci
+- floci (only if started on-demand — not expected by default)
 
 ---
 
@@ -511,8 +515,14 @@ Expected containers:
 - prometheus
 - loki
 - alloy
+- cadvisor
+- glances
+- node-exporter
+- proxmox-exporter
 - portainer
-- floci
+- floci (only if started on-demand for AWS work — absent by default)
+
+> **Note:** the `portainer` container's Compose project (`core-services`) has no matching compose file on disk (see `troubleshooting.md`). Docker's restart policy (`unless-stopped`) means Portainer itself will still come back up fine after a VM restart — this only matters if the container is ever deleted and needs to be recreated from scratch, at which point there's currently nothing to `docker compose up` from.
 
 ---
 
@@ -522,6 +532,8 @@ Expected containers:
 
 - Homepage unavailable
 - Vaultwarden unavailable
+- Central Portainer loses visibility into Hestia's containers (Portainer Agent down)
+- Hestia's logs/metrics stop appearing in the central Loki/Prometheus on Athena
 
 ### Verification
 
@@ -543,10 +555,25 @@ Verify:
 ping 10.10.10.2
 ```
 
+Verify containers:
+
+```bash
+docker ps
+```
+
+Expected containers:
+
+- homepage
+- vaultwarden
+- alloy
+- node-exporter
+- portainer_agent
+
 Then confirm:
 
 - Homepage loads
 - Vaultwarden login page loads
+- Hestia reappears in the central Portainer's container list
 
 ---
 
@@ -605,10 +632,12 @@ iptables -t nat -L -n -v
 
 Verify:
 
-- IP forwarding enabled
-- MASQUERADE rule present
+- IP forwarding enabled (`sysctl net.ipv4.ip_forward` should be `1`)
+- MASQUERADE rule present, bound to the real uplink interface (`wlx002e2df0393b` — confirm with `ip route` if in doubt, since a wrong or duplicated interface here is a real failure mode that's happened before)
 
 Restore if required.
+
+> **In progress:** Apollo's NAT layer is being migrated from `iptables` to `nftables`. Until that completes, this scenario's commands (`iptables -t nat -L -n -v`) are correct; afterward, this section will be updated to the `nftables` equivalent (`nft list ruleset`). See `postmortems.md` for the live migration log.
 
 ---
 
@@ -797,7 +826,7 @@ docker restart alloy
 
 Verify log ingestion in Grafana Explore.
 
-> **Known open issue:** as of 2026-07-05, Loki only ever shows logs for the `grafana` and `loki` containers — every other container on Athena (`prometheus`, `cadvisor`, `node-exporter`, `proxmox-exporter`, `portainer`, `floci_aws`) is missing, and a container restart alone does not fix it. This is a Docker-discovery configuration issue inside Alloy, not a Loki or Grafana fault. See `troubleshooting.md` and `postmortems.md` (2026-07-05) for the investigation and next steps.
+> **Historical note:** between 2026-07-05 and 2026-07-18, Loki only showed logs for the `grafana` and `loki` containers — every other container on Athena was missing, and a container restart alone didn't fix it. A live audit on 2026-07-18 confirmed this is now resolved — all 12 running containers across both Athena and Hestia are ingesting correctly. If this recurs, `troubleshooting.md` and `postmortems.md` (2026-07-05 / 2026-07-18) have the original investigation notes as a starting point.
 
 ---
 
@@ -1183,7 +1212,7 @@ Any future scripted automation on the platform (backups, exporters, custom tooli
 - `jq` for JSON generation, never hand-built string concatenation
 - `flock` for concurrency control on anything cron-scheduled
 
-These are the two safeguards that repeatedly prevented malformed data and overlapping jobs during the (now-decommissioned) dashboard automation era — see `postmortems.md` — and remain good defaults for anything built going forward.
+These are the two safeguards that repeatedly prevented malformed data and overlapping jobs during the dashboard automation era (decommissioned from deployment 2026-07-10, code retained in the repo — see `postmortems.md`) — and remain good defaults for anything built going forward.
 
 ---
 
@@ -1228,7 +1257,7 @@ For additional operational guidance, refer to:
 | Grafana | ✅ Operational |
 | Prometheus | ✅ Operational |
 | Loki | ✅ Operational |
-| Grafana Alloy | ⚠️ Operational — partial container log discovery (see `troubleshooting.md`) |
+| Grafana Alloy | ✅ Operational — full container log discovery confirmed (both hosts) |
 | Floci | ✅ Operational |
 | Terraform | ✅ Operational |
 

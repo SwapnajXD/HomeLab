@@ -62,14 +62,17 @@ LAN: 10.10.10.10        LAN: 10.10.10.2
 TS : 100.117.35.70      TS: None
 
 Services:               Services:
-• Grafana               • Homepage (stock)
+• Grafana               • Homepage (stock+theme)
 • Prometheus            • Vaultwarden
-• Loki
-• Grafana Alloy
+• Loki                  • Grafana Alloy
+• Grafana Alloy         • Node Exporter
+• cAdvisor / Glances    • Portainer Agent
 • K3s
 • Portainer
-• Floci
+• Floci (on-demand)
 ```
+
+> **In progress:** Apollo's firewall/NAT layer is being migrated from `iptables` to `nftables`. Everything below reflects the current, still-`iptables`-based configuration.
 
 ---
 
@@ -106,9 +109,12 @@ Remote administration is provided through a Tailscale mesh.
 
 ## Connected Nodes
 
-- Artemis
-- Apollo
-- Athena
+| Node | Status |
+|------|--------|
+| Artemis | Active |
+| Apollo | Active |
+| Athena | Active |
+| Personal Android device | Typically offline — not part of routine infra operations |
 
 ### Benefits
 
@@ -128,17 +134,18 @@ Apollo functions as the network gateway for the homelab.
 
 ## Outbound NAT
 
-Internal systems access the internet through a persistent MASQUERADE rule.
+Internal systems access the internet through a persistent MASQUERADE rule bound to Apollo's real uplink interface, confirmed live via `ip route`:
 
 ```text
-10.10.10.0/24
-        │
-        ▼
-Apollo
-        │
-        ▼
-Internet
+default via 192.168.1.1 dev wlx002e2df0393b   ← actual internet uplink (Wi-Fi)
+10.10.10.0/24 dev vmbr0                        ← internal LAN
 ```
+
+```bash
+iptables -t nat -A POSTROUTING -s 10.10.10.0/24 -o wlx002e2df0393b -j MASQUERADE
+```
+
+> A second physical interface (`enx4a7f6c52f9f5`, USB Ethernet) briefly ended up in the live NAT table as well, from an earlier troubleshooting session — it was not the real uplink and has since been removed, leaving only the correct Wi-Fi-bound rule above. `ip route` is the fastest way to confirm which interface is actually carrying the default route if this is ever in question again.
 
 This enables:
 
@@ -153,6 +160,11 @@ This enables:
 
 Only approved services are forwarded to the internal network.
 
+```bash
+iptables -t nat -A PREROUTING -p tcp --dport 3000 -j DNAT --to-destination 10.10.10.2:3000
+iptables -t nat -A PREROUTING -p tcp --dport 8080 -j DNAT --to-destination 10.10.10.2:8080
+```
+
 | External | Internal |
 |----------|----------|
 | Apollo:3000 | Hestia:3000 (Homepage) |
@@ -160,7 +172,17 @@ Only approved services are forwarded to the internal network.
 
 Vaultwarden requires HTTPS at the application layer and will reject plain HTTP connections.
 
-Persistent `iptables` rules ensure forwarding survives host reboots.
+### Return-path NAT
+
+An explicit return-path MASQUERADE rule exists for Vaultwarden's port:
+
+```bash
+iptables -t nat -A POSTROUTING -d 10.10.10.2 -p tcp --dport 8080 -j MASQUERADE
+```
+
+> **Known asymmetry:** `/etc/network/interfaces` also defines an equivalent explicit return-path rule for port 3000 (Homepage), but it has not been present in the live NAT table during recent audits — Homepage still works, most likely because the general `10.10.10.0/24` MASQUERADE rule covers it anyway, but the explicit rule for port 3000 specifically isn't actually applied. Not currently causing a problem, but worth reconciling during the `nftables` migration rather than carrying the inconsistency forward.
+
+Persistent `iptables` rules (defined in `/etc/network/interfaces`, applied via `post-up`/`post-down` hooks) ensure forwarding survives host reboots — this will be replaced by the `nftables` equivalent once the migration completes.
 
 ---
 
@@ -171,7 +193,7 @@ Athena hosts a single-node K3s cluster.
 ## Networking Characteristics
 
 - API Server: **6443**
-- NodePort services for testing workloads
+- No Ingress controller (Traefik) currently deployed — NodePort services used for exposing test workloads
 - Internal LAN communication
 - Certificate SANs bound to Athena's LAN IP
 
@@ -234,7 +256,7 @@ Monitors infrastructure health and service availability.
 
 ## Homepage (Decommissioned Dashboard API)
 
-Homepage previously consumed a custom Dashboard API on Athena (`10.10.10.10:8000`) that aggregated data from external services. That API, its fetch scripts, and their cron jobs have been fully removed — Homepage on Hestia now runs standalone in its stock configuration with no backend dependency. See `architecture.md` and `postmortems.md` for the removal history.
+Homepage previously consumed a custom Dashboard API on Athena (`10.10.10.10:8000`) that aggregated data from external services. That API, its fetch scripts, and their cron jobs have been decommissioned from active deployment — Homepage on Hestia now runs standalone in its stock configuration (plus an unrelated lightweight visual theme) with no backend dependency. The Dashboard API's code is retained in the repository as a portfolio reference rather than deleted. See `architecture.md` and `postmortems.md` for the full history.
 
 ---
 
@@ -282,7 +304,7 @@ The network follows a defense-in-depth approach.
 | Port Forwarding | Operational |
 | Kubernetes Networking | Operational |
 | Metrics Pipeline | Operational |
-| Logging Pipeline | Operational (partial container discovery — see `troubleshooting.md`) |
+| Logging Pipeline | Operational — full container discovery confirmed across both hosts |
 | Alerting Pipeline | Operational |
 
 ---
@@ -290,3 +312,5 @@ The network follows a defense-in-depth approach.
 # Current State
 
 The Olympus HomeLab network provides a secure, resilient, and production-inspired foundation for infrastructure experimentation. Apollo acts as the central gateway, enforcing routing and network isolation, while Tailscale enables encrypted remote administration without exposing management interfaces to the public internet. The architecture supports observability, Kubernetes, and self-hosted applications while maintaining a minimal attack surface and operational simplicity.
+
+Apollo's NAT/firewall layer is currently mid-migration from `iptables` to `nftables` — this document will be updated to reflect the new rule set once that migration completes. See `postmortems.md` for the live migration log.

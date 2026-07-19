@@ -6,6 +6,8 @@ This document serves as the authoritative inventory of the Olympus HomeLab envir
 
 The inventory acts as the single source of truth for infrastructure management, troubleshooting, capacity planning, and disaster recovery.
 
+**Last audited against live systems:** 2026-07-18 (`docker ps -a`, `kubectl get pods -A`, hardware/network commands run directly on Apollo, Athena, and Hestia — see `postmortems.md` for the full audit log).
+
 ---
 
 # Environment Summary
@@ -16,10 +18,11 @@ The inventory acts as the single source of truth for infrastructure management, 
 | Hypervisors | 1 | Operational |
 | Virtual Machines | 1 | Healthy |
 | LXC Containers | 1 | Healthy |
-| Docker Services | 9 | Operational |
+| Docker Services (Athena) | 10 running (+ 1 exited leftover) | Operational |
+| Docker Services (Hestia) | 5 running | Operational |
 | Kubernetes Cluster | 1 | Healthy |
-| Kubernetes Pods | 5+ | Running |
-| Monitoring Components | 6 | Healthy (logging partially complete — see `troubleshooting.md`) |
+| Kubernetes Pods | 5 | Running |
+| Monitoring Components | 7 | Healthy |
 | Self-Hosted Applications | 2 | Operational |
 
 ---
@@ -34,16 +37,17 @@ flowchart TB
     subgraph VM100["VM 100: Athena — Ubuntu Operations VM"]
         direction TB
         A1["Docker + K3s"]
-        A2["Grafana / Prometheus"]
+        A2["Grafana / Prometheus / cAdvisor / Glances"]
         A3["Loki / Grafana Alloy"]
-        A4["Portainer / Floci"]
+        A4["Portainer / Floci (on-demand)"]
     end
 
     subgraph CT101["CT 101: Hestia — Alpine Application LXC"]
         direction TB
         H1["Docker Compose"]
-        H2["Homepage (stock)"]
+        H2["Homepage (stock + visual theme)"]
         H3["Vaultwarden"]
+        H4["Alloy / Node Exporter / Portainer Agent"]
     end
 
     APOLLO --> VM100
@@ -60,9 +64,29 @@ flowchart TB
 
 | Property | Value |
 |----------|-------|
-| Platform | Proxmox VE 8.x |
+| Platform | Proxmox VE 9.2.2 |
 | Type | Type-1 Hypervisor |
+| Board | MSI MS-7C37 |
 | Status | Healthy |
+
+### Hardware Specification
+
+| Component | Detail |
+|-----------|--------|
+| CPU | AMD Ryzen 7 3700X — 8 cores / 16 threads, up to 4.43GHz boost |
+| Virtualization | AMD-V enabled |
+| RAM | 16GB DDR4 @ 3200MT/s (single stick — 3 of 4 DIMM slots free, room to expand) |
+| Storage — NVMe | 238.5GB — hosts the Proxmox LVM-thin pool (69.2GB root, ~141GB thin pool for guest disks) |
+| Storage — SATA | 232.9GB — mounted separately as the `Storage` directory pool |
+| GPU | NVIDIA GeForce GTX 1660 Super (running `nouveau`, **not** passed through to any guest — idle, candidate for future PCIe passthrough) |
+
+### Storage Pools (`pvesm status`)
+
+| Pool | Type | Total | Used | Available |
+|------|------|------:|-----:|----------:|
+| `Storage` | dir | 239GB | 11.8GB | 215GB |
+| `local` | dir | 70.9GB | 5.2GB | 62GB |
+| `local-lvm` | lvmthin | 147.7GB | 26.9GB | 120.8GB |
 
 ### Responsibilities
 
@@ -73,6 +97,8 @@ flowchart TB
 - Persistent NAT Gateway
 - DNAT Port Forwarding
 - Bridge Management (`vmbr0`)
+
+> **In progress:** Apollo's firewall/NAT layer is mid-migration from `iptables` to `nftables`. Current NAT rules are still `iptables`-based and documented in `network.md`; this section will be updated once the migration completes.
 
 ### Hosted Workloads
 
@@ -113,9 +139,12 @@ flowchart TB
 
 | Property | Value |
 |----------|-------|
-| OS | Ubuntu Server |
+| OS | Ubuntu Server 20.04.6 LTS |
+| CPU | 4 cores |
+| RAM | 3.8GB total |
+| Disk | 32GB (30GB root, ~52% used) |
 | Runtime | Docker Compose + K3s |
-| LAN IP | `10.10.10.10` |
+| LAN IP | `10.10.10.10` (`ens18`, netplan-managed) |
 | Status | Healthy |
 
 ### Key Configuration
@@ -125,19 +154,29 @@ flowchart TB
 - Single-node K3s Cluster
 - Infrastructure Automation Host
 
-### Hosted Services
+### Hosted Services (live, `docker ps -a`)
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| Grafana | 3001 | Dashboards & Alerting |
-| Prometheus | 9090 | Metrics Collection |
-| Loki | 3100 | Log Aggregation |
-| Grafana Alloy | Host | Log Collection |
-| Node Exporter | Internal | System Metrics |
-| Proxmox Exporter | Internal | Hypervisor Metrics |
-| Portainer | 9443 | Container Management |
-| Floci | 4566 | AWS Emulation |
-| K3s Control Plane | 6443 | Kubernetes API |
+| Service | Container | Port | Purpose |
+|---------|-----------|------|---------|
+| Grafana | `grafana` | 3001 | Dashboards & Alerting |
+| Prometheus | `prometheus` | 9090 | Metrics Collection |
+| Loki | `loki` | 3100 | Log Aggregation |
+| Grafana Alloy | `alloy` | 12345 | Log Collection |
+| Node Exporter | `node-exporter` | 9100 | System Metrics |
+| Proxmox Exporter | `proxmox-exporter` | 9221 | Hypervisor Metrics |
+| cAdvisor | `cadvisor` | 8080 | Per-container resource metrics |
+| Glances | `glances` | host network | System monitor (top/htop-style) |
+| Portainer | `portainer` | 9443 | Container Management (orphaned Compose project — see note below) |
+| K3s Control Plane | — | 6443 | Kubernetes API |
+| Floci | `floci_aws` | 4566 | AWS Emulation — **on-demand only, not always running** |
+
+> **Note — orphaned `core-services` project:** the `portainer` container reports Compose project `core-services`, but no matching `docker-compose.yml` exists anywhere on Athena's filesystem (`docker compose -p core-services config` returns "no configuration file provided"). Portainer itself is healthy and running; the compose file that originally defined it is simply missing. See `troubleshooting.md`.
+
+> **Note — Floci is on-demand.** Unlike the rest of the stack, Floci is intentionally started only when doing AWS-emulation/Terraform work, not left running continuously. Treat "not running" as expected, not a fault, when checking `docker ps`.
+
+> **Note — LocalStack retained but unused.** `docker-compose/localstack/` and its `localstack_data/` (including old TLS certs) remain on disk from before the migration to Floci. Kept for reference; not part of the active stack.
+
+> **Note — leftover exited container:** `floci-ec2-i-e4801109500e83d3a` (an Amazon Linux container Floci previously used to emulate an EC2 instance) is present but exited — safe to remove, harmless to leave.
 
 ## Hestia (CT 101)
 
@@ -146,19 +185,30 @@ flowchart TB
 | Property | Value |
 |----------|-------|
 | OS | Alpine Linux |
+| CPU | 1 core |
+| RAM | 512MB |
+| Disk | 8GB |
 | Runtime | Docker Compose |
 | LAN IP | `10.10.10.2` |
+| Unprivileged | Yes |
 | Tailscale | Disabled |
 | Status | Healthy |
 
 > Hestia is intentionally isolated from the Tailscale mesh and is accessible only through Apollo's port forwarding rules.
 
-### Hosted Services
+### Hosted Services (live, `docker ps -a`)
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| Homepage | 3000 | Infrastructure Dashboard (stock configuration, no custom widgets) |
-| Vaultwarden | 8080 | Password Management |
+| Service | Container | Port | Purpose |
+|---------|-----------|------|---------|
+| Homepage | `homepage` | 3000 | Infrastructure Dashboard — stock service-discovery + custom visual theme (see note) |
+| Vaultwarden | `vaultwarden` | 8080 → 80 (HTTPS internally) | Password Management |
+| Grafana Alloy | `alloy` | 12345 | Per-host log collection, forwards to Loki on Athena |
+| Node Exporter | `node-exporter` | — | Per-host system metrics |
+| Portainer Agent | `portainer_agent` | 9001 | Lets Athena's central Portainer manage Hestia's containers remotely |
+
+> **Correction from earlier documentation:** Hestia was previously documented as running only Homepage + Vaultwarden. The live audit confirms it also runs its own Alloy, Node Exporter, and Portainer Agent — a per-host exporter/agent pattern reporting up to the centralized Prometheus/Loki/Portainer on Athena. This is the accurate topology going forward.
+
+> **Homepage note:** `custom.js` exists but is confirmed **empty** — the old data-widget logic is fully gone. `custom.css` is a real, active stylesheet, but it's pure visual theming (card border-radius, hover animations, scrollbar styling, header subtitle) with no data-fetching logic — kept intentionally as a lightweight visual layer, not a leftover to clean up. Homepage's `KUBECONFIG` mount and `HOMEPAGE_ALLOWED_HOSTS=*` env var enable its native, built-in Kubernetes/Docker/Proxmox widgets — a stock Homepage feature, not custom code.
 
 ---
 
@@ -169,19 +219,29 @@ flowchart TB
 | Property | Value |
 |----------|-------|
 | Distribution | K3s |
+| Version | v1.35.5+k3s1 |
 | Topology | Single Node |
 | Host | Athena |
-| Status | Healthy |
+| Node OS | Ubuntu 20.04.6 LTS |
+| Kernel | 5.4.0-216-generic |
+| Container Runtime | containerd 2.2.3-k3s1 |
+| Status | Healthy (26+ days uptime) |
 
-### Features
+### Running Workloads (live, `kubectl get pods -A`)
 
-- Kubernetes Control Plane
-- Worker Node
-- CoreDNS
-- Metrics Server
-- Traefik
-- Portainer Agent
-- Learning Namespace (`artemis-lab`)
+| Namespace | Pod | Purpose |
+|-----------|-----|---------|
+| `kube-system` | `coredns` | Cluster DNS |
+| `kube-system` | `local-path-provisioner` | Default storage class |
+| `kube-system` | `metrics-server` | Resource metrics API |
+| `kube-system` | `svclb-portainer-agent` | LoadBalancer service helper |
+| `portainer` | `portainer-agent` | Portainer cluster management agent |
+
+> **Correction:** Traefik is **not** deployed in this cluster. Earlier documentation (`postmortems.md`, 2026-06-21) noted it was kept "for learning Ingress" — that never materialized or was later removed; either way, it isn't part of the current cluster and shouldn't be listed as a running component.
+
+### RBAC
+
+Homepage's native Kubernetes widget authenticates against the cluster using a dedicated, purpose-built `ClusterRole` (`homepage-readonly`, defined in `homepage-rbac.yaml` on Athena): read-only (`get`/`list`/`watch`) access to core resources, workloads, batch jobs, networking objects, and metrics — no write access anywhere. A clean example of least-privilege scoping.
 
 ### Management
 
@@ -192,6 +252,8 @@ kubectl
 ```
 
 The Kubernetes API is accessed through Athena's LAN IP (`10.10.10.10`) to match the certificate SANs — the Tailscale IP is not covered by the K3s-issued certificate (see `postmortems.md`, 2026-06-21).
+
+> **Known caveat:** the `chmod 644` workaround applied to `/etc/rancher/k3s/k3s.yaml` for passwordless local `kubectl` access does **not** persist across `k3s` service restarts — K3s regenerates that file with restrictive permissions on every restart. Use `sudo kubectl` on Athena itself, or reapply the `chmod` after restarts, until this is automated.
 
 ---
 
@@ -220,8 +282,9 @@ The Kubernetes API is accessed through Athena's LAN IP (`10.10.10.10`) to match 
 
 ### Monitored Targets
 
-- Node Exporter
+- Node Exporter (Athena + Hestia)
 - Proxmox Exporter
+- cAdvisor
 - Docker Services
 - K3s Components
 
@@ -237,7 +300,7 @@ The Kubernetes API is accessed through Athena's LAN IP (`10.10.10.10`) to match 
 - Log Search
 - Historical Retention
 
-**Status:** Healthy (ingestion incomplete — see below)
+**Status:** Healthy — full ingestion confirmed.
 
 ---
 
@@ -245,7 +308,7 @@ The Kubernetes API is accessed through Athena's LAN IP (`10.10.10.10`) to match 
 
 **Purpose**
 
-- Docker Log Discovery
+- Docker Log Discovery (runs on both Athena and Hestia, forwarding to the central Loki on Athena)
 - Log Collection
 - Log Forwarding
 
@@ -253,10 +316,14 @@ The Kubernetes API is accessed through Athena's LAN IP (`10.10.10.10`) to match 
 
 ```mermaid
 flowchart LR
-    D[Docker] --> A[Grafana Alloy] --> L[Loki] --> G[Grafana]
+    D1[Docker — Athena] --> A1[Alloy — Athena]
+    D2[Docker — Hestia] --> A2[Alloy — Hestia]
+    A1 --> L[Loki]
+    A2 --> L
+    L --> G[Grafana]
 ```
 
-**Status:** Running, but only ingesting logs from 2 of 9 running containers (`grafana`, `loki`). `discovery.docker`/`loki.source.docker` targeting is the suspected cause and is not yet resolved — see `troubleshooting.md` and `postmortems.md` (2026-07-05).
+**Status:** Healthy. The Docker log discovery gap previously tracked here (only 2 of 9 containers ingested, opened 2026-07-05) is **resolved** — a live query against Loki on 2026-07-18 confirmed all 12 running containers across both hosts are being ingested (`alloy, cadvisor, glances, grafana, homepage, loki, node-exporter, portainer, portainer_agent, prometheus, proxmox-exporter, vaultwarden`). Full resolution note in `postmortems.md`.
 
 ---
 
@@ -269,6 +336,8 @@ flowchart LR
 - Disk
 - Filesystem
 - Network
+
+**Runs on:** Athena and Hestia (per-host)
 
 **Status:** Healthy
 
@@ -289,6 +358,30 @@ flowchart LR
 
 ---
 
+## cAdvisor
+
+**Metrics**
+
+- Per-container CPU/memory/network/disk usage
+
+**Runs on:** Athena
+
+**Status:** Healthy
+
+---
+
+## Glances
+
+**Purpose**
+
+- Lightweight system monitor (top/htop-style), web/API accessible
+
+**Runs on:** Athena
+
+**Status:** Healthy
+
+---
+
 # Application Inventory
 
 ## Homepage
@@ -301,11 +394,12 @@ flowchart LR
 
 ### Features
 
-- Stock service-link dashboard
-- No custom JavaScript/CSS
-- No external API dependency
+- Stock service-discovery dashboard (native Docker/Kubernetes/Proxmox widgets)
+- Custom visual theme (`custom.css`) — border radius, hover animation, header subtitle, scrollbar styling only
+- `custom.js` present but empty — no custom data-fetching logic
+- No external Dashboard API dependency
 
-Homepage previously ran a heavily customized "Olympus" widget backed by a dedicated Dashboard API on Athena. Both were removed; see "Decommissioned Components" below.
+Homepage previously ran a heavily customized "Olympus" data widget backed by a dedicated Dashboard API on Athena. Both were decommissioned from active deployment; the Dashboard API's code is intentionally retained in the repository (`docker-compose/dashboard-api/`) as a portfolio reference rather than deleted. See "Decommissioned Components" below.
 
 ---
 
@@ -319,10 +413,11 @@ Homepage previously ran a heavily customized "Olympus" widget backed by a dedica
 
 ### Notes
 
-- Persistent Storage
+- Persistent Storage (SQLite, icon cache)
 - Password Management
 - Accessible only through Apollo port forwarding
 - Serves HTTPS internally on port 80 (`ROCKET_TLS`) — always connect with `https://`, not `http://` (see `troubleshooting.md`)
+- `SIGNUPS_ALLOWED=false`, WebSocket support enabled
 
 ---
 
@@ -332,10 +427,11 @@ Homepage previously ran a heavily customized "Olympus" widget backed by a dedica
 |----------|-------|
 | Host | Athena |
 | Port | 9443 |
+| Compose Project | `core-services` (orphaned — see K3s/Athena note above) |
 
 ### Responsibilities
 
-- Docker Management
+- Docker Management (Athena + Hestia via Portainer Agent)
 - Kubernetes Visibility (via Portainer Agent in K3s)
 - Container Monitoring
 
@@ -347,23 +443,27 @@ Homepage previously ran a heavily customized "Olympus" widget backed by a dedica
 |----------|-------|
 | Host | Athena |
 | Port | 4566 |
+| Usage Pattern | On-demand — started only for AWS-emulation/Terraform work, not left running |
 
 ### Services
 
 - Amazon S3
 - DynamoDB
+- EC2 (emulated instances)
 
-**Purpose:** Local AWS emulation for Terraform development.
+**Purpose:** Local AWS emulation for Terraform development. Superseded LocalStack (still present on disk, unused — see Athena note above).
 
 ---
 
 # Decommissioned Components
 
-| Component | Host | Removed | Reason |
-|-----------|------|---------|--------|
-| Olympus Dashboard API (FastAPI) | Athena | 2026-06/07 | Too much operational overhead for the value provided once the frontend widget was retired |
-| Custom `custom.js` / `custom.css` Homepage widget | Hestia | 2026-06-27 | Fragile, tightly coupled to Homepage internals, broke on mobile |
-| Fetch scripts + cron jobs (LastFM, weather, prices, Pokémon, media, anime) | Athena | 2026-06/07 | Only existed to feed the Dashboard API |
+| Component | Host | Status | Reason |
+|-----------|------|--------|--------|
+| Olympus Dashboard API (FastAPI) | Athena | Decommissioned from deployment 2026-07-10 — **code retained in repo** (`docker-compose/dashboard-api/`) as a portfolio reference | Too much operational overhead for the value provided once the frontend widget was retired |
+| Custom Homepage data-widget JS | Hestia | Removed (`custom.js` now empty) 2026-06-27 | Fragile, tightly coupled to Homepage internals, broke on mobile |
+| Fetch scripts + cron jobs (LastFM, weather, prices, Pokémon, media, anime) | Athena | Removed 2026-07-10 | Only existed to feed the Dashboard API |
+| Traefik (K3s Ingress) | Athena | Never deployed / removed | Not currently in the cluster; was noted as a future learning item but never materialized |
+| LocalStack | Athena | Superseded by Floci — files retained, not in use | Replaced by a lighter-weight AWS emulator |
 
 Full narrative in `postmortems.md`.
 
@@ -378,6 +478,7 @@ Full narrative in `postmortems.md`.
 | LAN Subnet | `10.10.10.0/24` |
 | Gateway | Apollo |
 | Bridge | `vmbr0` |
+| Outbound Uplink | `wlx002e2df0393b` (Wi-Fi) — confirmed via live `ip route` |
 
 ---
 
@@ -385,9 +486,14 @@ Full narrative in `postmortems.md`.
 
 ### Connected Nodes
 
-- Artemis
-- Apollo
-- Athena
+| Node | Type | Status |
+|------|------|--------|
+| Artemis | Laptop | Active |
+| Apollo | Hypervisor | Active |
+| Athena | VM | Active |
+| xa-12 | Android phone | Typically offline (not part of routine infra operations) |
+
+> Hestia is intentionally **not** on the Tailscale mesh — see Service Isolation below.
 
 ### Purpose
 
@@ -402,12 +508,14 @@ Full narrative in `postmortems.md`.
 
 ### Outbound NAT
 
-Provides internet access for internal workloads.
+Provides internet access for internal workloads via MASQUERADE on the Wi-Fi uplink (`wlx002e2df0393b`).
 
 ```mermaid
 flowchart LR
     LAN["10.10.10.0/24"] -->|MASQUERADE| INET[Internet]
 ```
+
+> **In progress:** this NAT layer is being migrated from `iptables` to `nftables`. See `network.md` and `postmortems.md` for the live migration log.
 
 ---
 
@@ -440,11 +548,19 @@ flowchart LR
 
 ---
 
+## Secrets Management
+
+- No `.env` files exist anywhere in the environment (confirmed via audit across all three hosts, 2026-07-18) — all configuration values are inline in Compose files.
+- No secrets-externalization layer (e.g., SOPS, Vault) currently in place — see `HOMELAB_ROADMAP.md` Phase 10 for a suggested future improvement.
+
+---
+
 ## Service Isolation
 
 - Hestia excluded from Tailscale
 - Frontend accessible only through Apollo
 - Internal services remain on the private LAN
+- Homepage's Kubernetes access is scoped to a dedicated read-only `ClusterRole`
 
 ---
 
@@ -457,7 +573,7 @@ flowchart LR
 | Disaster Recovery Runbook | Complete |
 | Health Verification Guide | Complete |
 | Infrastructure Validation | Complete |
-| NAT Persistence Documented | Yes |
+| NAT Persistence Documented | Yes (mid-migration to `nftables`) |
 | Operational Documentation | Complete |
 
 ---
@@ -473,21 +589,22 @@ flowchart LR
 | Kubernetes | Healthy |
 | Grafana | Healthy |
 | Prometheus | Healthy |
-| Loki | Healthy (partial ingestion) |
-| Grafana Alloy | Running (partial discovery) |
+| Loki | Healthy — full ingestion confirmed |
+| Grafana Alloy | Healthy (both hosts) |
 | Homepage | Healthy |
 | Vaultwarden | Healthy |
-| Floci | Healthy |
-| Network Routing | Operational |
-| Observability | Operational (logging gap open) |
+| Portainer | Healthy (orphaned Compose project — see note) |
+| Floci | Healthy when started (on-demand) |
+| Network Routing | Operational (NAT migration to `nftables` in progress) |
+| Observability | Fully Operational |
 
 ---
 
 # Summary
 
-The Olympus HomeLab consists of a production-inspired virtualized environment built around Proxmox VE, Docker, and K3s. Infrastructure responsibilities are distributed between Athena (operations, observability, and Kubernetes) and Hestia (a minimal, stock frontend), while Apollo provides virtualization, networking, and gateway services.
+The Olympus HomeLab consists of a production-inspired virtualized environment built around Proxmox VE, Docker, and K3s. Infrastructure responsibilities are distributed between Athena (operations, observability, and Kubernetes) and Hestia (a minimal, stock-plus-themed frontend, with its own local monitoring/agent footprint), while Apollo provides virtualization, networking, and gateway services on real hardware with meaningful headroom (16GB RAM, only 1 of 4 DIMM slots populated; an idle GPU available for future passthrough).
 
-The environment includes centralized monitoring, logging (with a known gap in Docker log discovery), Infrastructure as Code workflows, secure remote administration through Tailscale, and comprehensive operational documentation covering architecture, recovery, validation, troubleshooting, and health verification.
+The environment includes fully-working centralized monitoring and logging across both hosts, Infrastructure as Code workflows, secure remote administration through Tailscale, and comprehensive operational documentation covering architecture, recovery, validation, troubleshooting, and health verification. An in-progress `nftables` migration on Apollo is the current active infrastructure change.
 
 **Overall Infrastructure Status:** Healthy and Operational
 
