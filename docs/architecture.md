@@ -332,3 +332,9 @@ The Olympus HomeLab currently provides:
 - Production-inspired operational practices
 
 The platform continues to evolve incrementally while maintaining a stable, production-inspired architecture. Recent changes include simplifying the frontend back down to stock Homepage plus a lightweight theme after retiring the custom dashboard integration, and reworking Apollo's NAT/firewall layer into a dedicated, idempotent script with dynamic WAN detection (after root-causing a real outage to a hardcoded interface name and evaluating — then declining — a migration to `nftables`).
+
+---
+
+# Planned: Hermes VM (Not Yet Built)
+
+A new VM, **Hermes**, is planned to take over K3s and Floci from Athena, so that deliberately experimenting on and breaking K3s doesn't risk the always-on observability stack that's needed to diagnose it. This is **not yet built** — everything in this document reflects the current, live architecture (Athena still hosts K3s and Floci). Full plan: `HOMELAB_ROADMAP.md` ("Planned: Hermes VM — K3s / Floci Split") and `project-timeline.md` (Phase 13).

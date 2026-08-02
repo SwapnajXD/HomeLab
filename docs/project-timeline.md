@@ -419,3 +419,28 @@ The full documentation set (`inventory.md`, `architecture.md`, `network.md`, `tr
 
 ---
 
+# Phase 13 — Hermes VM: K3s / Floci Split (Planned, Not Started)
+
+**Planned:** 2026-07-19
+
+## What's Planned
+
+K3s and Floci currently run on Athena, alongside the always-on observability stack (Grafana, Prometheus, Loki, Alloy). Since K3s is meant to be deliberately experimented on and broken as a learning exercise, and Athena is the one host with the monitoring/logging needed to diagnose problems, the two are being separated: a new VM (**Hermes**) will take over K3s and Floci, leaving Athena as a stable, always-on observability core.
+
+## Target State
+
+- **Athena:** Grafana, Prometheus, Loki, Alloy, Node Exporter, Proxmox Exporter, cAdvisor, Glances, Portainer only.
+- **Hermes:** K3s (server), Floci (on-demand) — treated as disposable, snapshotted before risky changes.
+
+Full build plan (VM sizing, teardown/rebuild steps, per-host exporter setup, Homepage kubeconfig update): `HOMELAB_ROADMAP.md`, "Planned: Hermes VM — K3s / Floci Split."
+
+## Follow-on (Later)
+
+Once Hermes is stable, a third VM may join it as a K3s agent to unlock real multi-node scheduling, affinity, and eviction-on-failure exercises — isolated from Athena this time.
+
+## Status
+
+**Planned — not yet started.** No changes have been made to Apollo, Athena, or Hestia. This entry will be converted into a dated `postmortems.md` build log once Hermes is actually built, the same way the original K3s build and the Apollo firewall rework were documented.
+
+---
+

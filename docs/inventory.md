@@ -606,6 +606,8 @@ The Olympus HomeLab consists of a production-inspired virtualized environment bu
 
 The environment includes fully-working centralized monitoring and logging across both hosts, Infrastructure as Code workflows, secure remote administration through Tailscale, and comprehensive operational documentation covering architecture, recovery, validation, troubleshooting, and health verification. The most recent infrastructure change was reworking Apollo's NAT/firewall layer into a dedicated, idempotent script with dynamic WAN detection, after root-causing a real outage to a hardcoded interface name — `nftables` was evaluated as part of that work and explicitly declined.
 
+**Planned next:** a new VM, **Hermes**, will take over K3s and Floci from Athena, separating disposable/experimental workloads from the always-on observability stack. Not yet built — this inventory reflects the current, live state (K3s and Floci still on Athena). See `HOMELAB_ROADMAP.md` and `project-timeline.md` (Phase 13) for the full plan.
+
 **Overall Infrastructure Status:** Healthy and Operational
 
 **Operational Readiness:** Fully Validated

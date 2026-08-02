@@ -319,7 +319,45 @@ Homepage now runs standalone, in its stock configuration, with no backend depend
 
 ---
 
-# 🔮 Future Architecture Initiatives (Phase 9+)
+# 🛠️ Planned: Hermes VM — K3s / Floci Split (Not Yet Started)
+
+**Status:** Planned as of 2026-07-19. Not yet built — Apollo, Athena, and Hestia are all unchanged for now.
+
+## Motivation
+
+K3s and Floci currently live on Athena, alongside the always-on observability stack (Grafana, Prometheus, Loki, Alloy). This is a problem specifically because K3s is meant to be experimented on and deliberately broken as a learning exercise (killing nodes, forcing evictions, misconfiguring resource limits) — and Athena is also the one place with the monitoring/logging needed to understand what just broke. Sharing a VM between "thing I'm deliberately breaking" and "thing that tells me what broke" is bad design. Floci belongs with K3s for the same reason — both are on-demand, experimental, learning-lab workloads, not always-on infrastructure.
+
+## Target Architecture
+
+| | Athena (after split) | Hermes (new VM) |
+|---|---|---|
+| Purpose | Always-on observability core | Disposable K8s/cloud learning lab |
+| Runs | Grafana, Prometheus, Loki, Alloy, Node Exporter, Proxmox Exporter, cAdvisor, Glances, Portainer | K3s (server), Floci (on-demand) |
+| Treat as | Stable — avoid experimenting here | Disposable — snapshot before risky changes, safe to break |
+
+## Build Plan
+
+1. Create the VM on Apollo — 2 vCPU / 2–4GB RAM / 16GB disk, static IP (e.g. `10.10.10.11`), same pattern as Athena.
+2. Base OS prep — `br_netfilter` module, confirm `cgroup2fs` (GRUB fix if still `tmpfs`, same as the original K3s postmortem, `postmortems.md` 2026-06-21).
+3. **Snapshot Hermes right after base OS setup**, before installing anything else — a clean rollback point for every future experiment.
+4. Tear down K3s on Athena (nothing stateful is running in it — CoreDNS, local-path-provisioner, metrics-server, Portainer Agent are all trivially recreated, so this is a clean removal, not a live migration).
+5. Fresh K3s **server** install on Hermes, configured with its own correct LAN IP from the start (avoids repeating the Artemis-`kubectl` TLS/cert-SAN lesson from the original K3s build).
+6. Move Floci's compose file to Hermes.
+7. Add Node Exporter (and optionally cAdvisor) to Hermes, scraped by Athena's central Prometheus — same per-host pattern already working on Hestia.
+8. Update Homepage's kubeconfig on Hestia to point at Hermes's IP instead of Athena's.
+9. Reapply `homepage-rbac.yaml` on the new cluster.
+
+## Follow-on (Later, Optional)
+
+Once Hermes is stable, add a **third** small VM as a K3s **agent** joining Hermes's control plane — unlocks real multi-node scheduling, node affinity/anti-affinity, and eviction-on-node-failure exercises (deliberately killing the agent VM and watching pods reschedule; `kubectl drain`/`uncordon` for planned-maintenance practice) — safely isolated from Athena's monitoring stack this time.
+
+## Docs to Update Once Built
+
+`inventory.md`, `architecture.md`, `network.md`, and the `architecture/*.mmd` diagrams will need Athena's and the new Hermes VM's service lists updated once this is actually implemented — this entry should move from "planned" to a dated `postmortems.md` build log at that point, the same way the original K3s build and the Apollo firewall rework were documented.
+
+---
+
+
 
 > **Update:** since this roadmap was first written, a single-node **K3s Kubernetes cluster** has been stood up on Athena and is in active use, remotely managed from Artemis via `kubectl` (see `docs/postmortems.md`, 2026-06-21, and `docs/inventory.md`). It isn't listed as an item below because it's already done — the items below are what's still ahead.
 >
@@ -551,6 +589,7 @@ Stable Operational Environment
 | — | Centralized Logging (Loki + Grafana Alloy) | ✅ Complete — full container discovery confirmed 2026-07-18 |
 | — | Live Infrastructure Audit | ✅ Complete (2026-07-18) — see `docs/postmortems.md` |
 | — | `iptables` → `nftables` Migration | ✅ Resolved — evaluated and explicitly declined; dynamic firewall script shipped instead |
+| — | **Hermes VM — K3s/Floci Split** | 📋 **Planned — next up** (see dedicated section above) |
 | 9 | Reverse Proxy, Uptime, GitOps, IoT | 📋 Planned |
 | 10 | Suggested: Config Mgmt, Secrets, K8s Maturity, CI/CD Depth, Backup Automation, SLOs, Real-Cloud Practice, Hardware Utilization, FinOps | 💡 Suggested — not yet started |
 
@@ -558,7 +597,7 @@ Stable Operational Environment
 
 # Project Status
 
-**Current Phase:** Post-audit reconciliation — documentation now matches live infrastructure, including the resolved Apollo networking/firewall rework; Phase 9/10 items are next up.
+**Current Phase:** Post-audit reconciliation complete; next concrete build target is the Hermes VM (K3s/Floci split from Athena) — see the dedicated planning section above.
 
 **Infrastructure State:** Stable Operational Environment
 
