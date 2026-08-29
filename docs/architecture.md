@@ -90,7 +90,7 @@ AMD Ryzen 7 3700X (8 cores/16 threads), 16GB DDR4-3200, a 238.5GB NVMe drive hos
 - Persistent NAT gateway
 - Port forwarding for internal services
 
-Apollo uses `iptables` (legacy backend) to provide outbound internet access for internal workloads and selectively forwards traffic to trusted internal services. Firewall/NAT logic is managed by a dedicated, idempotent script (`/usr/local/sbin/apollo-firewall.sh`) with dynamic WAN interface detection, run via a `systemd` unit at boot — rather than hardcoded rules embedded in network config. A migration to `nftables` was evaluated and explicitly declined, since Apollo's `iptables-legacy` backend runs independently from `nftables`, and Tailscale/Docker/K3s already manage their own `iptables` chains. See `network.md` and `postmortems.md` (2026-07-18) for the full architecture and decision record.
+Apollo uses `iptables` (legacy backend) to provide outbound internet access for internal workloads and selectively forwards traffic to trusted internal services. Firewall/NAT logic is managed by a dedicated, idempotent script (`/usr/local/sbin/apollo-firewall.sh`) with dynamic WAN interface detection, run via a `systemd` unit at boot — rather than hardcoded rules embedded in network config. A migration to `nftables` was evaluated and explicitly declined, since Apollo's `iptables-legacy` backend runs independently from `nftables`, and Tailscale/Docker/K3s already manage their own `iptables` chains. The service initially recurred twice (2026-07-26/27, 2026-07-31) due to a boot-time race condition with Wi-Fi association timing; it's now hardened with a 30-second in-script retry loop plus `systemd` auto-recovery (`Restart=on-failure`, `RestartSec=10s`). See `network.md` and `postmortems.md` (2026-07-18, 2026-07-26→31) for the full architecture and decision record.
 
 ---
 
@@ -331,7 +331,7 @@ The Olympus HomeLab currently provides:
 - Remote-first administration
 - Production-inspired operational practices
 
-The platform continues to evolve incrementally while maintaining a stable, production-inspired architecture. Recent changes include simplifying the frontend back down to stock Homepage plus a lightweight theme after retiring the custom dashboard integration, and reworking Apollo's NAT/firewall layer into a dedicated, idempotent script with dynamic WAN detection (after root-causing a real outage to a hardcoded interface name and evaluating — then declining — a migration to `nftables`).
+The platform continues to evolve incrementally while maintaining a stable, production-inspired architecture. Recent changes include simplifying the frontend back down to stock Homepage plus a lightweight theme after retiring the custom dashboard integration, and reworking (then hardening) Apollo's NAT/firewall layer into a dedicated, idempotent script with dynamic WAN detection and boot-time retry logic (after root-causing a real outage to a hardcoded interface name, evaluating — then declining — a migration to `nftables`, and then fixing two further recurrences caused by a boot-time race condition).
 
 ---
 

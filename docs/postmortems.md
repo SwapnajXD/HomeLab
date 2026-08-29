@@ -22,7 +22,8 @@ Each entry follows the same shape: **Date → What happened → What broke → R
 | 2026-06-30 | Apollo network bring-up: NAT, port forwarding, Vaultwarden TLS mismatch | ✅ Resolved |
 | 2026-07-05 | Loki + Grafana Alloy centralized logging | ⚠️ Partially working at the time — Docker log discovery gap, resolved by 2026-07-18 |
 | 2026-07-10 | Dashboard API decommissioned from deployment; Homepage reverted to stock+theme config | ✅ Complete — code retained in repo |
-| 2026-07-18 | Apollo networking/firewall rework — root-caused interface bug, evaluated and declined `nftables`, shipped a dynamic firewall script | ✅ Complete |
+| 2026-07-18 | Apollo networking/firewall rework — root-caused interface bug, evaluated and declined `nftables`, shipped a dynamic firewall script | ⚠️ Recurred twice, see 2026-07-26→31 |
+| 2026-07-26 → 07-31 | Apollo firewall recurrence — boot-time race condition (`network.target` → `network-online.target` → retry loop + `Restart=on-failure`) | ✅ Complete, hardened |
 | 2026-07-18 | Live infrastructure audit — reconciled documentation against real running systems on all three hosts | ✅ Complete |
 
 **Note on the Dashboard's final status:** the raw notes originally contained two different endings for the Olympus Dashboard, since resolved. The custom Homepage widget's `custom.js` was emptied out on 2026-06-27 for being too fragile and tightly coupled to Homepage's internals (a separate, unrelated `custom.css` visual theme was later added/kept — purely cosmetic, no data logic). The FastAPI backend behind the original widget survived that round and stayed in use for a while — but as of **2026-07-10**, it was decommissioned from active deployment as well: the container was stopped and its fetch scripts/cron jobs were disabled. **The code itself was intentionally kept in the repository** (`docker-compose/dashboard-api/`, `scripts/fetch_*.sh`) rather than deleted — it's real, working engineering worth having visible, even though it's not part of the live deployment. Hestia's Homepage now runs stock (plus that unrelated theme), with no runtime backend dependency. K3s is unaffected and remains in active use. See the 2026-07-10 entry below and `changelog.md` (Phase 11) for details.
@@ -407,6 +408,125 @@ The port 3000 return-path NAT asymmetry flagged in the 2026-07-18 audit (Vaultwa
 
 ## Status
 
-**Complete.** Internet access, SSH, Homepage forwarding, and Vaultwarden forwarding are all confirmed working. This closes out the `iptables` → `nftables` migration item from the 2026-07-18 audit — the final decision was to **stay on `iptables`**, not migrate. `network.md`, `inventory.md`, `architecture.md`, and `disaster-recovery.md` have all been updated to describe the new firewall-script architecture in place of the old inline rules.
+**Resolved at the time** — internet access, SSH, Homepage forwarding, and Vaultwarden forwarding were all confirmed working, and this closed out the `iptables` → `nftables` migration item from the 2026-07-18 audit (final decision: stay on `iptables`, not migrate). **This fix recurred twice more before it actually stuck — see the entry immediately below.** `network.md`, `inventory.md`, `architecture.md`, and `disaster-recovery.md` have all been updated to describe the current, hardened firewall-script architecture in place of the old inline rules.
 
 ---
+
+# 2026-07-26 → 2026-07-31 — Apollo Firewall Recurrence: Boot-Time Race Condition (Permanent Fix)
+
+**Status:** Fully resolved and hardened as of 2026-07-31. This is a direct follow-on to the 2026-07-18 firewall rework above — that fix was correct but incomplete, and this entry documents why it recurred twice and what finally made it stick.
+
+## Recurrence #1 — 2026-07-26/27
+
+**Symptom:** Athena lost outbound internet access again — `ping 10.10.10.1` from Athena succeeded (LAN/`vmbr0` fine), `ping 8.8.8.8` hung (NAT/transit broken). Internal SSH and cross-node communication were unaffected.
+
+**Side investigation:** while diagnosing this, confirmed that Apollo is **not configured as a Tailscale subnet router** — SSH from Artemis to Athena's LAN IP (`10.10.10.10`) over Tailscale doesn't work for that reason. The working paths are either Athena's own Tailscale IP directly, or an SSH ProxyJump through Apollo's Tailscale IP. Worth documenting as the actual supported access pattern rather than something to "fix" — see `network.md`.
+
+**Root cause:** `apollo-firewall.service` was originally bound to `network.target`, which only confirms local network *managers* are active — not that an interface actually has a route yet. On boot, the service ran before Wi-Fi (`wlx002e2df0393b`) finished associating and getting a DHCP lease, so the script's `ip route` lookup found no default route and the script exited immediately without ever applying the MASQUERADE rule.
+
+**Fix applied:** rebound the service to `network-online.target`:
+
+```ini
+[Unit]
+After=network-online.target
+Wants=network-online.target
+```
+
+Reloaded and restarted (`systemctl daemon-reload && systemctl restart apollo-firewall.service`), verified NAT rules reapplied correctly and internet access restored. This looked like a complete fix at the time.
+
+## Recurrence #2 — 2026-07-31 (The Same Bug, One Layer Deeper)
+
+**Symptom:** Identical failure — Athena lost outbound internet after an Apollo reboot, despite the `network-online.target` fix from five days earlier. `apollo-firewall.service` had failed again on boot with `ERROR: No default route found`, exit code `1/FAILURE`.
+
+**Root cause:** `network-online.target` is a *best-effort* signal, not a guarantee — for wireless interfaces specifically, WPA handshake and DHCP negotiation are asynchronous and can still complete *after* the target reports "online." The previous fix narrowed the race window but didn't close it. This is a known, somewhat notorious sharp edge of systemd + Wi-Fi, not a one-off fluke — worth remembering if any other boot-ordered service ever depends on networking being "actually" ready.
+
+**Permanent fix — two layers of defense:**
+
+**Layer 1: retry loop inside the script itself.** `apollo-firewall.sh` now polls for a default route instead of checking once and giving up:
+
+```bash
+MAX_RETRIES=15
+RETRY_COUNT=0
+WAN_IF=""
+
+echo "Detecting active default WAN route..."
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    WAN_IF=$(ip route | awk '/^default/ {print $5; exit}')
+    if [[ -n "$WAN_IF" ]]; then
+        break
+    fi
+    echo "No default route yet. Waiting 2s... ($((RETRY_COUNT+1))/$MAX_RETRIES)"
+    sleep 2
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+done
+
+if [[ -z "$WAN_IF" ]]; then
+    echo "ERROR: No default route found after waiting." >&2
+    exit 1
+fi
+```
+
+Up to 30 seconds of polling (15 × 2s) before giving up — enough headroom for a slow Wi-Fi association without hanging boot indefinitely if something's genuinely wrong.
+
+**Layer 2: systemd auto-recovery as a backstop**, in case even 30 seconds isn't enough some day:
+
+```ini
+[Unit]
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+```
+
+If the script still exits with a failure, systemd now retries the whole thing every 10 seconds rather than giving up after one failed attempt.
+
+## Verification
+
+- `systemctl status apollo-firewall.service` → `active (exited)`, override loaded correctly.
+- `iptables -t nat -L POSTROUTING -v -n` → MASQUERADE rule correctly bound to `wlx002e2df0393b` for `10.10.10.0/24`.
+- `ping -c3 8.8.8.8` from Athena → 0% packet loss.
+- Confirmed idempotency held: port-forwarding rules (3000, 8080) and hairpin NAT were not duplicated across the repeated script executions during testing.
+
+## Lessons Learned
+
+1. **The first fix (`network-online.target`) was a real improvement, not a wasted effort — it just wasn't sufficient on its own.** Worth remembering that "this fixed the symptom once" and "this fixed the root cause" aren't always the same claim, especially with timing-dependent bugs.
+2. **Systemd's network-readiness targets are guidance, not guarantees, for wireless interfaces specifically.** Anything that depends on "the network is actually up" on a Wi-Fi-connected host should poll/retry internally rather than trusting a single ordering directive.
+3. **Defense in depth beats a single clever fix.** The permanent solution isn't "the retry loop" or "the systemd restart policy" — it's both together, so a slow boot is handled gracefully by the script, and a genuinely failed script is still retried by systemd instead of silently staying broken until the next manual intervention.
+4. **This is now the second time a boot-ordering/timing assumption has bitten this exact firewall script** (the first being the hardcoded-interface bug from 2026-07-18). Worth treating "does this survive a cold boot with a slow Wi-Fi association" as a standard test case for anything touching Apollo's networking going forward, not just something discovered by recurrence.
+
+## Current Operational State
+
+- `apollo-firewall.service`: bound to `network-online.target`, `Restart=on-failure`, `RestartSec=10s`.
+- `apollo-firewall.sh`: dynamic WAN detection with a 30-second retry loop before failing.
+- NAT rules: idempotent outbound MASQUERADE, symmetric return-path NAT for ports 3000/8080, hairpin NAT for LAN clients — unchanged from the 2026-07-18 rework, just now reliably applied on every boot instead of most boots.
+
+---
+
+# 2026-08-02 — Plaintext Credential Found in Repo (`docker-compose/telemetry/.env`)
+
+**Severity:** High. **Status:** Remediated in the repo; **password rotation on Apollo still required** (external action, not something a repo change can fix on its own).
+
+## What Happened
+
+A routine repo review turned up `docker-compose/telemetry/.env` containing a real Proxmox root password in plaintext. This directly contradicts the "no `.env` files exist anywhere" finding from the 2026-07-18 live audit — one existed here the whole time, in the one place nobody thought to check because the audit focused on live hosts, not repo contents.
+
+## Why It Matters
+
+This repo is headed toward a public GitHub portfolio. A committed plaintext root password isn't a documentation-accuracy problem like the others in this log — it's a live credential exposure risk the moment this repo goes public (or even before, if the repo history isn't fully private).
+
+## Remediation
+
+- Removed `docker-compose/telemetry/.env` from the repo.
+- Added `docker-compose/telemetry/.env.example` with a placeholder value, so the expected variable (`PROXMOX_ROOT_PASSWORD`) is still documented for anyone setting the stack up fresh.
+- Added a root `.gitignore` — this repo had **no `.gitignore` at all** before this, which is very likely how the real `.env` ended up committed in the first place. Now excludes `.env` (all variants), Terraform state/lock cruft, and leftover `.bak`/`.working` files.
+
+## Outstanding — External Action Required
+
+**The exposed Proxmox root password itself must be rotated on Apollo.** Removing the file from the repo does not undo the exposure if it was ever pushed anywhere — treat the old password as compromised regardless of whether this repo has ever actually been public, and change it directly on the Proxmox host.
+
+## Lesson
+
+The 2026-07-18 audit checked live hosts thoroughly but never checked the repo itself for committed secrets — a good reminder that "audit the infrastructure" and "audit the repo" are two different exercises, and a portfolio project heading to a public host needs both.

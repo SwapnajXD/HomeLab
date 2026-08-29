@@ -637,9 +637,11 @@ Verify:
 - The firewall script's `systemd` unit is active: `systemctl status apollo-firewall.service` should show `active (exited)`
 - MASQUERADE rule present, bound to the actual current uplink interface (the script detects this dynamically — confirm with `ip route` if in doubt)
 
+**If this failure appears right after a reboot specifically:** give it up to ~30 seconds before assuming it's broken — `apollo-firewall.sh` retries its route lookup for that long to accommodate slow Wi-Fi association before failing (see note below). If it's still down after that, proceed with manual restoration.
+
 Restore if required — re-running `/usr/local/sbin/apollo-firewall.sh` manually is safe (idempotent) and will reapply all NAT/port-forwarding rules.
 
-> **Resolved 2026-07-18:** this exact failure mode (outbound NAT silently broken because the MASQUERADE rule referenced a stale interface after switching from USB tethering back to Wi-Fi) happened for real and is now fixed at the root — the firewall script detects the WAN interface dynamically instead of using a hardcoded name. `nftables` was evaluated as an alternative fix and explicitly declined (Apollo runs `iptables-legacy`, independent from `nftables`, and Tailscale/Docker/K3s already manage their own `iptables` chains). See `postmortems.md` for the full incident and decision record.
+> **Resolved 2026-07-18, hardened 2026-07-31:** this failure mode (outbound NAT silently broken because the MASQUERADE rule referenced a stale interface after switching from USB tethering back to Wi-Fi) happened for real and was fixed at the root — the firewall script detects the WAN interface dynamically instead of using a hardcoded name. `nftables` was evaluated as an alternative fix and explicitly declined (Apollo runs `iptables-legacy`, independent from `nftables`, and Tailscale/Docker/K3s already manage their own `iptables` chains). **This same failure then recurred twice more** (2026-07-26/27, 2026-07-31) due to a separate boot-time race condition — the service could start before Wi-Fi finished associating. Permanent fix: a 30-second retry loop inside the script plus `systemd` `Restart=on-failure`/`RestartSec=10s` as a backstop. See `postmortems.md` for the full incident and decision record.
 
 ---
 

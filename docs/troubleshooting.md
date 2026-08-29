@@ -382,7 +382,40 @@ A test migration was attempted (`/etc/nftables.conf` written, loaded, tested aga
 - `/etc/network/interfaces` cleaned up to only configure networking, no embedded firewall logic.
 - Explicitly leaves Tailscale, Docker, and K3s/Flannel's own `iptables` rules untouched.
 
-Full write-up: `postmortems.md` (2026-07-18).
+> **Update:** this script recurred twice (2026-07-26/27, then again 2026-07-31) due to a boot-time race condition unrelated to the `nftables` decision itself — see "Resolved: Apollo Firewall Boot-Time Race Condition" below and `postmortems.md` for the full timeline. The `nftables` decision above still holds; what changed was hardening the systemd/script timing.
+
+Full write-up: `postmortems.md` (2026-07-18, 2026-07-26→31).
+
+---
+
+# Resolved: Apollo Firewall Boot-Time Race Condition
+
+**Status:** Resolved (hardened 2026-07-31, after two recurrences)
+
+### Symptoms
+
+Athena lost outbound internet access after an Apollo reboot — twice, five days apart (2026-07-26/27 and 2026-07-31) — despite the firewall script above working correctly when run manually. `apollo-firewall.service` failed on boot with `ERROR: No default route found`, exit code `1/FAILURE`.
+
+### Root Cause
+
+The service was originally bound to `network.target`, which only confirms local network managers are running, not that an interface actually has a route. Wi-Fi association and DHCP negotiation are asynchronous, so the script sometimes ran before a default route existed. Rebinding to `network-online.target` (first fix, 07-26/27) narrowed the race but didn't close it — `network-online.target` is a best-effort signal for wireless interfaces, not a guarantee, so the exact same failure recurred on 07-31.
+
+### Permanent Fix
+
+Two independent layers, so neither has to be perfect alone:
+
+1. **Script-level retry loop** — `apollo-firewall.sh` polls for a default route every 2 seconds, up to 15 times (30 seconds total), before giving up.
+2. **Systemd auto-recovery** — `Restart=on-failure` + `RestartSec=10s` added to the service, so even a genuine script failure gets retried automatically instead of leaving the host broken until manual intervention.
+
+### Also Clarified During Investigation
+
+Apollo is **not** configured as a Tailscale subnet router — SSH from Artemis to Athena's LAN IP (`10.10.10.10`) over Tailscale doesn't work for that reason, and isn't a bug. Use Athena's own Tailscale IP directly, or SSH ProxyJump through Apollo's Tailscale IP. See `network.md`.
+
+### Lesson
+
+"Fixed the symptom once" and "fixed the root cause" aren't automatically the same claim for timing-dependent bugs — worth testing a cold boot with a slow Wi-Fi association as a standard case for anything touching Apollo's networking, not just discovering it by recurrence.
+
+Full write-up: `postmortems.md` (2026-07-26→31).
 
 ---
 

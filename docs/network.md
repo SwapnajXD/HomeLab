@@ -126,6 +126,8 @@ Remote administration is provided through a Tailscale mesh.
 
 Hestia is intentionally excluded from the Tailscale network to reduce the attack surface for user-facing applications.
 
+> **Access pattern clarification (found 2026-07-26):** Apollo is **not** configured as a Tailscale subnet router, so SSH from Artemis to Athena's LAN IP (`10.10.10.10`) over Tailscale does not work — that's expected, not a bug. Use Athena's own Tailscale IP (`100.117.35.70`) directly, or SSH ProxyJump through Apollo's Tailscale IP (`100.81.86.51`).
+
 ---
 
 # NAT & Traffic Routing
@@ -138,10 +140,13 @@ Apollo functions as the network gateway for the homelab. As of 2026-07-18, all N
 |----------|-------|
 | Script | `/usr/local/sbin/apollo-firewall.sh` |
 | Managed by | `systemd` — `/etc/systemd/system/apollo-firewall.service` |
-| Trigger | Runs once at boot, after networking is up |
+| Trigger | Runs at boot, after `network-online.target` |
 | Enabled via | `systemctl enable apollo-firewall.service` |
+| Boot-time resilience | Script retries `ip route` lookup every 2s, up to 15 times (30s total), before failing; `systemd` additionally retries the whole service every 10s on failure (`Restart=on-failure`, `RestartSec=10s`) |
 | Verified state | `Active: active (exited)` |
 | Idempotency | Checks for existing rules before adding them — safe to re-run manually at any time |
+
+> **Why the retry logic:** the original version of this service ran once, checked for a default route, and gave up immediately if none existed yet — which failed twice in practice (2026-07-26/27, then again 2026-07-31) because Wi-Fi association/DHCP can complete *after* systemd considers networking "online." See `postmortems.md` (2026-07-26→31) for the full incident and why a single ordering directive (`network-online.target` alone) wasn't sufficient on its own.
 
 The script is responsible for:
 
@@ -335,4 +340,4 @@ The network follows a defense-in-depth approach.
 
 The Olympus HomeLab network provides a secure, resilient, and production-inspired foundation for infrastructure experimentation. Apollo acts as the central gateway, enforcing routing and network isolation, while Tailscale enables encrypted remote administration without exposing management interfaces to the public internet. The architecture supports observability, Kubernetes, and self-hosted applications while maintaining a minimal attack surface and operational simplicity.
 
-Apollo's NAT/firewall layer was reworked on 2026-07-18 following a real outage root-caused to a stale, hardcoded interface reference. `nftables` was evaluated as a fix and explicitly declined — Apollo runs `iptables-legacy`, which is fully independent from `nftables`, and Tailscale/Docker/K3s all already manage their own `iptables` state. Instead, firewall logic now lives in a dedicated, idempotent script with dynamic WAN interface detection, managed by its own `systemd` unit. See `postmortems.md` for the full incident and decision record.
+Apollo's NAT/firewall layer was reworked on 2026-07-18 following a real outage root-caused to a stale, hardcoded interface reference. `nftables` was evaluated as a fix and explicitly declined — Apollo runs `iptables-legacy`, which is fully independent from `nftables`, and Tailscale/Docker/K3s all already manage their own `iptables` state. Instead, firewall logic now lives in a dedicated, idempotent script with dynamic WAN interface detection, managed by its own `systemd` unit. That fix recurred twice more (2026-07-26/27, 2026-07-31) due to a boot-time race condition before it was fully hardened with a script-level retry loop and `systemd` auto-recovery. See `postmortems.md` for the full incident and decision record.

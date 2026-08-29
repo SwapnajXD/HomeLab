@@ -215,11 +215,11 @@ Verify Floci resources before modifying state.
 
 # Networking Operations
 
-Apollo provides routing and NAT for the internal network via a dedicated firewall script (`/usr/local/sbin/apollo-firewall.sh`), managed by `apollo-firewall.service`, run once at boot.
+Apollo provides routing and NAT for the internal network via a dedicated firewall script (`/usr/local/sbin/apollo-firewall.sh`), managed by `apollo-firewall.service`, run at boot after `network-online.target`. The script retries its route lookup for up to 30 seconds before failing, and `systemd` will additionally retry the whole service every 10 seconds on failure (`Restart=on-failure`, `RestartSec=10s`) — this hardening was added after the service failed on boot twice (2026-07-26/27, 2026-07-31) due to Wi-Fi association completing later than systemd's networking-ready signal.
 
 After every Apollo reboot verify:
 
-- `systemctl status apollo-firewall.service` reports `active (exited)`
+- `systemctl status apollo-firewall.service` reports `active (exited)` — if it's still starting/retrying, give it up to ~30 seconds before assuming a problem
 - IP forwarding enabled
 - NAT rules present, bound to the actual current WAN interface (detected dynamically, not hardcoded)
 - Internet connectivity restored
@@ -236,11 +236,14 @@ Useful commands:
 ```bash
 sysctl net.ipv4.ip_forward
 systemctl status apollo-firewall.service
+journalctl -u apollo-firewall.service -b   # check retry attempts on the most recent boot
 iptables -t nat -L -v -n
 ip route   # confirms which interface is the actual WAN uplink
 ```
 
-> Apollo runs `iptables` (legacy backend) intentionally — a migration to `nftables` was evaluated and declined since Tailscale, Docker, and K3s all manage their own independent `iptables` chains. See `network.md` and `postmortems.md` (2026-07-18).
+> Apollo runs `iptables` (legacy backend) intentionally — a migration to `nftables` was evaluated and declined since Tailscale, Docker, and K3s all manage their own independent `iptables` chains. See `network.md` and `postmortems.md` (2026-07-18, 2026-07-26→31).
+
+> **SSH access note:** Apollo is not a Tailscale subnet router — SSH to Athena over Tailscale must use Athena's own Tailscale IP directly, or ProxyJump through Apollo's Tailscale IP, not Athena's LAN IP.
 
 ---
 
