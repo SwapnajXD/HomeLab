@@ -1,5 +1,7 @@
 # Disaster Recovery Runbook
 
+> **Historical reference:** This page predates the September 12, 2026 V2 rebuild. Hestia is retired, Hermes VM 101 runs K3s, and Athena is observability-only. Use [V2 architecture](../../architecture.md) and the [rebuild history](../../rebuild-history.md) for the current reported state. Old commands, endpoints and health claims retain their original context.
+
 ## Purpose
 
 This document defines the disaster recovery procedures for the Olympus HomeLab environment.

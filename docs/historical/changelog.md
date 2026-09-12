@@ -1,5 +1,14 @@
 # Infrastructure Changelog
 
+## Olympus HomeLab V2 rebuild — 2026-09-12
+
+The operator reports the infrastructure rebuild completed: Hermes VM 101 now runs single-node K3s with working Artemis access over Tailscale; Hestia was retired after backup verification. Athena is observability-only after removing old K3s, Floci and Portainer. Loki has seven-day retention, Docker/journald logs are bounded, and Docker TCP 2375 is closed. All eight telemetry containers and the reported endpoint/target checks passed.
+
+Athena's V2 Proxmox backup passed Zstandard integrity testing. Restore testing, automated backups, Hermes observability integration, Kubernetes workload policy and application deployment remain pending. Athena's major OS migration is deferred for separate planning.
+
+See the [full rebuild history and recorded commands](../../rebuild-history.md). These are operator-supplied results, not a live audit by this documentation update. Earlier entries below preserve their dated context.
+
+
 ## Purpose
 
 This document records the major infrastructure changes, architectural decisions, and operational milestones throughout the evolution of the Olympus HomeLab.

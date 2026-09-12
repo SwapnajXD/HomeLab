@@ -1,5 +1,7 @@
 # Postmortems & Build History
 
+> **Historical reference:** This page predates the September 12, 2026 V2 rebuild. Hestia is retired, Hermes VM 101 runs K3s, and Athena is observability-only. Use [V2 architecture](../../architecture.md) and the [rebuild history](../../rebuild-history.md) for the current reported state. Old commands, endpoints and health claims retain their original context.
+
 ## Purpose
 
 This document is the single, dated record of what was built, what broke, and how it was fixed across the Olympus HomeLab. It consolidates a large number of raw session notes and incident write-ups (Olympus Dashboard build, Athena network outage, K3s lab, media-pipeline incidents, network bring-up, and observability logging) into one deduplicated, chronological reference.
