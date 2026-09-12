@@ -1,5 +1,5 @@
 # Screenshots
 
-> **V2 context:** Retained examples, diagrams or screenshots may describe the earlier deployment. See the [September 12 rebuild record](../rebuild-history.md) for the current reported state: Hestia retired, K3s on Hermes, Athena observability-only, and Floci/Portainer removed from Athena. These assets have not been synchronized with the rebuilt hosts.
+Existing screenshots are preserved in [historical/](historical/). They predate the documented V2 rebuild and include retired Homepage and Portainer services; they are not evidence of the current deployment.
 
-Store setup screenshots, diagrams, and validation images here.
+Add newly captured and dated V2 screenshots here when available. See the [current architecture](../docs/architecture.md) and [diagrams](../diagrams/README.md).
