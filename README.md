@@ -26,19 +26,19 @@ Artemis — Tailscale / SSH / kubectl / Git
 
 Athena runs Prometheus, Grafana, Loki, Alloy, Node Exporter, cAdvisor, Proxmox Exporter and Glances. Hestia is retired; Athena's old K3s, Portainer and Floci deployments were removed. Historical source remains in the repository.
 
-Start with the [complete rebuild history, challenges and validation](rebuild-history.md), [V2 architecture](architecture.md) and [roadmap](HOMELAB_ROADMAP.md).
+Start with the [complete rebuild history, challenges and validation](docs/history/rebuild-history.md), [V2 architecture](docs/architecture.md) and [roadmap](docs/roadmap.md).
 
 ## Documentation
 
-See the [V2 diagram index](architecture/README.md) for architecture, networking, metrics, logging, alerting and recovery diagrams.
+See the [V2 diagram index](diagrams/README.md) for architecture, networking, metrics, logging, alerting and recovery diagrams.
 
-- [Infrastructure](infrastructure.md) and [networking](networking.md)
-- [Kubernetes](kubernetes.md) and [observability](observability.md)
-- [Operations](operations.md) and [backup/recovery](disaster-recovery.md)
-- [Changelog](docs/historical/changelog.md), [project timeline](docs/historical/project-timeline.md) and [historical incidents](docs/historical/postmortems.md)
-- [Retired services](docs/historical/retired-services.md) and [pre-V2 roadmap](docs/historical/roadmap-pre-v2.md)
+- [Infrastructure](docs/infrastructure.md) and [networking](docs/networking.md)
+- [Kubernetes](docs/kubernetes.md) and [observability](docs/observability.md)
+- [Operations](docs/operations.md) and [backup/recovery](docs/disaster-recovery.md)
+- [Changelog](docs/history/changelog.md), [project timeline](docs/history/project-timeline.md) and [historical incidents](docs/history/postmortems.md)
+- [Retired services](docs/history/retired-services.md) and [pre-V2 roadmap](docs/history/v1/roadmap-pre-v2.md)
 
-Older documentation lives in `docs/historical/`; diagrams, screenshots and deployment examples retain their historical context. Use the root-level documentation for the current reported baseline; retained configuration files are not a verified export of the rebuilt hosts.
+Current guides live in `docs/`, with dated records in `docs/history/` and obsolete V1 guides in `docs/history/v1/`. Deployment snapshots in `archive/v1/` are historical; current host configuration exports are still needed before the repository can reproduce the live V2 stack.
 
 ## Validation and recovery
 
@@ -50,6 +50,24 @@ Next work: audit and configure the Kubernetes workload baseline, integrate Herme
 
 ## Repository
 
-The repository root contains the current documentation and V2 rebuild history. `docs/historical/` contains the older documentation. Root `.mmd` files contain current diagrams; `architecture/` provides their index. `docs/historical/diagrams/` and `screenshots/` preserve earlier visual context. `docker-compose/`, `configs/`, `scripts/` and `terraform/` retain implementation examples and prior deployment material.
+See the [reorganization record](docs/history/repository-reorganization.md) for the path map, configuration gaps and verification results.
+
+```text
+HomeLab/
+├── README.md
+├── LICENSE
+├── docs/                  # Current guides and one canonical roadmap
+│   └── history/           # Rebuild and incident records; v1/ for older guides
+├── diagrams/              # Current Mermaid sources
+├── infrastructure/        # Apollo, Athena and Hermes configuration locations
+├── kubernetes/            # Prepared manifest directories; no workloads yet
+├── docker/telemetry/      # Awaiting the current Athena Compose export
+├── terraform/             # Future active provisioning
+├── scripts/               # Health check and telemetry restart helpers
+├── screenshots/historical/
+└── archive/               # V1 deployments, data and superseded documentation
+```
+
+The old Apollo `101.conf` belongs to Hestia, and the old telemetry Compose uses Promtail. Both are archived. The active infrastructure directories document missing exports; no replacement configuration is claimed to have been fetched or deployed. The previous dashboard JSON remains locally preserved and ignored under `archive/v1/data/`.
 
 Licensed under the [MIT License](LICENSE).
