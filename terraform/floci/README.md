@@ -1,5 +1,7 @@
 # Infrastructure-as-Code (IaC) Local AWS Simulation Manifests
 
+> **V2 context:** Retained examples, diagrams or screenshots may describe the earlier deployment. See the [September 12 rebuild record](../../rebuild-history.md) for the current reported state: Hestia retired, K3s on Hermes, Athena observability-only, and Floci/Portainer removed from Athena. These assets have not been synchronized with the rebuilt hosts.
+
 This directory contains declarative Terraform configurations used to provision, validate, and experiment with AWS-style cloud architectures locally without incurring public cloud costs.
 
 > **Note:** These Terraform manifests originated as a LocalStack implementation and are retained in this directory for historical reference. The same configurations are now actively used against the Floci AWS emulator running within the HomeLab environment.

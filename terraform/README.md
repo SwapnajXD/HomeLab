@@ -1,5 +1,7 @@
 # Terraform
 
+> **V2 status correction:** Floci and LocalStack material below is historical. Floci was removed from Athena; no Hermes emulator deployment is reported. See the [rebuild record](../rebuild-history.md) and [V2 infrastructure](../infrastructure.md). Terraform-based homelab provisioning remains planned.
+
 ## Purpose
 
 This directory contains Infrastructure as Code (IaC) configurations used to provision and manage HomeLab resources.
