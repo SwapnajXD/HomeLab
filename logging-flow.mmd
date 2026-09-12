@@ -1,0 +1,15 @@
+%% Olympus V2 — operator-reported baseline 2026-09-12; no new live audit.
+flowchart LR
+    Docker["Athena — eight Docker containers<br/>JSON logs: 10m max-size / 3 files"]
+    Socket["Docker socket<br/>Read-only mount"]
+    Alloy["Grafana Alloy<br/>Labels: container / image / host"]
+    Loki["Loki 3.0.0<br/>Seven-day retention / persistent volume"]
+    Grafana["Grafana Explore"]
+    Docker --> Socket --> Alloy
+    Alloy -->|Push logs| Loki
+    Loki -->|Query results| Grafana
+    Evidence["Verification: fresh Grafana logs returned<br/>Complete container coverage not established"]
+    Grafana --- Evidence
+    Hermes["Hermes host and workload logs<br/>Collection and integration pending"] -.-> Loki
+    classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;
+    class Hermes pending;

@@ -1,0 +1,32 @@
+%% Olympus V2 — operator-reported baseline 2026-09-12; no new live audit.
+flowchart TB
+    Artemis["Artemis — management workstation<br/>SSH / kubectl / Git"]
+    Tailnet["Tailscale — private management"]
+    Artemis --> Tailnet
+    Internet["Internet"] --- Router["Router — 192.168.1.1"]
+    Router --- WAN["Apollo Wi-Fi — 192.168.1.20/24"]
+
+    subgraph Apollo["Apollo — Proxmox VE 9.2.2 / 16 GiB RAM"]
+        Host["Infrastructure / routing / firewall"]
+        Bridge["vmbr0 — 10.10.10.1/24<br/>Private VM bridge; no physical port"]
+        Backups["SATA backup storage<br/>/mnt/pve/Storage"]
+        subgraph Athena["Athena — VM 100 / Ubuntu 20.04.6<br/>4 vCPU / 4 GiB RAM / 32 GiB disk"]
+            Telemetry["Prometheus / Grafana / Loki / Alloy"]
+            Exporters["Node Exporter / cAdvisor<br/>Proxmox Exporter / Glances"]
+        end
+        subgraph Hermes["Hermes — VM 101 / Ubuntu 24.04.5<br/>4 vCPU / 4 GiB RAM / 32 GiB disk"]
+            K3s["Single-node K3s v1.36.4+k3s1<br/>Ready — 10.10.10.11"]
+            System["CoreDNS / Traefik / Local Path Provisioner<br/>Metrics Server / ServiceLB"]
+            K3s --- System
+        end
+        Host --- Bridge
+        Host --- Backups
+        Bridge --- Telemetry
+        Bridge --- K3s
+    end
+    WAN --- Host
+    Tailnet -->|100.81.86.51| Host
+    Tailnet -->|100.117.35.70| Telemetry
+    Tailnet -->|100.91.200.31:6443 — TLS SAN configured| K3s
+    K3s -.->|Metrics and logs — pending| Telemetry
+    classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;

@@ -1,0 +1,17 @@
+%% Olympus V2 — operator-reported baseline 2026-09-12; no new live audit.
+flowchart TB
+    Start["Recovery planning<br/>Full V2 restore test pending"] --> Apollo["Recover Apollo host and storage"]
+    Apollo --> Network["Verify vmbr0 and WAN default route<br/>Firewall service / forwarding / NAT"]
+    Network --> Athena["Recover Athena VM 100"]
+    Network --> Hermes["Recover Hermes VM 101"]
+    Archive["Athena V2 archive — September 12<br/>Zstandard integrity passed<br/>Restore and boot not yet tested"] -.->|Baseline recovery archive| Athena
+    HBackup["Hermes backup baseline<br/>Pending"] -.-> Hermes
+    Athena --> Telemetry["Verify eight telemetry containers<br/>Prometheus / Grafana / Loki health"]
+    Hermes --> K3s["Verify K3s node Ready<br/>System pods and required workload data"]
+    Network --> Access["Verify Tailscale and Artemis access<br/>SSH / API routing / TLS"]
+    Telemetry --> Validate["Validate restored data and services<br/>Record recovery results"]
+    K3s --> Validate
+    Access --> Validate
+    Validate --> Pending["Pending: restore drill, backup automation<br/>Rotation and off-box copies"]
+    classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;
+    class Start,HBackup,Pending pending;

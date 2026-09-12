@@ -1,0 +1,12 @@
+%% Olympus V2 — operator-reported baseline 2026-09-12; no new live audit.
+flowchart TB
+    Internet["Internet"] --- Router["Router / gateway<br/>192.168.1.1"]
+    Router --- WAN["Apollo Wi-Fi — wlx002e2df0393b<br/>192.168.1.20/24"]
+    WAN --- NAT["Apollo IPv4 forwarding / MASQUERADE<br/>Default-route WAN detection at script execution"]
+    NAT --- Bridge["vmbr0 — 10.10.10.1/24<br/>bridge-ports none"]
+    Bridge --- Athena["Athena VM 100<br/>Exact LAN IP unconfirmed"]
+    Bridge --- Hermes["Hermes VM 101 — enp6s18<br/>10.10.10.11/24 / gateway 10.10.10.1"]
+    Artemis["Artemis — 100.100.252.87"] --> Tailnet["Tailscale management"]
+    Tailnet -->|100.81.86.51| NAT
+    Tailnet -->|100.117.35.70| Athena
+    Tailnet -->|100.91.200.31:6443 — matching TLS SAN| Hermes

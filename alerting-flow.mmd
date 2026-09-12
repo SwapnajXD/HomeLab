@@ -1,0 +1,18 @@
+%% Olympus V2 — operator-reported baseline 2026-09-12; no new live audit.
+flowchart TB
+    Prom["Prometheus on Athena"]
+    Rules["Mounted alert.rules.yml<br/>One rule validated"]
+    Prom -->|Evaluates locally| Rules
+    subgraph Historical["Historical notification design — V2 delivery test pending"]
+        Grafana["Grafana Alerting"]
+        Contact["Notification policy / Telegram contact point"]
+        Telegram["Telegram notification"]
+        Grafana --> Contact --> Telegram
+    end
+    Prom -.->|Metric queries — revalidate alert configuration| Grafana
+    Loki["Loki on Athena"] -.->|Log queries — revalidate alert configuration| Grafana
+    Hermes["Hermes monitoring and alert rules<br/>Pending integration"] -.-> Prom
+    Test["Pending: test firing, delivery and recovery notifications"]
+    Telegram -.-> Test
+    classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;
+    class Hermes,Test,Grafana,Contact,Telegram pending;
