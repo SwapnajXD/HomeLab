@@ -560,3 +560,66 @@ Apollo backup storage: `/mnt/pve/Storage/dump/`. V1 material: `/root/olympus-v1-
 ## 59. V2 philosophy
 
 Keep infrastructure simple, separate responsibilities, back up before destructive operations, validate major changes, prefer reproducible configuration, secure management access and add complexity when it provides learning value. Apollo owns infrastructure; Athena owns observability; Hermes owns Kubernetes/applications; Artemis owns management.
+
+---
+
+**Recorded continuation baseline: 2026-09-14.** The sections below record a further operator-supplied update following section 59. As above, these are reported observations, not a live audit performed by this documentation update.
+
+## 60. Resource reallocation
+
+Following stability confirmation, resource allocation was reviewed against actual workload demand rather than initial defaults.
+
+| VM | Before | After |
+|---|---|---|
+| Athena | 4 vCPU / 4 GiB RAM | 2 vCPU / 2 GiB RAM |
+| Hermes | 4 vCPU / 4 GiB RAM | 4 vCPU / 6 GiB RAM |
+
+Rationale: Athena's observability stack (Prometheus, Grafana, Loki, Alloy, exporters) runs comfortably within 2 GiB given a 7-day Loki retention window and a small number of monitored targets; Hermes was given the freed RAM headroom since Kubernetes workloads are expected to grow. Post-resize verification: Athena reported ~1.9 GiB usable / ~1.0 GiB available memory with all observability containers still running; Hermes reported ~5.8 GiB usable / ~4.8 GiB available with the K3s node still `Ready` and all system pods running. Apollo's own allocation (16 GiB RAM, 16 threads) was unchanged.
+
+## 61. K3s baseline confirmed
+
+Current K3s workloads on Hermes: `coredns`, `local-path-provisioner`, `metrics-server`, `traefik`, `svclb-traefik`. Traefik is the default K3s-installed Ingress controller and is being kept permanently as part of the platform (this K3s installation used the default installer without `--disable traefik`, unlike the retired Athena K3s installation, which never had Traefik running). Default `local-path` StorageClass confirmed (provisioner `rancher.io/local-path`, reclaim policy `Delete`, binding mode `WaitForFirstConsumer`); no application PVs/PVCs deployed yet.
+
+## 62. Kubernetes fundamentals exercise (temporary, cleaned up)
+
+A throwaway exercise was run in a `lab` namespace to confirm the cluster behaves correctly before real workloads are deployed to it — not a permanent addition:
+
+- Nginx Deployment created; a Pod was manually deleted and Kubernetes recreated it automatically (reconciliation loop confirmed).
+- ClusterIP Service created; internal connectivity verified with a temporary curl Pod; EndpointSlice inspected to confirm correct Pod targeting.
+- Deployment scaled from 1 → 3 replicas.
+- A Traefik Ingress (`nginx-ingress`, host `nginx.local`) was created and tested with `curl -H "Host: nginx.local" http://10.10.10.11`, confirming the path Client → Traefik → Ingress → Service → Pod.
+- Everything (Deployment, Service, Ingress, and the `lab` namespace itself) was deleted afterward. Final namespace list: `default`, `kube-node-lease`, `kube-public`, `kube-system` — no application workloads currently run in K3s on Hermes.
+
+## 63. Hermes → Athena observability integration (complete)
+
+This completes the host/Docker metrics and Docker log paths within the "Hermes-to-Athena metrics/logs" item listed as pending in section 58. Kubernetes metrics, K3s/containerd workload logs and host journal collection remain unverified.
+
+**Host metrics:** Node Exporter installed directly on Hermes as a systemd service (`node_exporter 1.10.2`, endpoint `100.91.200.31:9100`). Athena's Prometheus scrapes it under job `hermes`; target confirmed `UP`.
+
+**Container metrics:** cAdvisor deployed as a Docker container on Hermes — a separate instance from Athena's own cAdvisor (still `v0.49.1`, monitoring Athena's own containers). Hermes's cAdvisor initially shipped at `v0.49.1` but failed to expose Floci's container metrics (`failed to identify the read-write layer ID`, related to Docker's `overlayfs` storage driver). Upgraded to `ghcr.io/google/cadvisor:0.60.5` with the same host mounts retained (`/`, `/var/run`, `/sys`, `/var/lib/docker`, `/dev/disk`); after the upgrade, `floci-floci-1` container metrics (e.g. `container_memory_usage_bytes`) were confirmed exposed and scraped correctly by Athena's Prometheus under job `hermes-cadvisor` (target `100.91.200.31:8080`, confirmed `UP`).
+
+**Logs:** Grafana Alloy installed directly on Hermes as a systemd service, reading `unix:///var/run/docker.sock` and pushing to `http://100.117.35.70:3100/loki/api/v1/push` (Athena's Loki), labeled `host="hermes"`. The Alloy service account (`alloy`) needed to be added to the `docker` group (`usermod -aG docker alloy`) to read the socket — Docker socket permissions were not weakened and the Docker TCP API was not re-enabled to achieve this. Verified via a Loki query for `{host="hermes"}` after restarting Floci to generate fresh events: 50 log entries returned with correct `container`, `host`, and `service_name` labels.
+
+**Full verified pipeline:** `Floci → Docker → cAdvisor 0.60.5 → Tailscale → Athena Prometheus` (metrics) and `Floci → Docker → Grafana Alloy → Tailscale → Athena Loki` (logs). Athena is now the confirmed centralized observability layer for both itself and Hermes.
+
+## 64. Floci deployed on Hermes (on-demand, Docker Compose — not K3s)
+
+Floci is intentionally run via Docker Compose on Hermes rather than as a K3s workload, since it's an on-demand AWS emulator, not a permanent service. Compose file: `/home/ops/apps/floci/compose.yml`; persistent data: `/home/ops/apps/floci/data`; image `floci/floci:latest`; listens on `4566`. Verified locally on Hermes (`HTTP/1.1 200 OK`) and remotely from Artemis over Tailscale (`http://100.91.200.31:4566`). No Floci UI deployed at this stage. This supersedes the "not reported" status in section 22/58 above — Floci is now reported running on Hermes, on-demand, alongside K3s's permanent workloads.
+
+## 65. Updated known-good state (supersedes section 56 for Athena/Hermes specs)
+
+| Node | Recorded baseline |
+|---|---|
+| Apollo | Unchanged — Proxmox 9.2.2; `10.10.10.1`; Tailscale `100.81.86.51`; NAT, firewall service and storage working |
+| Athena | VM 100; Ubuntu 20.04.6; **2 vCPU / 2 GiB RAM** / 32 GiB disk; eight telemetry containers running; now also scraping Hermes host/Docker metrics and receiving Docker logs |
+| Hermes | VM 101; Ubuntu 24.04.5; **4 vCPU / 6 GiB RAM** / 32 GiB disk; `10.10.10.11`; Tailscale `100.91.200.31`; single-node K3s `v1.36.4+k3s1` (containerd `2.3.4-k3s1.36`), Ready; Traefik, CoreDNS, metrics-server, local-path-provisioner running; Floci running on-demand via Docker Compose; Node Exporter and Grafana Alloy running as host-level systemd services; cAdvisor `0.60.5` running as a Docker container |
+| Artemis | Unchanged |
+| Hestia | Unchanged — retired |
+
+## 66. Pending work (supersedes section 58)
+
+**Hermes:** Kubernetes metrics, K3s/containerd workload logs and host journal collection; detailed K3s baseline audit (namespaces, RBAC, secrets, resource limits beyond what's noted above), persistent storage tests with a real PVC, application ingress beyond the cleaned-up exercise, a real application deployment (D2Bus is the stated future candidate), rollout/rollback tests, failure-testing exercises.
+
+**Athena:** Ubuntu 20.04 → 24.04 migration planning (still deliberately deferred), exporter/dashboard improvements, alerting improvements.
+
+**Olympus:** automated backups, rotation, restore tests, infrastructure-as-code, Terraform, Ansible, CI/CD, GitOps, secrets management (SOPS+age), and D2Bus deployment. Hermes-to-Athena metrics/logs integration (previously pending) is now complete as of section 63.

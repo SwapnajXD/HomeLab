@@ -1,4 +1,4 @@
-%% Olympus V2 — operator-reported baseline 2026-09-12; no new live audit.
+%% Olympus V2 — operator-reported baseline 2026-09-12 with 2026-09-14 continuation; no new live audit.
 flowchart TB
     Prom["Prometheus on Athena"]
     Rules["Mounted alert.rules.yml<br/>One rule validated"]
@@ -11,8 +11,8 @@ flowchart TB
     end
     Prom -.->|Metric queries — revalidate alert configuration| Grafana
     Loki["Loki on Athena"] -.->|Log queries — revalidate alert configuration| Grafana
-    Hermes["Hermes monitoring and alert rules<br/>Pending integration"] -.-> Prom
+    Hermes["Hermes host/container metrics feed Prom<br/>Kubernetes-level alert rules still pending"] --> Prom
     Test["Pending: test firing, delivery and recovery notifications"]
     Telegram -.-> Test
     classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;
-    class Hermes,Test,Grafana,Contact,Telegram pending;
+    class Test,Grafana,Contact,Telegram pending;

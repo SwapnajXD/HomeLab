@@ -2,7 +2,7 @@
 
 Olympus is a Cloud/DevOps learning and portfolio platform. Prioritize **infrastructure → automation → deployment → observability → reliability → recovery → cloud**, rather than the number of tools installed.
 
-Status reflects the operator-supplied [September 12, 2026 rebuild record](history/rebuild-history.md), not a new live audit. Checked items are reported achievements; unchecked items remain planned. Earlier milestones retain their historical context.
+Status reflects the operator-supplied [September 12, 2026 rebuild record](history/rebuild-history.md) plus a [September 14, 2026 continuation](history/rebuild-history.md#60-resource-reallocation) (resource resize, Hermes↔Athena observability integration, Floci deployment), not a new live audit. Checked items are reported achievements; unchecked items remain planned. Earlier milestones retain their historical context.
 
 ## Phase 1 — Foundation: Completed
 
@@ -33,10 +33,11 @@ These achievements do not imply automated backups, complete restore coverage, or
 - [x] Retire Hestia after backup verification; keep Athena observability-only.
 - [ ] Audit K3s baseline; define namespaces, RBAC, secrets and resource limits.
 - [ ] Configure application ingress and test persistent storage.
-- [ ] Monitor Hermes from Athena and centralize host/workload logs in Loki.
+- [x] Monitor Hermes host/Docker metrics from Athena and centralize Docker logs in Loki (host metrics via Node Exporter, container metrics via a dedicated cAdvisor 0.60.5, logs via Grafana Alloy — all confirmed 2026-09-14).
+- [ ] Integrate and validate Kubernetes metrics, K3s/containerd workload logs and host journal collection.
 - [ ] Validate alerts, rollout/rollback and recovery.
 
-Single-node operation is intentional. Floci is not reported deployed on Hermes. See [Kubernetes baseline](kubernetes.md).
+Single-node operation is intentional. Floci is now reported deployed on Hermes via Docker Compose, on-demand rather than continuously running. See [Kubernetes baseline](kubernetes.md).
 
 ## Phase 5 — Workload Platform: Planned
 
@@ -67,7 +68,7 @@ No CI/CD implementation is claimed. With later GitOps, the pipeline can update d
 - [ ] Introduce Ansible where repeatability provides value: VM configuration, packages, baseline setup, and repeatable server provisioning.
 - [ ] Demonstrate repeatable execution and document what remains manual.
 
-Terraform/Floci examples remain as historical learning material; a current emulator deployment is not reported. Proxmox IaC and broader VM reproducibility are incremental future work; the whole homelab is not claimed to be Terraform-provisioned.
+Terraform/Floci examples remain as historical learning material; Floci is reported deployed on Hermes via on-demand Docker Compose as of September 14. Proxmox IaC and broader VM reproducibility are incremental future work; the whole homelab is not claimed to be Terraform-provisioned.
 
 ## Phase 10 — Secrets: Planned
 

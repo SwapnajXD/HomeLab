@@ -1,6 +1,6 @@
 # Terraform
 
-Terraform-based V2 infrastructure provisioning remains planned. There is no current emulator deployment established by the V2 report.
+Terraform-based V2 infrastructure provisioning remains planned. The September 14 continuation reports Floci deployed on Hermes via on-demand Docker Compose; current Terraform provisioning has not been established.
 
 The earlier [Floci](../archive/v1/terraform/floci/) and [LocalStack](../archive/v1/terraform/localstack/) examples are preserved once under `archive/v1/terraform/`. No duplicate `terraform/archive/` tree is maintained.
 

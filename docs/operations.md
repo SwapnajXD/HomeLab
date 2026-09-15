@@ -1,6 +1,6 @@
 # V2 operations
 
-The [September 12 rebuild history](history/rebuild-history.md) is the dated implementation and troubleshooting record. Its health results were supplied by the operator; this documentation update did not run live checks.
+The [September 12 rebuild history and September 14 continuation](history/rebuild-history.md) is the dated implementation and troubleshooting record. Its health results were supplied by the operator; this documentation update did not run live checks.
 
 ## Command ownership
 
@@ -8,7 +8,7 @@ The [September 12 rebuild history](history/rebuild-history.md) is the dated impl
 |---|---|
 | Apollo | `qm`, `pct`, `vzdump`; storage, routing/NAT and firewall |
 | Athena | Docker Compose telemetry, log retention, guest packages |
-| Hermes | K3s, guest networking, Kubernetes workloads |
+| Hermes | K3s, guest networking, Kubernetes workloads, on-demand Floci Compose and host/Docker telemetry |
 | Artemis | SSH, Git, kubeconfig and remote kubectl |
 
 Hestia is retired. VM 101 now means Hermes, so historical CT 101 procedures must not be replayed.
@@ -16,7 +16,7 @@ Hestia is retired. VM 101 now means Hermes, so historical CT 101 procedures must
 ## Reported validation
 
 - Apollo: Internet and VM connectivity, forwarding/NAT, active firewall service and working storage.
-- Athena: eight running containers, zero failed systemd units, Prometheus ready, Grafana database `ok`, Loki ready, five up scrape targets and TCP 2375 not listening.
+- Athena: eight running containers, zero failed systemd units, Prometheus ready, Grafana database `ok`, Loki ready, five up scrape targets on September 12, plus two Hermes targets confirmed up on September 14 and TCP 2375 not listening.
 - Hermes: Ready K3s node, healthy system components and working Artemis API access with certificate validation.
 - Athena backup: successful `vzdump` and Zstandard integrity check; restore testing pending.
 
@@ -28,6 +28,6 @@ Validate configuration before restart, inspect active Prometheus targets rather 
 
 ## Outstanding verification
 
-Athena's exact LAN IP is unconfirmed in the new report. Hermes baseline policy, storage tests, observability integration, application recovery, automated backup coverage, restore testing and fresh alert-delivery validation remain outstanding. The named Athena archive's ordering relative to the package upgrade should be checked before relying on its exact package contents.
+Athena's exact LAN IP is unconfirmed in the new report. Hermes baseline policy, storage tests, Kubernetes metrics and host/K3s log collection, application recovery, automated backup coverage, restore testing and fresh alert-delivery validation remain outstanding. The named Athena archive's ordering relative to the package upgrade should be checked before relying on its exact package contents.
 
 Earlier [runbooks](history/v1/runbook.md), [health checks](history/v1/health-checks.md), [troubleshooting](history/v1/troubleshooting.md), [validation reports](history/v1/validation-report.md) and [postmortems](history/postmortems.md) preserve history; use the V2 inventory and endpoints when planning future operations.

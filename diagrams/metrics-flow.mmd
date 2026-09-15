@@ -1,17 +1,16 @@
-%% Olympus V2 — operator-reported baseline 2026-09-12; no new live audit.
+%% Olympus V2 — operator-reported baseline 2026-09-12 with 2026-09-14 continuation; no new live audit.
 flowchart LR
     %% Arrows show metric data flow, not connection initiation.
     Apollo["Apollo — Proxmox API<br/>100.81.86.51"] --> PVE["Proxmox Exporter on Athena<br/>Exporter port 9221"]
     Athena["Athena Linux host"] --> Node["Node Exporter<br/>node-exporter:9100"]
     Docker["Athena Docker containers"] --> Cadvisor["cAdvisor<br/>cadvisor:8080"]
     Probes["External probes<br/>probes-794f.onrender.com"]
-    Prom["Prometheus on Athena<br/>Five active targets reported up"]
+    Prom["Prometheus on Athena<br/>Seven targets reported up across the two dated checks"]
     PVE -->|Scraped metrics| Prom
     Node -->|Scraped metrics| Prom
     Cadvisor -->|Scraped metrics| Prom
     Probes -->|Scraped metrics| Prom
     Prom -->|Self-scrape — localhost:9090| Prom
     Prom -->|Query results| Grafana["Grafana on Athena"]
-    Hermes["Hermes host and Kubernetes metrics<br/>Integration pending"] -.-> Prom
-    classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;
-    class Hermes pending;
+    HermesNode["Node Exporter on Hermes<br/>100.91.200.31:9100"] -->|Scraped metrics| Prom
+    HermesCadvisor["cAdvisor 0.60.5 on Hermes<br/>100.91.200.31:8080 — includes Floci"] -->|Scraped metrics| Prom

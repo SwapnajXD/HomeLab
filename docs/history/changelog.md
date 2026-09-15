@@ -6,6 +6,8 @@ The operator reports the infrastructure rebuild completed: Hermes VM 101 now run
 
 Athena's V2 Proxmox backup passed Zstandard integrity testing. Restore testing, automated backups, Hermes observability integration, Kubernetes workload policy and application deployment remain pending. Athena's major OS migration is deferred for separate planning.
 
+**Continuation, 2026-09-14:** resources were resized based on observed workload demand (Athena reduced to 2 vCPU/2 GiB; Hermes increased to 4 vCPU/6 GiB). Hermes↔Athena observability integration — previously listed as pending above — is now reported complete: Node Exporter and a dedicated cAdvisor (upgraded from `v0.49.1` to `0.60.5` to fix a Floci/`overlayfs` metrics bug) feed Athena's Prometheus; Grafana Alloy on Hermes feeds Athena's Loki. A throwaway Kubernetes fundamentals exercise (Deployment/Service/Ingress via Traefik, scaling, reconciliation-loop test) validated the cluster and was fully cleaned up afterward — no application workloads run in K3s on Hermes yet. Floci is now reported running on Hermes via Docker Compose, on-demand. Restore testing, automated backups, and D2Bus deployment remain pending.
+
 See the [full rebuild history and recorded commands](rebuild-history.md). These are operator-supplied results, not a live audit by this documentation update. Earlier entries below preserve their dated context.
 
 

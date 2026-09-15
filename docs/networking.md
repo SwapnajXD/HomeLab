@@ -1,6 +1,6 @@
 # V2 networking
 
-Baseline from the [September 12 rebuild report](history/rebuild-history.md).
+Baseline from the [September 12 rebuild report and September 14 continuation](history/rebuild-history.md).
 
 ```mermaid
 flowchart TB
@@ -30,6 +30,8 @@ Athena's new report specifies `10.10.10.x`; earlier `10.10.10.10` is not reconfi
 | Artemis | `100.100.252.87` |
 
 Artemis reaches the K3s API directly at `https://100.91.200.31:6443`. Hermes's `/etc/rancher/k3s/config.yaml` includes that IP in `tls-san`; K3s was restarted and remote `kubectl get nodes` succeeded. This resolves the earlier documented uncertainty over the management API path.
+
+Floci, running on Hermes via Docker Compose (on-demand), is also reported reachable from Artemis over the same Tailscale path at `http://100.91.200.31:4566` — confirmed alongside local testing directly on Hermes.
 
 Hermes interface `enp6s18` uses `/etc/netplan/01-hermes.yaml`: static `10.10.10.11/24`, default gateway `10.10.10.1`, DNS `1.1.1.1` and `8.8.8.8`. Full YAML and the wait-online failed-state investigation are in rebuild sections 12–13.
 

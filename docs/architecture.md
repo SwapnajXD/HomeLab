@@ -1,6 +1,6 @@
 # Olympus HomeLab V2 architecture
 
-**Recorded baseline: 2026-09-12.** The [operator-supplied rebuild history](history/rebuild-history.md) supersedes the earlier migration plan. This is documentation of reported implementation, not a new live audit.
+**Recorded baseline: 2026-09-12, with a 2026-09-14 continuation.** The [operator-supplied rebuild history](history/rebuild-history.md) supersedes the earlier migration plan. This is documentation of reported implementation, not a new live audit.
 
 | System | Responsibility | Current state |
 |---|---|---|
@@ -22,14 +22,17 @@ flowchart TB
         Host["Infrastructure / routing / firewall"]
         Bridge["vmbr0 — 10.10.10.1/24<br/>Private VM bridge; no physical port"]
         Backups["SATA backup storage<br/>/mnt/pve/Storage"]
-        subgraph Athena["Athena — VM 100 / Ubuntu 20.04.6<br/>4 vCPU / 4 GiB RAM / 32 GiB disk"]
+        subgraph Athena["Athena — VM 100 / Ubuntu 20.04.6<br/>2 vCPU / 2 GiB RAM / 32 GiB disk"]
             Telemetry["Prometheus / Grafana / Loki / Alloy"]
             Exporters["Node Exporter / cAdvisor<br/>Proxmox Exporter / Glances"]
         end
-        subgraph Hermes["Hermes — VM 101 / Ubuntu 24.04.5<br/>4 vCPU / 4 GiB RAM / 32 GiB disk"]
+        subgraph Hermes["Hermes — VM 101 / Ubuntu 24.04.5<br/>4 vCPU / 6 GiB RAM / 32 GiB disk"]
             K3s["Single-node K3s v1.36.4+k3s1<br/>Ready — 10.10.10.11"]
             System["CoreDNS / Traefik / Local Path Provisioner<br/>Metrics Server / ServiceLB"]
             K3s --- System
+            Floci["Floci — on-demand Docker Compose"]
+            HermesTelemetry["Node Exporter / cAdvisor / Alloy"]
+            Floci --> HermesTelemetry
         end
         Host --- Bridge
         Host --- Backups
@@ -40,11 +43,12 @@ flowchart TB
     Tailnet -->|100.81.86.51| Host
     Tailnet -->|100.117.35.70| Telemetry
     Tailnet -->|100.91.200.31:6443 — TLS SAN configured| K3s
-    K3s -.->|Metrics and logs — pending| Telemetry
+    HermesTelemetry -->|Host/Docker metrics and Docker logs| Telemetry
+    K3s -.->|Kubernetes metrics and logs — pending| Telemetry
     classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;
 ```
 
-Athena no longer hosts K3s, Floci or Portainer. Hermes monitoring integration is pending. The VM boundary allows Kubernetes experiments without placing them in the telemetry VM; all guests still depend on Apollo's storage, networking and power. This is a single-host learning platform with no HA claim.
+Athena no longer hosts K3s, Floci or Portainer. **Hermes host/Docker monitoring integration is reported complete** (Node Exporter and a dedicated cAdvisor `0.60.5` on Hermes feed Athena's Prometheus; Grafana Alloy on Hermes feeds Athena's Loki — see [rebuild history §63](history/rebuild-history.md#63-hermes--athena-observability-integration-complete)). Floci now runs on Hermes via Docker Compose, on-demand. The VM boundary allows Kubernetes experiments without placing them in the telemetry VM; all guests still depend on Apollo's storage, networking and power. Resources were resized 2026-09-14 (Athena reduced to 2 vCPU/2 GiB, Hermes increased to 4 vCPU/6 GiB) based on observed workload demand. This is a single-host learning platform with no HA claim.
 
 A Raspberry Pi is an optional future ARM/edge/IoT experiment. Multiple Kubernetes nodes are deliberately deferred.
 

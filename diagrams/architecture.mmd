@@ -1,4 +1,4 @@
-%% Olympus V2 — operator-reported baseline 2026-09-12; no new live audit.
+%% Olympus V2 — operator-reported baseline 2026-09-12 with 2026-09-14 continuation; no new live audit.
 flowchart TB
     Artemis["Artemis — management workstation<br/>SSH / kubectl / Git"]
     Tailnet["Tailscale — private management"]
@@ -10,14 +10,17 @@ flowchart TB
         Host["Infrastructure / routing / firewall"]
         Bridge["vmbr0 — 10.10.10.1/24<br/>Private VM bridge; no physical port"]
         Backups["SATA backup storage<br/>/mnt/pve/Storage"]
-        subgraph Athena["Athena — VM 100 / Ubuntu 20.04.6<br/>4 vCPU / 4 GiB RAM / 32 GiB disk"]
+        subgraph Athena["Athena — VM 100 / Ubuntu 20.04.6<br/>2 vCPU / 2 GiB RAM / 32 GiB disk"]
             Telemetry["Prometheus / Grafana / Loki / Alloy"]
             Exporters["Node Exporter / cAdvisor<br/>Proxmox Exporter / Glances"]
         end
-        subgraph Hermes["Hermes — VM 101 / Ubuntu 24.04.5<br/>4 vCPU / 4 GiB RAM / 32 GiB disk"]
+        subgraph Hermes["Hermes — VM 101 / Ubuntu 24.04.5<br/>4 vCPU / 6 GiB RAM / 32 GiB disk"]
             K3s["Single-node K3s v1.36.4+k3s1<br/>Ready — 10.10.10.11"]
             System["CoreDNS / Traefik / Local Path Provisioner<br/>Metrics Server / ServiceLB"]
             K3s --- System
+            Floci["Floci — on-demand Docker Compose"]
+            HermesTelemetry["Node Exporter / cAdvisor / Alloy"]
+            Floci --> HermesTelemetry
         end
         Host --- Bridge
         Host --- Backups
@@ -28,5 +31,6 @@ flowchart TB
     Tailnet -->|100.81.86.51| Host
     Tailnet -->|100.117.35.70| Telemetry
     Tailnet -->|100.91.200.31:6443 — TLS SAN configured| K3s
-    K3s -.->|Metrics and logs — pending| Telemetry
+    HermesTelemetry -->|Host/Docker metrics and Docker logs| Telemetry
+    K3s -.->|Kubernetes metrics and logs — pending| Telemetry
     classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;

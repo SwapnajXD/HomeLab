@@ -12,4 +12,4 @@ This directory is prepared for future Hermes workloads. No manifests have been d
 | `storage/` | Storage and PVC definitions |
 | `observability/` | Hermes monitoring and logging resources |
 
-See the [Kubernetes baseline](../docs/kubernetes.md) and [roadmap](../docs/roadmap.md) before adding applications. RBAC, secrets, resource policy, storage validation and observability integration remain pending.
+See the [Kubernetes baseline](../docs/kubernetes.md) and [roadmap](../docs/roadmap.md) before adding applications. RBAC, secrets, resource policy, storage validation and Kubernetes-specific observability integration remain pending. Host/Docker metrics and Floci Docker logs are reported integrated with Athena as of September 14.

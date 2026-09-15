@@ -1,13 +1,13 @@
 # Olympus V2 diagrams
 
-Current Mermaid sources live in `diagrams/`; current documentation lives in `docs/`. They reflect the operator-reported September 12, 2026 baseline; no new live audit or restore drill was performed.
+Current Mermaid sources live in `diagrams/`; current documentation lives in `docs/`. They reflect the operator-reported September 12, 2026 baseline with the September 14 continuation; no new live audit or restore drill was performed.
 
 | Diagram | Scope |
 |---|---|
 | [Architecture](architecture.mmd) | Apollo, Athena telemetry, Hermes K3s and Artemis management |
 | [Networking](networking.mmd) | Wi-Fi WAN, private bridge, NAT and Tailscale API access |
-| [Metrics](metrics-flow.mmd) | Five active scrape targets and pending Hermes integration |
-| [Logging](logging-flow.mmd) | Athena Alloy/Loki pipeline and retention |
+| [Metrics](metrics-flow.mmd) | Seven reported scrape targets, including Hermes host/Docker metrics |
+| [Logging](logging-flow.mmd) | Athena Alloy/Loki pipeline, retention and Hermes Docker log integration |
 | [Alerting](alerting-flow.mmd) | Validated Prometheus rule and notification tests still pending |
 | [Recovery](recovery-flow.mmd) | Planned recovery sequence and archive verification limits |
 
