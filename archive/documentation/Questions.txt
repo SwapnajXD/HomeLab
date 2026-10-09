@@ -1,3 +1,7 @@
+# Historical HomeLab interview questions
+
+These V1 interview prompts are preserved for reference. Hestia, Portainer and Homepage references describe retired deployments; use the current README and guides for the VM 102 baseline.
+
 ## 🟢 Easy Questions
 
 1. Tell me about your homelab.

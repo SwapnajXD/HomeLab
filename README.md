@@ -50,6 +50,8 @@ Current focus: deploy a real application on Hermes K3s. The [Olympus infrastruct
 
 ## Repository
 
+See [contribution and validation instructions](CONTRIBUTING.md) for local checks and CI, and [configuration export requirements](docs/configuration-exports.md) for the remaining reproducibility work.
+
 See the [reorganization record](docs/history/repository-reorganization.md) for the path map, configuration gaps and verification results.
 
 ```text

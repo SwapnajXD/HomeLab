@@ -1,5 +1,9 @@
 # Infrastructure Changelog
 
+## Repository validation and cleanup — 2026-10-09
+
+Added CI for current local documentation links, mirrored diagrams, shell checks, YAML/Compose validation and simulated health-check tests. Health checks now aggregate failures with bounded noninteractive execution. Cleaned the MIT license template using the repository author identity, removed the unused root environment template, corrected the seven-target reference and restored V1 interview prompts to the historical archive. Live configuration imports remain pending because Apollo and Athena SSH connections timed out; see [export requirements](../configuration-exports.md).
+
 ## Post-migration documentation synchronization — 2026-10-09
 
 Incorporated the operator's [post-migration account](athena-migration-report.md) and [September Apollo incident](apollo-power-loss-2026-09.md). Event dates beyond the incident month were not supplied; October 9 is the documentation date.
