@@ -1,11 +1,11 @@
 # Olympus HomeLab V2 architecture
 
-**Recorded baseline: 2026-09-12, with a 2026-09-14 continuation.** The [operator-supplied rebuild history](history/rebuild-history.md) supersedes the earlier migration plan. This is documentation of reported implementation, not a new live audit.
+**Updated 2026-10-09 from the [operator-supplied post-migration report](history/athena-migration-report.md).** Athena VM 102 supersedes VM 100. This records reported implementation, not a new live audit.
 
 | System | Responsibility | Current state |
 |---|---|---|
 | Apollo | Virtualization, storage, routing/NAT, firewall, VM backups | Physical Proxmox VE host |
-| Athena | Observability | VM 100; eight Docker telemetry containers |
+| Athena | Observability | VM 102; eight Docker telemetry containers |
 | Hermes | Kubernetes and applications | VM 101; single-node K3s, Ready |
 | Artemis | Management | Tailscale, SSH, kubectl, Git |
 | Hestia | Historical personal services | Retired after backup integrity verification |
@@ -18,11 +18,11 @@ flowchart TB
     Internet["Internet"] --- Router["Router — 192.168.1.1"]
     Router --- WAN["Apollo Wi-Fi — 192.168.1.20/24"]
 
-    subgraph Apollo["Apollo — Proxmox VE 9.2.2 / 16 GiB RAM"]
+    subgraph Apollo["Apollo — Proxmox VE / 16 GiB RAM"]
         Host["Infrastructure / routing / firewall"]
         Bridge["vmbr0 — 10.10.10.1/24<br/>Private VM bridge; no physical port"]
         Backups["SATA backup storage<br/>/mnt/pve/Storage"]
-        subgraph Athena["Athena — VM 100 / Ubuntu 20.04.6<br/>2 vCPU / 2 GiB RAM / 32 GiB disk"]
+        subgraph Athena["Athena — VM 102 / Ubuntu 24.04.5<br/>Resource allocation not supplied"]
             Telemetry["Prometheus / Grafana / Loki / Alloy"]
             Exporters["Node Exporter / cAdvisor<br/>Proxmox Exporter / Glances"]
         end
@@ -41,16 +41,16 @@ flowchart TB
     end
     WAN --- Host
     Tailnet -->|100.81.86.51| Host
-    Tailnet -->|100.117.35.70| Telemetry
+    Tailnet -->|100.93.224.83| Telemetry
     Tailnet -->|100.91.200.31:6443 — TLS SAN configured| K3s
     HermesTelemetry -->|Host/Docker metrics and Docker logs| Telemetry
     K3s -.->|Kubernetes metrics and logs — pending| Telemetry
     classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;
 ```
 
-Athena no longer hosts K3s, Floci or Portainer. **Hermes host/Docker monitoring integration is reported complete** (Node Exporter and a dedicated cAdvisor `0.60.5` on Hermes feed Athena's Prometheus; Grafana Alloy on Hermes feeds Athena's Loki — see [rebuild history §63](history/rebuild-history.md#63-hermes--athena-observability-integration-complete)). Floci now runs on Hermes via Docker Compose, on-demand. The VM boundary allows Kubernetes experiments without placing them in the telemetry VM; all guests still depend on Apollo's storage, networking and power. Resources were resized 2026-09-14 (Athena reduced to 2 vCPU/2 GiB, Hermes increased to 4 vCPU/6 GiB) based on observed workload demand. This is a single-host learning platform with no HA claim.
+Athena no longer hosts K3s, Floci or Portainer. **Hermes host/Docker monitoring integration is reported complete** (Node Exporter and a dedicated cAdvisor `0.60.5` on Hermes feed Athena's Prometheus; Grafana Alloy on Hermes feeds Athena's Loki — see [rebuild history §63](history/rebuild-history.md#63-hermes--athena-observability-integration-complete)). Floci now runs on Hermes via Docker Compose, on-demand. The VM boundary allows Kubernetes experiments without placing them in the telemetry VM; all guests still depend on Apollo's storage, networking and power. The September 14 resize applied to old Athena VM 100 and Hermes. Replacement Athena VM 102 resources are not specified in the latest account. This is a single-host learning platform with no HA claim.
 
-A Raspberry Pi is an optional future ARM/edge/IoT experiment. Multiple Kubernetes nodes are deliberately deferred.
+Multiple Kubernetes nodes are deferred until suitable hardware is available; Oracle is a possible future worker. [Olympus](olympus.md) is a proposed lightweight infrastructure dashboard on Hermes K3s, using server-side Proxmox/Prometheus/Loki/Kubernetes APIs while Grafana remains the detailed observability interface.
 
 ## Documentation map
 

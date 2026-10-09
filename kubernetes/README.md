@@ -13,3 +13,5 @@ This directory is prepared for future Hermes workloads. No manifests have been d
 | `observability/` | Hermes monitoring and logging resources |
 
 See the [Kubernetes baseline](../docs/kubernetes.md) and [roadmap](../docs/roadmap.md) before adding applications. RBAC, secrets, resource policy, storage validation and Kubernetes-specific observability integration remain pending. Host/Docker metrics and Floci Docker logs are reported integrated with Athena as of September 14.
+
+The post-migration roadmap proposes [Olympus](../docs/olympus.md) as a first real K3s application, with D2Bus later. Hermes host paths `~/k8s/{apps,infrastructure,namespaces}/` differ from this repository layout; neither the report nor this update supplies deployable application manifests.

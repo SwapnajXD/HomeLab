@@ -1,11 +1,11 @@
-%% Olympus V2 — operator-reported baseline 2026-09-12 with 2026-09-14 continuation; no new live audit.
+%% Operator-reported state synchronized 2026-10-09; no new live audit.
 flowchart LR
     %% Arrows show metric data flow, not connection initiation.
     Apollo["Apollo — Proxmox API<br/>100.81.86.51"] --> PVE["Proxmox Exporter on Athena<br/>Exporter port 9221"]
     Athena["Athena Linux host"] --> Node["Node Exporter<br/>node-exporter:9100"]
     Docker["Athena Docker containers"] --> Cadvisor["cAdvisor<br/>cadvisor:8080"]
     Probes["External probes<br/>probes-794f.onrender.com"]
-    Prom["Prometheus on Athena<br/>Seven targets reported up across the two dated checks"]
+    Prom["Prometheus on Athena<br/>Seven targets reported up after migration"]
     PVE -->|Scraped metrics| Prom
     Node -->|Scraped metrics| Prom
     Cadvisor -->|Scraped metrics| Prom

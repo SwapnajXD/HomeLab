@@ -2,7 +2,7 @@
 
 Olympus is a Cloud/DevOps learning and portfolio platform. Prioritize **infrastructure → automation → deployment → observability → reliability → recovery → cloud**, rather than the number of tools installed.
 
-Status reflects the operator-supplied [September 12, 2026 rebuild record](history/rebuild-history.md) plus a [September 14, 2026 continuation](history/rebuild-history.md#60-resource-reallocation) (resource resize, Hermes↔Athena observability integration, Floci deployment), not a new live audit. Checked items are reported achievements; unchecked items remain planned. Earlier milestones retain their historical context.
+Status includes the [post-migration report](history/athena-migration-report.md), incorporated 2026-10-09, alongside the dated September rebuild record; no new live audit was performed. Checked items are reported achievements; unchecked items remain planned. Earlier milestones retain their historical context.
 
 ## Phase 1 — Foundation: Completed
 
@@ -14,7 +14,7 @@ Status reflects the operator-supplied [September 12, 2026 rebuild record](histor
 
 - [x] Prometheus, Grafana, Loki, and Grafana Alloy.
 - [x] Node Exporter, Proxmox Exporter, and cAdvisor.
-- [x] Grafana alerting and Telegram notifications.
+- [x] Historical Grafana alerting and Telegram notifications; current delivery still requires validation.
 
 ## Phase 3 — Reliability / Operations: Completed baseline
 
@@ -41,7 +41,7 @@ Single-node operation is intentional. Floci is now reported deployed on Hermes v
 
 ## Phase 5 — Workload Platform: Planned
 
-- [ ] Deploy a real application to K3s; D2Bus is a future candidate.
+- [ ] Deploy [Olympus](olympus.md) as a candidate real application to Hermes K3s; D2Bus remains later work.
 - [ ] Demonstrate building, containerizing, deploying, observing, updating, and recovering the application, including any required persistent data.
 
 The outcome is the ability to operate an application on Kubernetes, beyond having a cluster. No production traffic or users are claimed.
@@ -77,12 +77,13 @@ Terraform/Floci examples remain as historical learning material; Floci is report
 
 Do not add Vault solely to expand the tool list. Hestia's retired Vaultwarden service and retained recovery material are separate from this planned infrastructure-secrets workflow.
 
-## Phase 11 — Backup & Recovery: Baseline archived; improvements planned
+## Phase 11 — Backup & Recovery: Migration verified; current backup gap
 
 - [x] Preserve Hestia/V1 recovery material and verify the Hestia compressed backup.
-- [x] Create Athena V2 snapshot-mode backup on Apollo and pass Zstandard integrity testing.
+- [x] Historical VM 100 baseline backup passed Zstandard integrity testing; current availability is unconfirmed. Migration backups were removed.
 - [ ] Define backup rotation and a Hermes backup baseline.
-- [ ] Plan and test Athena's Ubuntu 20.04 → 24.04 migration and rollback.
+- [x] Migrate Athena from VM 100 / Ubuntu 20.04 to VM 102 / Ubuntu 24.04 and verify restored telemetry; delete VM 100 after verification.
+- [ ] Establish a fresh VM 102 recovery point; migration backups and the old VM no longer provide rollback.
 
 - [ ] Automate backups and maintain off-box copies.
 - [ ] Test restores, document recovery procedures, and perform regular recovery drills.
@@ -109,11 +110,11 @@ Historical Floci work demonstrates **Terraform-based cloud infrastructure workfl
 
 | Priority | Ordered work |
 |---|---|
-| Highest | 1. audit K3s and set workload policy; 2. monitor Hermes; 3. centralize Hermes logs; 4. test storage and rollback; 5. deploy a real application |
-| Next | 8. Helm; 9. CI/CD; 10. GitOps; 11. Ansible; 12. secrets management; 13. backup/restore automation; 14. failure testing |
-| Later | 15. multi-node Kubernetes; 16. real cloud; 17. SLOs/error budgets; 18. advanced infrastructure testing; 19. additional automation |
+| Highest | 1. establish current backup inventory/recovery point; 2. audit K3s workload policy; 3. test ingress/storage and rollback; 4. deploy Olympus or another real application |
+| Next | Helm; CI/CD; GitOps; Ansible; secrets management; backup/restore automation; failure testing |
+| Later | Multi-node Kubernetes; real cloud; SLOs/error budgets; advanced infrastructure testing; additional automation |
 
-Multi-node Kubernetes is optional: add another VM/node to practice scheduling, node failure, rescheduling and cluster maintenance after the initial migration. It is not an initial Hermes requirement or an HA claim. Restore testing is still pending despite successful archive integrity checks.
+Multi-node Kubernetes is optional: add another VM/node to practice scheduling, node failure, rescheduling and cluster maintenance after the initial migration. It is not an initial Hermes requirement or an HA claim. Athena migration restore/data validation is reported complete; isolated disaster-recovery drills and ongoing backup coverage remain pending. Oracle is a possible later worker when available.
 
 ## Engineering history and completion evidence
 

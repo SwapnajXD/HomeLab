@@ -1,10 +1,10 @@
 # V2 observability
 
-Athena VM 100 is observability-only. The [September 12 rebuild report](history/rebuild-history.md) records eight running containers: Prometheus, Grafana, Loki, Alloy, Node Exporter, cAdvisor, Proxmox Exporter and Glances.
+Athena VM 102 is observability-only. The [post-migration report](history/athena-migration-report.md), incorporated 2026-10-09, records these eight services: Prometheus, Grafana, Loki, Alloy, Node Exporter, cAdvisor, Proxmox Exporter and Glances.
 
 ## Metrics and logs
 
-The September 14 continuation adds two Hermes targets to the five reported on September 12.
+The post-migration report verifies seven targets up and preservation of Prometheus, Grafana and Loki data. The table below is the last detailed target inventory (September 14); the latest report does not re-export job names or every scrape URL.
 
 | Prometheus job | Reported target / instance | Status |
 |---|---|---|
@@ -16,7 +16,7 @@ The September 14 continuation adds two Hermes targets to the five reported on Se
 | hermes | `100.91.200.31:9100` | up |
 | hermes-cadvisor | `100.91.200.31:8080` | up |
 
-Proxmox Exporter exposes metrics on port 9221 and queries Apollo; Apollo's address is the monitored instance, not necessarily the scrape URL. Hestia is absent from active targets; historical series were retained. **Hermes host/Docker metrics integration is reported complete as of 2026-09-14** — Node Exporter and a dedicated cAdvisor (`0.60.5`, separate from Athena's own `v0.49.1` instance) run directly on Hermes and are scraped by Athena's Prometheus over Tailscale. The Hermes cAdvisor was specifically upgraded from `v0.49.1` to `0.60.5` after the older version failed to expose Floci's container metrics (an `overlayfs` read-write-layer identification bug); the upgrade resolved it and Floci's `container_memory_usage_bytes` and related metrics are now confirmed flowing through.
+Proxmox Exporter exposes metrics on port 9221 and queries Apollo; Apollo's address is the monitored instance, not necessarily the scrape URL. Hestia is absent from active targets; historical series were retained. **Hermes host/Docker metrics integration is reported complete as of 2026-09-14** — Node Exporter and a dedicated cAdvisor (`0.60.5`, separate from Athena's `v0.49.1` instance recorded before migration) run directly on Hermes and are scraped by Athena's Prometheus over Tailscale. The Hermes cAdvisor was specifically upgraded from `v0.49.1` to `0.60.5` after the older version failed to expose Floci's container metrics (an `overlayfs` read-write-layer identification bug); the upgrade resolved it and Floci's `container_memory_usage_bytes` and related metrics are now confirmed flowing through.
 
 ```mermaid
 flowchart LR
@@ -25,7 +25,7 @@ flowchart LR
     Athena["Athena Linux host"] --> Node["Node Exporter<br/>node-exporter:9100"]
     Docker["Athena Docker containers"] --> Cadvisor["cAdvisor<br/>cadvisor:8080"]
     Probes["External probes<br/>probes-794f.onrender.com"]
-    Prom["Prometheus on Athena<br/>Seven targets reported up across the two dated checks"]
+    Prom["Prometheus on Athena<br/>Seven targets reported up after migration"]
     PVE -->|Scraped metrics| Prom
     Node -->|Scraped metrics| Prom
     Cadvisor -->|Scraped metrics| Prom
@@ -51,9 +51,11 @@ flowchart LR
     HermesAlloy["Grafana Alloy on Hermes<br/>host=hermes"] -->|Push logs, incl. Floci| Loki
 ```
 
-Alloy discovers containers using the mounted Docker socket and labels logs with container, image and host. A Loki query for `{host="athena"}` returned fresh Grafana logs. This verifies that sample pipeline, not exhaustive per-container coverage. **Hermes's own Grafana Alloy instance** (installed as a systemd service, not a container, reading `unix:///var/run/docker.sock`) pushes to the same Athena Loki (`http://100.117.35.70:3100/loki/api/v1/push`) labeled `host="hermes"` — its Docker group membership (`usermod -aG docker alloy`) was needed for socket access, without weakening socket permissions or re-enabling Docker's TCP API. A `{host="hermes"}` query after restarting Floci returned 50 fresh log entries with correct `container`/`service_name` labels, confirming the Floci log path end-to-end.
+The September baseline records Alloy discovering containers using the mounted Docker socket and labeling logs with container, image and host. A Loki query for `{host="athena"}` returned fresh Grafana logs. This verifies that sample pipeline, not exhaustive per-container coverage. **Hermes's own Grafana Alloy instance** (installed as a systemd service, not a container, reading `unix:///var/run/docker.sock`) now pushes to replacement Athena Loki (`http://100.93.224.83:3100/loki/api/v1/push`) labeled `host="hermes"` — its Docker group membership (`usermod -aG docker alloy`) was needed for socket access, without weakening socket permissions or re-enabling Docker's TCP API. In the September 14 check, a `{host="hermes"}` query after restarting Floci returned 50 fresh log entries with correct `container`/`service_name` labels, confirming the Floci log path end-to-end.
 
 ## Configuration and retention
+
+The details below are the September 12–14 configuration baseline. The migration preserved telemetry configuration, but no current export confirms every image tag, volume name or retention setting on VM 102.
 
 Recorded Athena host stack directory: `~/homelab/docker-compose/telemetry/`. The repository destination is [docker/telemetry/](../docker/telemetry/); its current host export is pending. Reorganizing this repository did not relocate the running stack.
 
@@ -91,3 +93,9 @@ flowchart TB
     classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;
     class Test,Grafana,Contact,Telegram pending;
 ```
+
+## Post-migration verification and limits
+
+The operator reports healthy Prometheus, Loki, Grafana and cAdvisor, seven scrape targets up, preserved telemetry data, and fresh Hermes Docker logs retrieved from Athena through Loki. Hermes Alloy uses `host="hermes"`; its HTTP interface is `100.91.200.31:12345`. The exact migration date is not supplied.
+
+Image versions, retention values, volume names and the detailed 50-entry log check above are retained from the September baseline, not a new VM 102 configuration export. They require confirmation against the migrated stack. Grafana remains the detailed metrics/log interface; planned Olympus provides a lightweight overview. The report's general mention of Kubernetes dashboards does not establish collection of Kubernetes metrics or containerd logs.

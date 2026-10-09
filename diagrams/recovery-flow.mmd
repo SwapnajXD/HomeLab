@@ -1,17 +1,17 @@
-%% Olympus V2 — operator-reported baseline 2026-09-12; no new live audit.
+%% Operator-reported state synchronized 2026-10-09; no new live audit.
 flowchart TB
-    Start["Recovery planning<br/>Full V2 restore test pending"] --> Apollo["Recover Apollo host and storage"]
-    Apollo --> Network["Verify vmbr0 and WAN default route<br/>Firewall service / forwarding / NAT"]
-    Network --> Athena["Recover Athena VM 100"]
+    Start["Recovery planning<br/>Confirm current recovery points"] --> Apollo["Recover Apollo host and storage"]
+    Apollo --> Network["Verify vmbr0, routing, firewall and Tailscale"]
+    Network --> Athena["Recover Athena VM 102"]
     Network --> Hermes["Recover Hermes VM 101"]
-    Archive["Athena V2 archive — September 12<br/>Zstandard integrity passed<br/>Restore and boot not yet tested"] -.->|Baseline recovery archive| Athena
+    Archive["Fresh VM 102 backup required<br/>Migration backups removed"] -.-> Athena
     HBackup["Hermes backup baseline<br/>Pending"] -.-> Hermes
-    Athena --> Telemetry["Verify eight telemetry containers<br/>Prometheus / Grafana / Loki health"]
-    Hermes --> K3s["Verify K3s node Ready<br/>System pods and required workload data"]
-    Network --> Access["Verify Tailscale and Artemis access<br/>SSH / API routing / TLS"]
-    Telemetry --> Validate["Validate restored data and services<br/>Record recovery results"]
+    Athena --> Telemetry["Verify telemetry data and service health<br/>Seven targets and fresh Hermes logs"]
+    Hermes --> K3s["Verify K3s Ready and workload data"]
+    Network --> Access["Verify Artemis SSH and API access"]
+    Telemetry --> Validate["Record isolated recovery results"]
     K3s --> Validate
     Access --> Validate
-    Validate --> Pending["Pending: restore drill, backup automation<br/>Rotation and off-box copies"]
+    Validate --> Pending["Automate backups, rotation and off-box copies"]
     classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;
-    class Start,HBackup,Pending pending;
+    class Start,Archive,HBackup,Pending pending;

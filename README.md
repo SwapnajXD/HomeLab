@@ -2,7 +2,7 @@
 
 A Proxmox-based Cloud/DevOps learning platform with separate infrastructure, observability, Kubernetes and management systems.
 
-**Baseline: September 12, 2026**, based on the operator's rebuild report, with a **September 14, 2026 continuation** (resource resize, Hermes↔Athena observability integration, Floci deployment). The infrastructure rebuild is complete; application deployment and recovery automation remain pending. This documentation update did not perform live checks.
+**Documentation synchronized: 2026-10-09**, from the operator's [post-migration report](docs/history/athena-migration-report.md) and [September Apollo incident](docs/history/apollo-power-loss-2026-09.md). Athena now runs as VM 102; VM 100 was deleted after migration validation. Exact event dates were not supplied. These are reported results, not new live checks.
 
 ```text
 Artemis — Tailscale / SSH / kubectl / Git
@@ -13,20 +13,20 @@ Artemis — Tailscale / SSH / kubectl / Git
              10.10.10.0/24
           +---------+---------+
           |                   |
-     Athena (VM 100)     Hermes (VM 101)
+     Athena (VM 102)     Hermes (VM 101)
      Observability      Single-node K3s
 ```
 
 | System | Current role and baseline |
 |---|---|
-| Apollo | Proxmox VE 9.2.2, Debian 13, Ryzen 7 3700X, 16 GiB RAM; Wi-Fi WAN and private VM bridge |
-| Athena | Ubuntu 20.04.6; 2 vCPU, 2 GiB RAM (reduced from 4 GiB), 32 GiB disk; Docker Compose telemetry |
+| Apollo | Proxmox VE / Debian 13 (reported version details in the infrastructure guide), Ryzen 7 3700X, 16 GiB RAM; Wi-Fi WAN and private VM bridge |
+| Athena | VM 102, Ubuntu 24.04.5; Docker Compose telemetry; replacement VM resource allocation not supplied |
 | Hermes | Ubuntu 24.04.5; 4 vCPU, 6 GiB RAM (increased from 4 GiB), 32 GiB disk; K3s `v1.36.4+k3s1`, Ready; Floci on-demand via Docker Compose |
 | Artemis | Management workstation; working Kubernetes API access over Tailscale |
 
 Athena runs Prometheus, Grafana, Loki, Alloy, Node Exporter, cAdvisor, Proxmox Exporter and Glances. Hestia is retired; Athena's old K3s, Portainer and Floci deployments were removed. Historical source remains in the repository.
 
-Start with the [complete rebuild history, challenges and validation](docs/history/rebuild-history.md), [V2 architecture](docs/architecture.md) and [roadmap](docs/roadmap.md).
+Start with the [post-migration report](docs/history/athena-migration-report.md), [earlier rebuild history](docs/history/rebuild-history.md), [V2 architecture](docs/architecture.md) and [roadmap](docs/roadmap.md).
 
 ## Documentation
 
@@ -42,11 +42,11 @@ Current guides live in `docs/`, with dated records in `docs/history/` and obsole
 
 ## Validation and recovery
 
-The rebuild report records eight running Athena containers, healthy Prometheus/Grafana/Loki endpoints, five up Prometheus targets, zero failed Athena systemd units, Docker TCP 2375 closed, seven-day Loki retention and a Ready Hermes node. Hermes metrics (host + container, via a dedicated cAdvisor `0.60.5`) and logs (via Grafana Alloy) are now confirmed integrated with Athena's Prometheus and Loki as of the September 14 continuation.
+The post-migration report records preserved Prometheus, Grafana and Loki data, healthy service endpoints, seven Prometheus targets up, and fresh Hermes Docker logs queried from Athena. Hermes remains a Ready single-node K3s cluster; cAdvisor `0.60.5` and host Alloy provide Docker telemetry.
 
-Athena's V2 backup is retained on Apollo at `/mnt/pve/Storage/dump/vzdump-qemu-100-2026_09_12-18_35_13.vma.zst`. It passed Zstandard integrity testing; full restore testing remains pending. Hestia and V1 configuration backups were preserved.
+The migration backups and old VM 100 disk were removed after verification. A retained recovery point for VM 102 is not established; see [recovery](docs/disaster-recovery.md) before relying on historical archive paths. Apollo is operational after the power-loss incident; its GPU still negotiates Gen1 x16, with no active PCIe errors reported during investigation.
 
-Next work: audit and configure the Kubernetes workload baseline, integrate Hermes monitoring, test storage and rollout/rollback, deploy an application such as D2Bus, automate backups and test recovery. Athena's OS migration is a separate planned change. Multi-node Kubernetes and an optional Raspberry Pi are outside the current core design.
+Current focus: deploy a real application on Hermes K3s. The [Olympus infrastructure dashboard](docs/olympus.md) is a candidate; D2Bus, additional nodes and Oracle as a possible worker remain later work. Backup automation, isolated restore drills and Kubernetes-level telemetry remain outstanding.
 
 ## Repository
 

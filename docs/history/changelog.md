@@ -1,5 +1,17 @@
 # Infrastructure Changelog
 
+## Post-migration documentation synchronization — 2026-10-09
+
+Incorporated the operator's [post-migration account](athena-migration-report.md) and [September Apollo incident](apollo-power-loss-2026-09.md). Event dates beyond the incident month were not supplied; October 9 is the documentation date.
+
+- Athena migrated from VM 100 / Ubuntu 20.04 to VM 102 / Ubuntu 24.04.5; telemetry data and health verified, seven targets up, fresh Hermes logs queried.
+- VM 100, its disk and migration backups removed; a current VM 102 recovery point still needs documenting.
+- Athena endpoints updated to `10.10.10.10` and `100.93.224.83`.
+- Apollo operational after power-loss/GPU reseating; Gen1 x16 link remains unresolved. Version strings preserved with verification caveats.
+- Olympus proposed as a Hermes K3s workload; host layout and later Oracle/D2Bus plans recorded.
+
+Earlier entries below retain their original dated state, including migration plans now superseded.
+
 ## Olympus HomeLab V2 rebuild — 2026-09-12
 
 The operator reports the infrastructure rebuild completed: Hermes VM 101 now runs single-node K3s with working Artemis access over Tailscale; Hestia was retired after backup verification. Athena is observability-only after removing old K3s, Floci and Portainer. Loki has seven-day retention, Docker/journald logs are bounded, and Docker TCP 2375 is closed. All eight telemetry containers and the reported endpoint/target checks passed.

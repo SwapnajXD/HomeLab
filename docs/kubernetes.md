@@ -1,6 +1,6 @@
 # V2 Kubernetes
 
-**Implemented:** single-node K3s on Hermes VM 101, replacing Athena's old installation. The [September 12 rebuild record](history/rebuild-history.md) reports Ubuntu 24.04.5, 4 vCPU, 32 GiB disk; RAM was increased from 4 GiB to **6 GiB** on 2026-09-14 as Kubernetes workloads are expected to grow (Athena was correspondingly reduced to 2 vCPU/2 GiB — see [infrastructure](infrastructure.md)).
+**Implemented:** single-node K3s on Hermes VM 101, replacing Athena's old installation. The [September 12 rebuild record](history/rebuild-history.md) reports Ubuntu 24.04.5, 4 vCPU, 32 GiB disk; RAM was increased from 4 GiB to **6 GiB** on 2026-09-14 as Kubernetes workloads are expected to grow (old Athena VM 100 was correspondingly reduced to 2 vCPU/2 GiB; replacement VM 102 resources are unspecified — see [infrastructure](infrastructure.md)).
 
 | Item | Recorded state |
 |---|---|
@@ -31,14 +31,14 @@ Floci is now reported deployed on **Hermes** — deliberately via Docker Compose
 
 ## Observability integration — complete
 
-Hermes host metrics (Node Exporter), container metrics (a dedicated cAdvisor `0.60.5` — separate from Athena's own `v0.49.1` instance, upgraded specifically to fix a Floci/overlayfs metrics bug), and Docker logs (Grafana Alloy) are all confirmed flowing into Athena's Prometheus and Loki over Tailscale. See [observability](observability.md) and [rebuild history §63](history/rebuild-history.md#63-hermes--athena-observability-integration-complete).
+Hermes host metrics (Node Exporter), container metrics (a dedicated cAdvisor `0.60.5` — separate from Athena's pre-migration `v0.49.1` instance, upgraded specifically to fix a Floci/overlayfs metrics bug), and Docker logs (Grafana Alloy) are all confirmed flowing into Athena's Prometheus and Loki over Tailscale. See [observability](observability.md) and [rebuild history §63](history/rebuild-history.md#63-hermes--athena-observability-integration-complete).
 
 ## Pending baseline and workloads
 
 - Detailed K3s audit; namespaces, RBAC, secrets and resource policy/limits beyond what the validation exercise covered.
 - Application ingress and persistent storage validation with a real PVC (the exercise above used no persistent storage).
-- Application deployment, including D2Bus; rollout and rollback testing.
+- Deploy a real application: [Olympus](olympus.md) is the current candidate, D2Bus later; test rollout and rollback.
 - Kubernetes metrics, K3s/containerd workload logs and host journal collection.
 - CI/CD and repeatable deployment configuration.
 
-A Raspberry Pi may later support ARM/edge/IoT experiments. Multi-node Kubernetes remains outside the current core design.
+Multi-node K3s is postponed until another suitable node is available; Oracle is a possible later worker. The latest report retains single-node K3s `v1.36.4+k3s1` with Traefik and a Ready control-plane/worker node. Host Kubernetes configuration is organized under `~/k8s/{apps,infrastructure,namespaces}/`; see [Hermes layout](../infrastructure/hermes/README.md).

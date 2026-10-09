@@ -34,3 +34,6 @@ __pycache__/
 *.pyc
 # Preserve the previously tracked V1 provider lockfile after archiving.
 !archive/v1/terraform/localstack/.terraform.lock.hcl
+
+# Derived knowledge graph and extraction cache
+/graphify-out/

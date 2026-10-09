@@ -1,62 +1,46 @@
 # V2 backup and disaster recovery
 
-The [September 12 rebuild record](history/rebuild-history.md) reports preserved V1 data and a new Athena V2 baseline backup. Integrity checks passed; full restore testing remains pending.
+The [post-migration report](history/athena-migration-report.md), incorporated 2026-10-09, supersedes the September VM 100 recovery baseline. Exact migration and cleanup dates were not supplied.
 
-## Retained recovery material
+## Migration outcome and current recovery gap
 
-| Location | Recorded contents / verification |
-|---|---|
-| Apollo `/mnt/pve/Storage/dump/vzdump-lxc-101-2026_09_01-00_01_38.tar.zst` | Hestia September backup; `zstd -t` passed before CT destruction |
-| Apollo `/mnt/pve/Storage/dump/vzdump-qemu-100-2026_09_12-18_35_13.vma.zst` | Athena V2 baseline; ~7.8 GB; `zstd -t` passed, reporting 28462859776 decompressed bytes |
-| Apollo `/root/olympus-v1-backup/` and `/root/olympus-v1-backup.tar.gz` | Retained infrastructure configuration and V1 recovery material |
-| Athena `/root/olympus-v1-backup/k3s/` | Old K3s configuration/service backup |
-| Athena `/root/olympus-v1-backup/docker/override.conf` | Previous Docker systemd override |
-| Athena `/root/olympus-v1-backup/portainer-volume.tar.gz` | Portainer data archive, inspected before volume removal |
+Athena moved from VM 100 / Ubuntu 20.04 to VM 102 / Ubuntu 24.04. Prometheus, Grafana and Loki data and telemetry configuration were restored and verified. Health checks covered Prometheus, Loki, Grafana, cAdvisor, seven scrape targets and fresh Hermes → Loki logs.
 
-The report also retains `vault.crt` and `vault.key`; preserve these recovery files. Same-named paths on Apollo and Athena are host-local; copying all Athena archives into Apollo's V1 tarball is not established. The named Athena backup's ordering relative to its package upgrade is not unambiguous in the supplied history.
+After successful verification, VM 100 and its disk were deleted. Migration backups temporarily held on `/mnt/pve/Storage` were also removed. This is evidence of a successful migration restore, not a standing rollback copy or a complete disaster-recovery drill. A retained VM 102 backup is not established by the supplied report.
 
-## Recorded Athena backup procedure
+## Historical material requiring inventory
 
-Run Proxmox commands on **Apollo**, not inside Athena:
+The [September rebuild record](history/rebuild-history.md) documented the VM 100 baseline archive `vzdump-qemu-100-2026_09_12-18_35_13.vma.zst`, Hestia's `vzdump-lxc-101-2026_09_01-00_01_38.tar.zst`, Apollo's `/root/olympus-v1-backup/` and tarball, and old Athena-local K3s/Docker/Portainer backups. The migration report does not identify every deleted archive by filename or establish that VM 100-local recovery material was copied to VM 102. Re-inventory these paths before relying on them; do not treat the old Athena archive as a confirmed available backup.
 
-```bash
-vzdump 100 \
-  --storage Storage \
-  --mode snapshot \
-  --compress zstd \
-  --notes-template "Olympus HomeLab V2 - Athena observability baseline"
+Apollo's SATA storage is on the same physical host and is not an off-box copy. Hestia's former ID 101 now belongs to Hermes VM 101.
 
-zstd -t /mnt/pve/Storage/dump/vzdump-qemu-100-2026_09_12-18_35_13.vma.zst
-```
+## Required recovery work
 
-The dated filename identifies the completed archive; a new backup creates a different filename. Keep the baseline archive. Zstandard testing verifies the compressed stream, not guest bootability or application recovery. SATA storage is on Apollo and is not an off-box copy.
+- Create and verify a fresh Athena VM 102 recovery point; record its exact archive identifier and location.
+- Establish Hermes VM 101 and Kubernetes persistent-data backup scope.
+- Include Apollo configuration, infrastructure credentials, required certificates/keys and management recovery material.
+- Define schedules, retention, protected off-box copies and recovery objectives.
+- Test isolated restores, guest boot, data integrity, telemetry and application behavior; record results and recovery time.
 
-## Pending recovery work
-
-- Define automated schedules, rotation, protected off-box copies and backup scope for Apollo, Athena, Hermes and management credentials.
-- Test isolated restores, boot, data integrity, telemetry and application behavior; record backup identifiers and measured recovery time.
-- Establish a Hermes recovery point and test required Kubernetes persistent-data recovery.
-- Plan Athena's Ubuntu migration separately with a tested rollback procedure.
-
-Recover Apollo's foundation first when affected, then Athena observability and dependent workloads. Hestia's historical ID 101 is now Hermes VM 101; choose an unused identity and isolated network for any Hestia restore test. Historical recovery exercises do not establish current V2 restore coverage or RTO/RPO.
+Proxmox backup operations belong on Apollo. Select current guest IDs (Athena 102, Hermes 101), verified storage and an appropriate maintenance window. Zstandard integrity alone does not prove application recovery. No backup or deletion commands were run against the hosts by this documentation update.
 
 ## Planned recovery workflow
 
 ```mermaid
 flowchart TB
-    Start["Recovery planning<br/>Full V2 restore test pending"] --> Apollo["Recover Apollo host and storage"]
-    Apollo --> Network["Verify vmbr0 and WAN default route<br/>Firewall service / forwarding / NAT"]
-    Network --> Athena["Recover Athena VM 100"]
+    Start["Recovery planning<br/>Confirm current recovery points"] --> Apollo["Recover Apollo host and storage"]
+    Apollo --> Network["Verify vmbr0, routing, firewall and Tailscale"]
+    Network --> Athena["Recover Athena VM 102"]
     Network --> Hermes["Recover Hermes VM 101"]
-    Archive["Athena V2 archive — September 12<br/>Zstandard integrity passed<br/>Restore and boot not yet tested"] -.->|Baseline recovery archive| Athena
+    Archive["Fresh VM 102 backup required<br/>Migration backups removed"] -.-> Athena
     HBackup["Hermes backup baseline<br/>Pending"] -.-> Hermes
-    Athena --> Telemetry["Verify eight telemetry containers<br/>Prometheus / Grafana / Loki health"]
-    Hermes --> K3s["Verify K3s node Ready<br/>System pods and required workload data"]
-    Network --> Access["Verify Tailscale and Artemis access<br/>SSH / API routing / TLS"]
-    Telemetry --> Validate["Validate restored data and services<br/>Record recovery results"]
+    Athena --> Telemetry["Verify telemetry data and service health<br/>Seven targets and fresh Hermes logs"]
+    Hermes --> K3s["Verify K3s Ready and workload data"]
+    Network --> Access["Verify Artemis SSH and API access"]
+    Telemetry --> Validate["Record isolated recovery results"]
     K3s --> Validate
     Access --> Validate
-    Validate --> Pending["Pending: restore drill, backup automation<br/>Rotation and off-box copies"]
+    Validate --> Pending["Automate backups, rotation and off-box copies"]
     classDef pending fill:#fff3cd,stroke:#9a6700,color:#24292f;
-    class Start,HBackup,Pending pending;
+    class Start,Archive,HBackup,Pending pending;
 ```

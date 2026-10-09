@@ -1,4 +1,4 @@
-%% Olympus V2 — operator-reported baseline 2026-09-12 with 2026-09-14 continuation; no new live audit.
+%% Operator-reported state synchronized 2026-10-09; no new live audit.
 flowchart TB
     Artemis["Artemis — management workstation<br/>SSH / kubectl / Git"]
     Tailnet["Tailscale — private management"]
@@ -6,11 +6,11 @@ flowchart TB
     Internet["Internet"] --- Router["Router — 192.168.1.1"]
     Router --- WAN["Apollo Wi-Fi — 192.168.1.20/24"]
 
-    subgraph Apollo["Apollo — Proxmox VE 9.2.2 / 16 GiB RAM"]
+    subgraph Apollo["Apollo — Proxmox VE / 16 GiB RAM"]
         Host["Infrastructure / routing / firewall"]
         Bridge["vmbr0 — 10.10.10.1/24<br/>Private VM bridge; no physical port"]
         Backups["SATA backup storage<br/>/mnt/pve/Storage"]
-        subgraph Athena["Athena — VM 100 / Ubuntu 20.04.6<br/>2 vCPU / 2 GiB RAM / 32 GiB disk"]
+        subgraph Athena["Athena — VM 102 / Ubuntu 24.04.5<br/>Resource allocation not supplied"]
             Telemetry["Prometheus / Grafana / Loki / Alloy"]
             Exporters["Node Exporter / cAdvisor<br/>Proxmox Exporter / Glances"]
         end
@@ -29,7 +29,7 @@ flowchart TB
     end
     WAN --- Host
     Tailnet -->|100.81.86.51| Host
-    Tailnet -->|100.117.35.70| Telemetry
+    Tailnet -->|100.93.224.83| Telemetry
     Tailnet -->|100.91.200.31:6443 — TLS SAN configured| K3s
     HermesTelemetry -->|Host/Docker metrics and Docker logs| Telemetry
     K3s -.->|Kubernetes metrics and logs — pending| Telemetry

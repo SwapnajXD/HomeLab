@@ -1,5 +1,7 @@
 # Olympus HomeLab V2
 
+> **Historical September 12–14 baseline:** Athena VM 100, its endpoints, backup instructions and pending migration below describe that period. The [later migration report](athena-migration-report.md) supersedes current-state claims: Athena is VM 102, VM 100 is deleted, and migration backups were removed. Use the [current recovery guide](../disaster-recovery.md) before planning operations.
+
 ## Infrastructure rebuild, challenges, solutions and current state
 
 **Recorded baseline: 2026-09-12.** This implementation/history document records the operator-supplied rebuild report for future maintenance and troubleshooting. Versions, health results and capacity figures below are reported observations from that rebuild, not a live audit performed by this documentation update. Commands describe completed work; destructive commands are historical records, not a procedure to replay.

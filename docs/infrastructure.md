@@ -1,26 +1,29 @@
 # V2 infrastructure and IaC
 
-Based on the [September 12 rebuild record](history/rebuild-history.md) plus a [September 14 continuation](history/rebuild-history.md#60-resource-reallocation) (resource resize, Hermes↔Athena observability integration, Floci deployment), without new provisioning or live inspection since.
+Current state follows the [operator-supplied post-migration report](history/athena-migration-report.md), incorporated 2026-10-09 without live inspection. The exact migration date is not supplied.
 
 | Resource | Apollo | Athena | Hermes |
 |---|---|---|---|
-| Identity | Physical host | VM 100 | VM 101 |
-| Platform | Proxmox VE 9.2.2 / Debian 13 | Ubuntu 20.04.6 | Ubuntu 24.04.5 |
-| Kernel | `7.0.2-6-pve` | `5.4.0-216-generic` | Not supplied |
-| CPU | Ryzen 7 3700X, 8 cores / 16 threads | 2 vCPU (reduced from 4) | 4 vCPU |
-| RAM | 16 GiB | 2 GiB (reduced from 4) | 6 GiB (increased from 4) |
-| Storage | ~238.5 GB NVMe + ~232.9 GB SATA | 32 GiB virtual disk | 32 GiB virtual disk |
+| Identity | Standalone physical host | VM 102 | VM 101 |
+| Platform | Proxmox VE / Debian 13 | Ubuntu Server 24.04.5 LTS | Ubuntu 24.04.5 |
+| Kernel | Reported `7.0.14-19-pve` | Not supplied for VM 102 | Not supplied |
+| CPU | Ryzen 7 3700X, 8 cores / 16 threads | Not supplied for VM 102 | Last recorded 4 vCPU |
+| RAM | 16 GiB DDR4-3200 | Not supplied for VM 102 | Last recorded 6 GiB |
+| Storage | Earlier inventory: ~238.5 GB NVMe + ~232.9 GB SATA | Not supplied for VM 102 | Last recorded 32 GiB disk |
+| Internal IP | `10.10.10.1` | `10.10.10.10` | `10.10.10.11` |
 
-Apollo's NVMe holds EFI, root, swap and the `local-lvm` thin pool. SATA is mounted at `/mnt/pve/Storage` for backups. Storage IDs are `local`, `local-lvm`, `Storage`.
+VM 100 (Ubuntu 20.04) was retired and deleted after Athena's telemetry configuration and Prometheus/Grafana/Loki data were migrated and verified on VM 102. The old 2 vCPU / 2 GiB / 32 GiB allocation belongs to VM 100 and must not be assumed for VM 102. Hermes allocations were last recorded on September 14.
 
-Hermes uses Q35, VirtIO networking, VirtIO SCSI and QEMU Guest Agent enabled, with autostart. Its LV/filesystem was expanded within the original virtual disk to approximately 30 GB root, with 23 GB available at the recorded check. See rebuild sections 9–14 for creation commands and fixes.
+## Apollo hardware and versions
 
-Hestia CT 101 was destroyed after backup verification; Hermes now uses VM ID 101. No LXCs remain. Athena's final root usage was approximately 12 GB of 30 GB (40%), with 17 GB available; memory available was approximately 2.6 GiB before the September 14 resize. These are dated observations.
+MSI X570-A PRO motherboard, MSI GTX 1660 SUPER 6 GB, Cooler Master MWE 750 White 230V V2 (`MPE-7501-ACABW-IN`) PSU, BIOS `E7C37AMS.HA0` dated 2020-09-07. The Ryzen CPU has no integrated graphics. See the [power-loss investigation](history/apollo-power-loss-2026-09.md) for GPU reseating, Gen1 x16 link negotiation, diagnostic evidence and deferred investigation.
 
-**Resource resize (2026-09-14):** allocation was reviewed against actual workload demand — Athena's observability stack runs comfortably in 2 GiB given 7-day Loki retention and a small number of scrape targets; the freed RAM was moved to Hermes for Kubernetes workload growth. Post-resize, Athena reported ~1.9 GiB usable / ~1.0 GiB available memory with all containers still running; Hermes reported ~5.8 GiB usable / ~4.8 GiB available with the K3s node still `Ready`. See [rebuild history §60](history/rebuild-history.md#60-resource-reallocation).
+The latest account lists Proxmox VE `9.2.0`, `pve-manager 9.2.20`, `pve-qemu-kvm 11.0.3-3`, `qemu-server 9.2.8`, Ceph `19.2.6-pve4` and ZFS `2.4.4-pve1`. These are supplied strings, not independently verified versions; the VE/manager strings need reconciliation with a current host export. Earlier records listed VE 9.2.2 and kernel `7.0.2-6-pve`.
+
+Storage IDs are `local`, `local-lvm` and `Storage`; the latter is mounted at `/mnt/pve/Storage`. Migration backups and VM 100's disk were removed. Apollo is not a Proxmox cluster and remains a single physical point of failure.
 
 ## Reproducibility
 
-Infrastructure-as-code, Terraform-based homelab provisioning, Ansible and CI/CD remain future work. Retained [Floci examples](../archive/v1/terraform/floci/README.md) document earlier AWS API emulation experiments. **Floci is now reported deployed on Hermes** (not Athena) via Docker Compose, on-demand rather than continuously running — see [Kubernetes](kubernetes.md) and [rebuild history §64](history/rebuild-history.md#64-floci-deployed-on-hermes-on-demand-docker-compose--not-k3s). LocalStack is historical/deprecated. The repository is not a verified export of the current host configuration.
+Current host exports remain pending. Terraform, Ansible and CI/CD provisioning are planned; archived configurations cannot reproduce the current hosts. Request sanitized VM 101 and VM 102 definitions, interfaces, storage and firewall configuration when exporting the live baseline.
 
-Athena's Ubuntu migration is planned separately, with backup and rollback preparation; see [recovery](disaster-recovery.md).
+Hermes runs K3s and deliberately retains Docker Compose for Floci. Its last recorded Q35/VirtIO/guest-agent and disk-expansion details remain in the [September rebuild history](history/rebuild-history.md). Hestia CT 101 is retired; its archived definition is not Hermes VM 101. See [recovery](disaster-recovery.md) for the post-migration backup gap.

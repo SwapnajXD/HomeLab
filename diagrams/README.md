@@ -1,6 +1,6 @@
 # Olympus V2 diagrams
 
-Current Mermaid sources live in `diagrams/`; current documentation lives in `docs/`. They reflect the operator-reported September 12, 2026 baseline with the September 14 continuation; no new live audit or restore drill was performed.
+Current Mermaid sources live in `diagrams/`; current documentation lives in `docs/`. They incorporate the operator-reported Athena migration, synchronized 2026-10-09. Detailed telemetry configuration remains the last exported/documented September baseline where the newer account supplies no replacement. No new live audit or restore drill was performed.
 
 | Diagram | Scope |
 |---|---|
